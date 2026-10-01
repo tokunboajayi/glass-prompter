@@ -13,7 +13,7 @@ WDA_NONE, WDA_EXCLUDEFROMCAPTURE = 0x00, 0x11
 WM_HOTKEY = 0x0312
 MOD_ALT, MOD_CONTROL, MOD_SHIFT, MOD_NOREPEAT = 0x1, 0x2, 0x4, 0x4000
 VK = {"SPACE": 0x20, "LEFT": 0x25, "UP": 0x26, "RIGHT": 0x27, "DOWN": 0x28,
-      "E": 0x45, "H": 0x48, "R": 0x52}
+      "E": 0x45, "H": 0x48, "R": 0x52, "V": 0x56, "G": 0x47, "PGUP": 0x21, "PGDN": 0x22}
 CREATE_NO_WINDOW = 0x08000000
 
 if IS_WINDOWS:
@@ -70,6 +70,86 @@ def parse_hotkey_msg(message_ptr):
     except Exception:
         return None
     return int(msg.wParam) if msg.message == WM_HOTKEY else None
+
+
+GWL_EXSTYLE, WS_EX_TRANSPARENT, WS_EX_LAYERED = -20, 0x20, 0x80000
+
+
+def set_click_through(hwnd, on):
+    """Let mouse clicks pass straight through a window to whatever is behind it."""
+    if not IS_WINDOWS:
+        return False
+    get = user32.GetWindowLongPtrW
+    put = user32.SetWindowLongPtrW
+    get.restype = ctypes.c_ssize_t
+    get.argtypes = [wintypes.HWND, ctypes.c_int]
+    put.restype = ctypes.c_ssize_t
+    put.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_ssize_t]
+    style = get(hwnd, GWL_EXSTYLE)
+    new = (style | WS_EX_TRANSPARENT | WS_EX_LAYERED) if on else (style & ~WS_EX_TRANSPARENT)
+    if new != style:
+        put(hwnd, GWL_EXSTYLE, new)
+    return bool(get(hwnd, GWL_EXSTYLE) & WS_EX_TRANSPARENT) == on
+
+
+# ------------------------------------------------------------------ frosted glass (Windows 11)
+class _MARGINS(ctypes.Structure):
+    _fields_ = [("l", ctypes.c_int), ("r", ctypes.c_int), ("t", ctypes.c_int), ("b", ctypes.c_int)]
+
+
+class _ACCENT(ctypes.Structure):
+    _fields_ = [("state", ctypes.c_int), ("flags", ctypes.c_int), ("color", ctypes.c_uint), ("anim", ctypes.c_int)]
+
+
+class _WCAD(ctypes.Structure):
+    _fields_ = [("attr", ctypes.c_int), ("data", ctypes.c_void_p), ("size", ctypes.c_size_t)]
+
+
+DWMWA_DARK, DWMWA_CORNERS, DWMWA_BORDER, DWMWA_BACKDROP = 20, 33, 34, 38
+BACKDROPS = {"none": 1, "mica": 2, "acrylic": 3}
+
+
+def _dwm_int(hwnd, attr, value):
+    v = ctypes.c_int(value)
+    return ctypes.windll.dwmapi.DwmSetWindowAttribute(wintypes.HWND(hwnd), attr, ctypes.byref(v), ctypes.sizeof(v))
+
+
+def backdrop_supported():
+    """System backdrops need Windows 11 22H2 (build 22621) or newer."""
+    if not IS_WINDOWS:
+        return False
+    try:
+        return sys.getwindowsversion().build >= 22621
+    except Exception:
+        return False
+
+
+def apply_backdrop(hwnd, kind="acrylic"):
+    """Frosted blur behind a translucent window. Returns 'dwm', 'accent' or '' (unsupported)."""
+    if not IS_WINDOWS:
+        return ""
+    try:
+        _dwm_int(hwnd, DWMWA_DARK, 1)
+        _dwm_int(hwnd, DWMWA_CORNERS, 2)                       # rounded
+        _dwm_int(hwnd, DWMWA_BORDER, 0x00403A36)               # subtle hairline (COLORREF, BGR)
+        if kind == "none":
+            _dwm_int(hwnd, DWMWA_BACKDROP, 1)
+            _accent(hwnd, 0, 0)
+            return ""
+        ctypes.windll.dwmapi.DwmExtendFrameIntoClientArea(wintypes.HWND(hwnd), ctypes.byref(_MARGINS(-1, -1, -1, -1)))
+        if backdrop_supported() and _dwm_int(hwnd, DWMWA_BACKDROP, BACKDROPS.get(kind, 3)) == 0:
+            return "dwm"
+        if _accent(hwnd, 4, 0x30181812):                       # Windows 10 acrylic fallback
+            return "accent"
+    except Exception as ex:
+        log.debug("backdrop failed: %s", ex)
+    return ""
+
+
+def _accent(hwnd, state, abgr):
+    a = _ACCENT(state, 2, abgr, 0)
+    d = _WCAD(19, ctypes.cast(ctypes.pointer(a), ctypes.c_void_p), ctypes.sizeof(a))
+    return bool(user32.SetWindowCompositionAttribute(wintypes.HWND(hwnd), ctypes.byref(d)))
 
 
 def key_down(vk):

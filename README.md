@@ -1,11 +1,16 @@
-# Glass Prompter
+﻿# Glass Prompter
 
 A see-through teleprompter that sits right under your webcam, so you can read your script and keep eye contact on calls, demos and videos. It is hidden from screen sharing and recordings.
 
-**Install:** run `dist/GlassPrompter-Setup-1.0.0.exe`. It installs per user (no admin rights), adds Start menu and desktop shortcuts, and lives in the tray.
+**Install:** download the latest installer from Releases. It installs per user (no admin rights), adds Start menu and desktop shortcuts, and lives in the tray.
 
 ## Features
 
+- **Voice Follow:** the script scrolls as you speak. It runs 100% offline and only listens for your script's own words, so it's accurate. Spoken words fade so your eye lands on the next one, it shows your live words per minute, and you get a summary at the end.
+- **macOS-style glass:** real frosted blur on Windows 11, traffic-light window buttons, frameless glass dialogs and iOS-style switches.
+- **Ghost mode:** clicks pass through the prompter to the app behind it.
+- **Sections:** `# Heading` lines become jump points, handy for interviews and Q&A.
+- **Mirror mode:** for teleprompter glass.
 - **Glass overlay:** frameless, always on top, see-through panel with crisp text. The reading line is highlighted and the edges fade out.
 - **Hidden from screen share:** uses Windows display affinity. It re-checks with Windows every 1.5 seconds and re-applies the setting if anything reset it. A badge shows the real state.
 - **Words-per-minute pacing:** the speed holds at any text size or window width. A 3-2-1 countdown runs before scrolling starts. `[PAUSE]` and `[CUE]` markers are supported.
@@ -40,7 +45,7 @@ The server runs on background threads and never touches the UI. It reaches the U
 |---|---|---|
 | GET | `/api/v1/health` | public |
 | POST | `/api/v1/session` | `{"pin": "123456"}` returns a token and an HttpOnly cookie |
-| GET | `/api/v1/state` · `/api/v1/events` (SSE) | live prompter state |
+| GET | `/api/v1/state` Â· `/api/v1/events` (SSE) | live prompter state |
 | POST | `/api/v1/control` | `{"action": "play"/"restart"/"faster"/"slower"/"back"/"ahead"/"bigger"/"smaller"/"hide"}` |
 | GET/POST | `/api/v1/scripts` | list (`?q=` search) / create (`load: true` to show it) |
 | GET/PUT/DELETE | `/api/v1/scripts/{id}` | read, update, delete |
@@ -61,9 +66,9 @@ The server runs on background threads and never touches the UI. It reaches the U
 ## Develop
 
 ```powershell
-python -m pip install PySide6-Essentials qrcode pytest pyinstaller
+python -m pip install -r requirements.txt
 python glass_prompter.pyw                     # run from source
-python -m pytest --basetemp=.pytest_tmp tests # 45 tests
+python -m pytest --basetemp=.pytest_tmp tests # 53 tests
 powershell -ExecutionPolicy Bypass -File packaging\build.ps1   # test -> bundle -> installer
 python tools\smoke.py .smoke --visible        # UI smoke test with screenshots
 ```
@@ -74,6 +79,6 @@ Scripts and settings stay on the PC in `%APPDATA%\GlassPrompter` (`library.db`, 
 
 ## Known limits
 
-- The installer is not code-signed yet, so Windows SmartScreen shows "Windows protected your PC". Click *More info → Run anyway*. Signing (about $10/month via Azure Artifact Signing) or a Microsoft Store listing removes this.
+- The installer is not code-signed yet, so Windows SmartScreen shows "Windows protected your PC". Click *More info â†’ Run anyway*. Signing (about $10/month via Azure Artifact Signing) or a Microsoft Store listing removes this.
 - Windows only (Windows 10 2004 or later for screen-share hiding).
 - The phone remote needs the same Wi-Fi. If Windows marks the network Public, allow the firewall prompt or switch the network to Private.

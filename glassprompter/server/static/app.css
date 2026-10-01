@@ -61,5 +61,42 @@ textarea.field{min-height:40vh;resize:vertical}
   border-radius:12px;font-size:14px;font-weight:600;max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:9}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #toast.ok{color:var(--ok)} #toast.bad{color:var(--bad)}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chips span{background:var(--surface-2);border:1px solid var(--outline);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--muted)}
+.btn.on{border-color:var(--accent);color:var(--accent)}
+.btn.on small{color:var(--accent)}
 [hidden]{display:none!important}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}.btn:active{transform:none}}
+
+/* ---------- iOS-style glassmorphism layer ---------- */
+:root{
+  --surface:rgba(255,255,255,.07); --surface-2:rgba(255,255,255,.10); --outline:rgba(255,255,255,.14);
+  --blur:saturate(180%) blur(22px); --r:20px;
+}
+html{background:#07070b}
+body{min-height:100vh;background:
+  radial-gradient(60% 45% at 12% 8%, rgba(255,176,32,.32), transparent 70%),
+  radial-gradient(55% 40% at 92% 22%, rgba(120,90,255,.30), transparent 70%),
+  radial-gradient(70% 50% at 50% 100%, rgba(0,190,255,.18), transparent 70%),
+  #07070b;background-attachment:fixed;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased}
+h1,.status b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI Variable Display",system-ui,sans-serif;letter-spacing:-.02em}
+.card,.tabs,.item,.field,.btn,.pill,#toast,.upload,.chips span{
+  background:var(--surface);border:1px solid var(--outline);
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 8px 30px rgba(0,0,0,.25)}
+.card{border-radius:var(--r)}
+.tabs{border-radius:14px}
+.tabs button[aria-selected=true]{background:rgba(255,255,255,.16);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.btn{border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.btn.primary{background:linear-gradient(180deg,#ffc24a,#ffa514);color:#1a1205;border:0;
+  box-shadow:0 8px 24px rgba(255,170,30,.35),inset 0 1px 0 rgba(255,255,255,.5)}
+.bar{background:rgba(255,255,255,.12)}
+.bar>div{background:linear-gradient(90deg,#ffb020,#ffd27a)}
+.pin{background:rgba(255,255,255,.06);border:1px solid var(--outline)}
+.item.current{border-color:rgba(255,176,32,.8);box-shadow:0 0 0 1px rgba(255,176,32,.35),0 8px 30px rgba(0,0,0,.25)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .card,.tabs,.item,.field,.btn,.pill,#toast{background:#17171d}
+}

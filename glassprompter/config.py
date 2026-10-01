@@ -18,6 +18,9 @@ class Settings:
     wpm: int = 140
     countdown: bool = True
     current_script_id: int = 0
+    voice_follow: bool = False
+    click_through: bool = False
+    mirror: bool = False
     # look
     font_px: int = 34
     font_family: str = "Segoe UI Variable Display"

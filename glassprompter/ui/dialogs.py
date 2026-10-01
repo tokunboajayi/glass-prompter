@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QCheckBox, QDialog, QFileDialog, QFrame, QGridLay
                                QSlider, QSpinBox, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, __version__, engine, paths, scripts, win32
+from .glass import GlassDialog, Switch
 from .theme import DASH, DOT, ELLIPSIS
 
 try:
@@ -36,16 +37,12 @@ def button(text, fn, primary=False, danger=False):
     return b
 
 
-class BaseDialog(QDialog):
-    """Dark, top-most dialog that is also hidden from screen sharing (scripts and PINs stay private)."""
+class BaseDialog(GlassDialog):
+    """Frosted glass, top-most dialog that is also hidden from screen sharing (scripts and PINs stay private)."""
 
-    def __init__(self, parent, title):
-        super().__init__(parent, Qt.WindowType.Dialog | Qt.WindowType.WindowStaysOnTopHint)
+    def __init__(self, parent, title, resizable=False):
+        super().__init__(parent, resizable=resizable)
         self.setWindowTitle("%s %s %s" % (APP_NAME, DASH, title))
-
-    def showEvent(self, e):
-        super().showEvent(e)
-        win32.set_capture_excluded(int(self.winId()), True)
 
     def confirm(self, title, text, ok_text):
         box = QMessageBox(self)
@@ -62,7 +59,7 @@ class BaseDialog(QDialog):
 # ====================================================================== library
 class LibraryDialog(BaseDialog):
     def __init__(self, parent, store, current_id, load_cb):
-        super().__init__(parent, "Scripts")
+        super().__init__(parent, "Scripts", resizable=True)
         self.store, self.load_cb = store, load_cb
         self.current = None              # dict of the script being edited (None = new)
         self.dirty = False
@@ -320,19 +317,23 @@ class SettingsDialog(BaseDialog):
             return sl
 
         def check(lay, text, val, apply, hint=None):
-            cb = QCheckBox(text)
+            cb = Switch(text)
             cb.setChecked(val)
             cb.toggled.connect(apply)
             lay.addWidget(cb)
             if hint:
                 h = label(hint, "muted", True)
-                h.setContentsMargins(28, 0, 0, 2)
+                h.setContentsMargins(54, 0, 0, 2)
                 lay.addWidget(h)
             return cb
 
         section(left, "Reading", first=True)
         slider_row(left, "Speed", 40, 400, s.wpm, lambda v: "%d wpm" % v, lambda v: self._set("wpm", v))
         check(left, "3-2-1 countdown before scrolling", s.countdown, lambda v: self._set("countdown", v))
+        check(left, "Voice Follow: scroll as I speak", s.voice_follow,
+              lambda v: v != s.voice_follow and controller.prompter.toggle_voice(),
+              "Listens on your microphone and keeps your place. Runs 100% offline " + DASH + " no audio leaves "
+              "this PC.")
         section(left, "Look")
         slider_row(left, "Text size", 14, 96, s.font_px, lambda v: "%d px" % v, lambda v: self._set("font_px", v))
         slider_row(left, "Glass", 20, 100, int(s.panel_alpha * 100), lambda v: "%d%%" % v,
@@ -341,6 +342,7 @@ class SettingsDialog(BaseDialog):
                    lambda v: self._set("read_line", v / 100))
         check(left, "Text only (no glass panel)", s.clear_mode, lambda v: self._set("clear_mode", v))
         check(left, "Reduce motion", s.reduce_motion, lambda v: self._set("reduce_motion", v))
+        check(left, "Mirror text (for teleprompter glass)", s.mirror, lambda v: self._set("mirror", v))
         row = QHBoxLayout()
         row.addWidget(button("Move back under the camera", controller.prompter.reset_position))
         row.addStretch(1)
@@ -538,7 +540,7 @@ class WelcomeDialog(BaseDialog):
             ("2", "Add a script", "Press E for your script library, send one from your phone (P), or drop a file "
                                   "into Documents\\Glass Prompter."),
             ("3", "Read from any app", "Ctrl+Alt+Space plays and pauses even while Zoom or Teams is in front. "
-                                       "Ctrl+Alt+Up and Down change the speed."),
+                                       "Turn on Voice Follow (V) and the script scrolls as you speak."),
         ]
         for num, head, body in steps:
             card = QFrame()

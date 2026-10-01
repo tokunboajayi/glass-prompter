@@ -65,5 +65,21 @@ def documents_dir():
     return os.path.join(os.path.expanduser("~"), "Documents")
 
 
+MODEL_NAME = "vosk-model-small-en-us-0.15"
+
+
+def model_dir():
+    """Offline speech model for Voice Follow: bundled with the app, or a dev copy."""
+    candidates = [
+        os.path.join(package_dir(), "models", MODEL_NAME),
+        os.path.join(data_dir(), "models", MODEL_NAME),
+        os.path.join(os.environ.get("LOCALAPPDATA", ""), "GlassPrompter-build", "models", MODEL_NAME),
+    ]
+    for c in candidates:
+        if os.path.isfile(os.path.join(c, "am", "final.mdl")):
+            return c
+    return None
+
+
 def default_drop_dir():
     return os.path.join(documents_dir(), APP_NAME)

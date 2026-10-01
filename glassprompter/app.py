@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 from . import APP_ID, APP_NAME, ORG, __version__, config, engine, paths, scripts, win32
 from . import log as logsetup
 from .server import RemoteServer
+from .voice import VoiceEngine
 from .ui import icon as appicon
 from .ui import theme
 from .ui.dialogs import AboutDialog, LibraryDialog, PhoneDialog, SettingsDialog, WelcomeDialog
@@ -23,7 +24,8 @@ from .ui.prompter import Prompter
 log = logging.getLogger("glassprompter")
 
 HOTKEYS = {1: ("SPACE", "play"), 2: ("UP", "faster"), 3: ("DOWN", "slower"), 4: ("LEFT", "back"),
-           5: ("RIGHT", "ahead"), 6: ("R", "restart"), 7: ("H", "toggle"), 8: ("E", "library")}
+           5: ("RIGHT", "ahead"), 6: ("R", "restart"), 7: ("H", "toggle"), 8: ("E", "library"),
+           9: ("V", "voice"), 10: ("G", "ghost"), 11: ("PGUP", "prev_section"), 12: ("PGDN", "next_section")}
 DROP_EXT = (".txt", ".md", ".docx")
 WELCOME_SCRIPT = """Welcome to Glass Prompter.
 
@@ -102,6 +104,13 @@ class Controller(QObject):
         self.prompter.stateChanged.connect(self.schedule_publish)
         self.prompter.pendingConsumed.connect(self._pending_loaded)
 
+        self.voice = VoiceEngine()
+        self.voice.heard.connect(self.prompter.on_heard)
+        self.voice.level.connect(self.prompter.on_level)
+        self.voice.status.connect(self.prompter.on_voice_status)
+        self.voice.failed.connect(self._voice_failed)
+        self.prompter.listenRequested.connect(self._listen)
+
         self.save_timer = QTimer(self, singleShot=True, interval=600, timeout=self.cfg.save)
         self.publish_timer = QTimer(self, singleShot=True, interval=80, timeout=self.publish)
         self.tick = QTimer(self, interval=1000, timeout=self.periodic)
@@ -134,6 +143,18 @@ class Controller(QObject):
             QTimer.singleShot(300, lambda: self.import_path(args.file))
         log.info("Ready (remote=%s, hotkeys=%d/%d)", bool(self.server and self.server.running),
                  sum(self.hotkeys_ok), len(HOTKEYS))
+
+    # ------------------------------------------------------------ voice follow
+    def _listen(self, on):
+        if on:
+            self.voice.start(self.prompter.vwords)
+        else:
+            self.voice.stop()
+
+    def _voice_failed(self, msg):
+        self.prompter.stop_listening(summary=False)
+        self.prompter.toast(msg, theme.T.bad, 6)
+        self.tray.showMessage(APP_NAME, msg, QSystemTrayIcon.MessageIcon.Warning, 6000)
 
     # ------------------------------------------------------------ startup helpers
     def _first_script(self):
@@ -315,7 +336,8 @@ class Controller(QObject):
         {"play": p.toggle_play, "restart": p.restart, "faster": lambda: p.change_wpm(10),
          "slower": lambda: p.change_wpm(-10), "back": lambda: p.nudge(-2), "ahead": lambda: p.nudge(2),
          "bigger": lambda: p.change_font(2), "smaller": lambda: p.change_font(-2),
-         "hide": p.toggle_window}[action]()
+         "hide": p.toggle_window, "voice": p.toggle_voice, "ghost": p.toggle_ghost,
+         "next_section": lambda: p.jump_section(1), "prev_section": lambda: p.jump_section(-1)}[action]()
         self.schedule_publish()
 
     # ------------------------------------------------------------ hotkeys
@@ -338,7 +360,8 @@ class Controller(QObject):
             self._poll_prev[hid] = down
 
     def hotkey_report(self):
-        names = {"SPACE": "Space", "UP": "Up", "DOWN": "Down", "LEFT": "Left", "RIGHT": "Right"}
+        names = {"SPACE": "Space", "UP": "Up", "DOWN": "Down", "LEFT": "Left", "RIGHT": "Right",
+                 "PGUP": "PgUp", "PGDN": "PgDn"}
         taken = ["Ctrl+Alt+" + names.get(HOTKEYS[h][0], HOTKEYS[h][0]) for h in getattr(self, "poll_ids", [])]
         if not taken:
             return "All Ctrl+Alt shortcuts are active."
@@ -358,6 +381,14 @@ class Controller(QObject):
             return p.toggle_window()
         if action == "library":
             return self.open_library()
+        if action == "ghost":
+            return p.toggle_ghost()
+        if action == "voice":
+            if not p.isVisible():
+                p.show_window()
+            return p.toggle_voice()
+        if action in ("prev_section", "next_section"):
+            return p.jump_section(-1 if action == "prev_section" else 1)
         if not p.isVisible():
             p.show_window()
         {"play": p.toggle_play, "faster": lambda: p.change_wpm(10), "slower": lambda: p.change_wpm(-10),
@@ -406,6 +437,16 @@ class Controller(QObject):
         m.addAction(QAction("Phone remote" + theme.ELLIPSIS, m, triggered=self.open_phone))
         m.addAction(QAction("Settings" + theme.ELLIPSIS, m, triggered=self.open_settings))
         m.addSeparator()
+        self.act_voice = QAction("Voice Follow (scroll as I speak)", m, checkable=True,
+                                 triggered=lambda on: on != self.cfg.s.voice_follow and self.prompter.toggle_voice())
+        self.act_ghost = QAction("Ghost mode (click through)", m, checkable=True,
+                                 triggered=lambda on: self.prompter.set_ghost(on))
+        self.act_mirror = QAction("Mirror text", m, checkable=True,
+                                  triggered=lambda on: on != self.cfg.s.mirror and self.prompter.toggle_mirror())
+        m.addAction(self.act_voice)
+        m.addAction(self.act_ghost)
+        m.addAction(self.act_mirror)
+        m.addSeparator()
         self.act_capture = QAction("Hide from screen share", m, checkable=True,
                                    triggered=lambda on: self._set_capture(on))
         m.addAction(self.act_capture)
@@ -435,7 +476,10 @@ class Controller(QObject):
         self.act_show.setText("Hide prompter" if p.isVisible() else "Show prompter")
         self.act_play.setText("Pause" if (p.playing or p.counting) else "Play")
         self.act_capture.setChecked(self.cfg.s.hide_from_capture)
-        state = "Playing" if p.playing else "Paused"
+        self.act_voice.setChecked(self.cfg.s.voice_follow)
+        self.act_ghost.setChecked(p.ghost)
+        self.act_mirror.setChecked(self.cfg.s.mirror)
+        state = "Listening" if p.listening else ("Playing" if p.playing else "Paused")
         self.tray.setToolTip("%s %s %s %s %s" % (APP_NAME, theme.DASH, state, theme.DOT, p.script_title[:40]))
 
     # ------------------------------------------------------------ lifecycle
@@ -446,6 +490,7 @@ class Controller(QObject):
 
     def quit(self):
         log.info("Quitting")
+        self.voice.stop()
         self.unregister_hotkeys()
         self.stop_server()
         self.cfg.save()

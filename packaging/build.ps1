@@ -10,6 +10,16 @@ Write-Host "-- tests"
 python -m pytest -q -p no:cacheprovider --basetemp=.pytest_tmp tests
 if ($LASTEXITCODE -ne 0) { throw "Tests failed - not building." }
 
+Write-Host "-- speech model"
+$model = Join-Path $env:LOCALAPPDATA "GlassPrompter-build\models\vosk-model-small-en-us-0.15"
+if (-not (Test-Path $model)) {
+  New-Item -ItemType Directory -Force (Split-Path $model) | Out-Null
+  $zip = Join-Path (Split-Path $model) "model.zip"
+  Invoke-WebRequest -UseBasicParsing "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip" -OutFile $zip
+  Expand-Archive $zip -DestinationPath (Split-Path $model) -Force
+  Remove-Item $zip
+}
+
 Write-Host "-- assets"
 python packaging\make_assets.py
 if ($LASTEXITCODE -ne 0) { throw "Asset generation failed." }

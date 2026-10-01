@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 
 PAUSE_RE = re.compile(r"\[\s*pause\s*\]", re.I)
+HEADING_RE = re.compile(r"#{1,6}\s*(.+)")
 CUE_RE = re.compile(r"\[(.+)\]")
 _INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
 
@@ -15,7 +16,7 @@ _INVISIBLE = dict.fromkeys((0x200B, 0x200C, 0x200D, 0x2060, 0xFEFF), None)
 @dataclass(frozen=True)
 class Line:
     text: str
-    kind: str        # text | cue | pause | blank | end
+    kind: str        # text | cue | pause | section | blank | end
 
 
 END_TEXT = chr(0x2014) + "  END  " + chr(0x2014)
@@ -31,7 +32,7 @@ def normalize(text):
 
 def is_marker(line):
     s = line.strip()
-    return bool(PAUSE_RE.fullmatch(s) or CUE_RE.fullmatch(s))
+    return bool(PAUSE_RE.fullmatch(s) or CUE_RE.fullmatch(s) or HEADING_RE.fullmatch(s))
 
 
 def count_words(text):
@@ -41,7 +42,10 @@ def count_words(text):
 def title_from(text, limit=60):
     for ln in normalize(text).split("\n"):
         s = ln.strip()
-        if s and not is_marker(s):
+        h = HEADING_RE.fullmatch(s)
+        if h:
+            s = h.group(1).strip()
+        if s and (h or not is_marker(s)):
             return s if len(s) <= limit else s[: limit - 1].rstrip() + chr(0x2026)
     return "Untitled script"
 
@@ -60,6 +64,10 @@ def wrap(text, max_width, measure):
             continue
         if PAUSE_RE.fullmatch(s):
             out.append(Line("PAUSE", "pause"))
+            continue
+        h = HEADING_RE.fullmatch(s)
+        if h:
+            out.append(Line(h.group(1).strip().upper(), "section"))
             continue
         m = CUE_RE.fullmatch(s)
         kind = "text"
@@ -86,6 +94,34 @@ def wrap(text, max_width, measure):
             out.append(Line(line, kind))
     out += [Line("", "blank"), Line(END_TEXT, "end")]
     return out
+
+
+def sections(lines):
+    """[(line_index, title)] for every '# Heading' in the script."""
+    return [(i, ln.text) for i, ln in enumerate(lines) if ln.kind == "section"]
+
+
+def word_map(lines):
+    """Spoken-word index for Voice Follow.
+
+    Returns (words, word_line, line_tokens): every normalized word in reading order, the display
+    line each word sits on, and per line the cumulative word count after each space-separated token
+    (used to highlight words that have already been said).
+    """
+    from .tracking import norm_words
+    words, word_line, line_tokens = [], [], {}
+    for i, ln in enumerate(lines):
+        if ln.kind != "text":
+            continue
+        cum, ends = len(words), []
+        for tok in ln.text.split(" "):
+            nw = norm_words(tok)
+            words.extend(nw)
+            word_line.extend([i] * len(nw))
+            cum += len(nw)
+            ends.append(cum)
+        line_tokens[i] = ends
+    return words, word_line, line_tokens
 
 
 def words_per_line(lines):

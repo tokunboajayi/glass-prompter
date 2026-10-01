@@ -181,6 +181,9 @@ def test_control(srv):
     tok = login(srv)
     r, _ = req(srv, "POST", "/api/v1/control", {"action": "play"}, token=tok)
     assert r.status == 200 and srv.bridge.calls[-1] == ("control", "play")
+    for action in ("voice", "ghost", "next_section", "prev_section"):
+        r, _ = req(srv, "POST", "/api/v1/control", {"action": action}, token=tok)
+        assert r.status == 200 and srv.bridge.calls[-1] == ("control", action)
     r, d = req(srv, "POST", "/api/v1/control", {"action": "rm -rf"}, token=tok)
     assert r.status == 400 and d["error"]["code"] == "bad_action"
 

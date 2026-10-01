@@ -82,7 +82,7 @@ def test_concurrent_writes_are_safe(store):
 def test_read_docx_and_markdown_and_encodings():
     assert scripts.read_bytes("a.docx", make_docx(["First &amp; line", "Second"])) == "First & line\nSecond"
     md = scripts.read_bytes("a.md", b"# Title\n**Bold** and [a link](http://x.y) `code`")
-    assert md == "Title\nBold and a link code"
+    assert md == "# Title\nBold and a link code"
     assert scripts.read_bytes("a.txt", "caf\xe9".encode("cp1252")) == "caf\xe9"
     assert scripts.read_bytes("a.txt", "\ufeffhi".encode("utf-8")) == "hi"
     assert scripts.read_bytes("a.txt", "hi".encode("utf-16")) == "hi"

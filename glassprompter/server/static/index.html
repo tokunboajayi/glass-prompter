@@ -57,6 +57,16 @@
         <button class="btn" data-action="hide"><span class="sym">&#9681;</span><small>Hide / show</small></button>
         <button class="btn half" data-action="smaller"><span class="sym sm">A</span><small>Smaller</small></button>
         <button class="btn half" data-action="bigger"><span class="sym lg">A</span><small>Bigger</small></button>
+        <button id="voiceBtn" class="btn half" data-action="voice"><span class="sym">&#127908;</span><small id="voiceText">Voice Follow off</small></button>
+        <button class="btn half" data-action="ghost"><span class="sym">&#128123;</span><small>Ghost mode</small></button>
+      </div>
+      <div id="secWrap" hidden>
+        <p class="hint">Sections</p>
+        <div class="row-2">
+          <button class="btn" data-action="prev_section"><span class="sym">&#8676;</span><small>Previous section</small></button>
+          <button class="btn" data-action="next_section"><span class="sym">&#8677;</span><small>Next section</small></button>
+        </div>
+        <div id="secList" class="chips"></div>
       </div>
     </section>
 
@@ -72,7 +82,7 @@
         <button id="newBtn" class="link" type="button" hidden>Start a new one</button>
       </div>
       <input id="title" class="field" maxlength="120" placeholder="Title (optional)" aria-label="Title">
-      <textarea id="body" class="field" placeholder="Paste or type your script.&#10;&#10;[PAUSE] on its own line stops the scroll.&#10;[ANY CUE] on its own line shows in amber." aria-label="Script"></textarea>
+      <textarea id="body" class="field" placeholder="Paste or type your script.&#10;&#10;# Heading on its own line starts a section.&#10;[PAUSE] on its own line stops the scroll.&#10;[ANY CUE] on its own line shows in amber." aria-label="Script"></textarea>
       <p id="count" class="hint">0 words</p>
       <div class="actions">
         <button id="saveLoad" class="btn primary" type="button">Save &amp; load</button>

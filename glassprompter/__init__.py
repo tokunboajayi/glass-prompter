@@ -1,7 +1,7 @@
 """Glass Prompter - a see-through teleprompter that sits under your webcam
 and stays hidden from screen sharing."""
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 APP_NAME = "Glass Prompter"
 APP_ID = "GlassPrompter"
 ORG = "Glass Prompter"

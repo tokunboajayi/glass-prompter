@@ -69,13 +69,26 @@
   // ---------------------------------------------------------------- live state
   function render(s) {
     state = s || {};
-    $("stateText").textContent = s.counting ? "Starting..." : s.playing ? "Playing" : "Paused";
-    $("meta").textContent = (s.wpm || 0) + " wpm · " + (s.left || "0:00") + " left";
+    const voice = !!s.voice_follow;
+    $("stateText").textContent = s.counting ? "Starting..." : s.listening ? "Listening" : s.playing ? "Playing" : "Paused";
+    $("meta").textContent = (voice ? (s.live_wpm ? "You: " + s.live_wpm + " wpm" : "Voice Follow")
+      : (s.wpm || 0) + " wpm") + " \u00b7 " + (s.left || "0:00") + " left";
+    $("voiceBtn").classList.toggle("on", voice);
+    $("voiceText").textContent = voice ? (s.listening ? "Listening" : "Voice Follow on") : "Voice Follow off";
+    const secs = s.sections || [];
+    $("secWrap").hidden = secs.length === 0;
+    const sl = $("secList");
+    if (sl.dataset.key !== secs.join("|")) {
+      sl.dataset.key = secs.join("|");
+      sl.textContent = "";
+      secs.forEach((t) => { const c = document.createElement("span"); c.textContent = t; sl.appendChild(c); });
+    }
     $("scriptTitle").textContent = s.script ? s.script.title : "";
     $("prog").style.width = Math.round((s.progress || 0) * 100) + "%";
     $("queued").hidden = !s.queued;
-    $("ppIcon").textContent = s.playing || s.counting ? "❚❚" : "▶";
-    $("ppText").textContent = s.playing || s.counting ? "Pause" : "Play";
+    const active = s.playing || s.counting || s.listening;
+    $("ppIcon").textContent = active ? "\u275a\u275a" : "\u25b6";
+    $("ppText").textContent = voice ? (s.listening ? "Stop listening" : "Start listening") : (active ? "Pause" : "Play");
     if (!s.window_visible) setConn("Prompter hidden", "warn");
     else if (s.capture_hidden) setConn("Hidden from share", "ok");
     else setConn("VISIBLE in share", "bad");

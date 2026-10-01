@@ -48,7 +48,7 @@ def _decode_text(data):
 
 
 def _strip_markdown(text):
-    text = re.sub(r"^#{1,6}\s*", "", text, flags=re.M)
+    text = re.sub(r"^#{1,6}\s*", "# ", text, flags=re.M)          # headings become sections
     text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)              # images
     text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)           # links -> text
     text = re.sub(r"(\*\*|__|`)", "", text)
