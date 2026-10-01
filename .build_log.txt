@@ -1,17 +1,18 @@
-== Glass Prompter 2.0.0 ==
+== Glass Prompter 2.1.0 ==
 -- tests
-...................................................................      [100%]
-67 passed in 9.76s
+.......................................................................  [100%]
+71 passed in 10.84s
 -- speech model
+-- natural voice
 -- assets
-assets ready for 2.0.0
+assets ready for 2.1.0
 -- bundle
-142 INFO: PyInstaller: 6.22.3, contrib hooks: 2026.8
-142 INFO: Python: 3.12.10
-170 INFO: Platform: Windows-11-10.0.26300-SP0
-170 INFO: Python environment: C:\Users\RecoveryAdmin\AppData\Local\Programs\Python\Python312
-30627 WARNING: Hidden import "pycparser.lextab" not found!
-30627 WARNING: Hidden import "pycparser.yacctab" not found!
-30740 WARNING: Ignoring /System/Library/Frameworks/Carbon.framework/Carbon imported from C:\Users\RecoveryAdmin\OneDrive\Desktop\tele read\glassprompter\platform\macos.py - only basenames are supported with ctypes imports!
+216 INFO: PyInstaller: 6.22.3, contrib hooks: 2026.8
+216 INFO: Python: 3.12.10
+244 INFO: Platform: Windows-11-10.0.26300-SP0
+244 INFO: Python environment: C:\Users\RecoveryAdmin\AppData\Local\Programs\Python\Python312
+33061 WARNING: Hidden import "pycparser.lextab" not found!
+33061 WARNING: Hidden import "pycparser.yacctab" not found!
+33251 WARNING: Ignoring /System/Library/Frameworks/Carbon.framework/Carbon imported from C:\Users\RecoveryAdmin\OneDrive\Desktop\tele read\glassprompter\platform\macos.py - only basenames are supported with ctypes imports!
 -- installer
-== Done: dist\GlassPrompter-Setup-2.0.0.exe (75.1 MB)  SHA-256 63FDB36FEC8C3A8EA5ABB9C630F7F0BD6B92463A20B8A10A6249BA05A2AF3A2C
+== Done: dist\GlassPrompter-Setup-2.1.0.exe (150.6 MB)  SHA-256 AD490F312B6172541981EFF6DE5998E7F07B44076FDA8E1F90CC4EA50B39FB04

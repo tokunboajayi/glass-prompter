@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.1.0 - 2026-10-01
+Human voice and a refinement pass on the whole interface.
+
+- **Natural Read Aloud:** an offline neural voice (Piper) replaces the robotic system voice:
+  - It starts speaking in about half a second.
+  - The prompter follows the exact word being spoken, karaoke-style, instead of scrolling at a fixed speed.
+  - Pace follows your words-per-minute setting.
+  - `[PAUSE]` lines and new sections get natural pauses, and `[CUES]` are never read out.
+  - Read Aloud starts from the line you're on.
+  - Lessac (warm US female) ships with the app. Ryan, Amy and Alan download in Settings (about 60 MB each).
+  - **Play sample** lets you hear a voice before you choose it.
+  - The system voice remains as a fallback.
+- **Refined UI:**
+  - **Typography:** Inter is bundled, so text looks the same on Windows and macOS.
+  - **Status:** one quiet status capsule replaces the row of badges.
+  - **Reading band:** a soft band of light replaces the gradient box, with slim accent ticks marking the line.
+  - **Script markers:** sections render as editorial headings, and cues and `[PAUSE]` as small chips.
+  - **Panel edge:** a calmer glass edge, where accent color appears only when something is running.
+  - **Control bar:** grouped into four clusters plus an overflow menu, with a white primary Play button.
+  - **Shortcuts:** the shortcut sheet shows real keycaps.
+  - **Settings:** rebuilt as grouped cards, with a switch on the right of each row.
+  - **Dialogs:** headers no longer repeat the title, and primary buttons are solid white throughout. The phone app matches.
+- 71 automated tests.
+
 ## 2.0.0 - 2026-10-01
 Cross-platform release. Built from research into where competing prompters fail: voice-scroll lag and jumps,
 freezes mid-take, Mac-only notch apps, false "invisible" claims on macOS 15+, and lost scripts.

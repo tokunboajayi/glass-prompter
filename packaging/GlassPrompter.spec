@@ -14,6 +14,9 @@ MAC = sys.platform == "darwin"
 MODEL = os.environ.get("GLASSPROMPTER_MODEL") or os.path.join(build_dir(), "models", MODEL_NAME)
 if not os.path.isfile(os.path.join(MODEL, "am", "final.mdl")):
     raise SystemExit("Speech model missing: " + MODEL)
+VOICE = os.path.join(build_dir(), "voices", "en_US-lessac-medium.onnx")       # bundled natural voice
+if not (os.path.isfile(VOICE) and os.path.isfile(VOICE + ".json")):
+    raise SystemExit("Natural voice missing: " + VOICE)
 
 # Qt modules the app never imports - excluding them keeps the install small.
 QT_EXCLUDES = [
@@ -24,7 +27,8 @@ QT_EXCLUDES = [
     "PySide6.QtSvg", "PySide6.QtSvgWidgets", "PySide6.QtXml", "PySide6.QtDBus", "PySide6.QtDesigner",
     "PySide6.QtHelp", "PySide6.QtPrintSupport", "PySide6.QtConcurrent", "PySide6.QtStateMachine",
 ]
-hidden = ["qrcode", "qrcode.constants", "vosk", "sounddevice", "_sounddevice_data", "cffi"]
+hidden = ["qrcode", "qrcode.constants", "vosk", "sounddevice", "_sounddevice_data", "cffi", "piper", "piper.voice",
+          "piper.config", "piper.phonemize_espeak", "piper.espeakbridge", "onnxruntime"]
 if MAC:
     hidden += ["objc", "AppKit", "Foundation", "glassprompter.platform.macos"]
 else:
@@ -33,12 +37,16 @@ else:
 a = Analysis(
     [os.path.join(ROOT, "glass_prompter.pyw")],
     pathex=[ROOT],
-    binaries=collect_dynamic_libs("vosk"),
+    binaries=collect_dynamic_libs("vosk") + collect_dynamic_libs("piper") + collect_dynamic_libs("onnxruntime"),
     datas=[(os.path.join(ROOT, "glassprompter", "server", "static"), os.path.join("glassprompter", "server", "static")),
-           (MODEL, os.path.join("glassprompter", "models", MODEL_NAME))]
-          + collect_data_files("_sounddevice_data"),
+           (MODEL, os.path.join("glassprompter", "models", MODEL_NAME)),
+           (os.path.join(ROOT, "glassprompter", "fonts"), os.path.join("glassprompter", "fonts")),
+           (VOICE, os.path.join("glassprompter", "voices")),
+           (VOICE + ".json", os.path.join("glassprompter", "voices"))]
+          + collect_data_files("_sounddevice_data")
+          + collect_data_files("piper", excludes=["train/**", "tashkeel/**", "hebrew/**", "img/**", "templates/**"]),
     hiddenimports=hidden,
-    excludes=QT_EXCLUDES + ["tkinter", "unittest", "pytest", "pydoc", "PIL", "numpy"],
+    excludes=QT_EXCLUDES + ["tkinter", "unittest", "pytest", "pydoc", "PIL", "piper.train", "torch"],
     noarchive=False,
     optimize=1,
 )

@@ -91,3 +91,8 @@ def default_drop_dir():
 
 def backup_dir():
     return ensure(os.path.join(data_dir(), "backups"))
+
+
+def voices_dir():
+    """Downloaded natural (neural) voices for Read Aloud."""
+    return ensure(os.path.join(data_dir(), "voices"))

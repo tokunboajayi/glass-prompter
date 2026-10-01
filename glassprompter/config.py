@@ -23,6 +23,7 @@ class Settings:
     mirror: bool = False
     coach: bool = True
     mic_device: str = ""                               # "" = system default microphone
+    tts_voice: str = "lessac"                          # natural voice id, or "system"
     # look
     font_px: int = 34
     font_family: str = ""                              # "" = the platform's display font

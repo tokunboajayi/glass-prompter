@@ -13,7 +13,7 @@ class T:
     surface = QColor(12, 14, 24)
     surface_2 = QColor(26, 29, 44)
     on_surface = QColor(245, 247, 255)
-    muted = QColor(154, 163, 184)
+    muted = QColor(160, 168, 188)
     outline = QColor(255, 255, 255, 30)
     aqua = QColor(64, 232, 208)
     violet = QColor(139, 108, 255)
@@ -66,13 +66,27 @@ def _pick(*families):
     return QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont).family()
 
 
+def _load_bundled():
+    """Inter (SIL OFL) ships with the app so type looks identical and premium on Windows and macOS."""
+    import os
+    from .. import paths
+    fams = []
+    d = os.path.join(paths.package_dir(), "fonts")
+    for f in ("Inter-Regular.ttf", "Inter-Medium.ttf", "Inter-SemiBold.ttf", "Inter-Bold.ttf"):
+        fid = QFontDatabase.addApplicationFont(os.path.join(d, f))
+        if fid >= 0:
+            fams += QFontDatabase.applicationFontFamilies(fid)
+    return fams
+
+
 def fonts():
-    """Native UI fonts on each OS: Segoe UI Variable (Windows 11), SF Pro (macOS), Inter or system elsewhere."""
+    """Inter everywhere (bundled), falling back to each OS's own UI font."""
     if not _fonts:
-        _fonts["ui"] = _pick("Segoe UI Variable Text", "SF Pro Text", ".AppleSystemUIFont", "Helvetica Neue",
-                             "Inter", "Segoe UI")
-        _fonts["display"] = _pick("Segoe UI Variable Display", "SF Pro Display", ".AppleSystemUIFont",
-                                  "Helvetica Neue", "Inter", "Segoe UI Semibold", "Segoe UI")
+        inter = _load_bundled()
+        first = inter[:1]
+        _fonts["ui"] = _pick(*(first + ["Segoe UI Variable Text", "SF Pro Text", ".AppleSystemUIFont", "Segoe UI"]))
+        _fonts["display"] = _pick(*(first + ["Segoe UI Variable Display", "SF Pro Display", ".AppleSystemUIFont",
+                                             "Segoe UI"]))
     return _fonts
 
 
@@ -89,18 +103,18 @@ DOT, DASH, ELLIPSIS = chr(0xB7), chr(0x2014), chr(0x2026)
 def bar_qss():
     f = fonts()
     return f"""
-QFrame#bar {{ background: rgba(14,16,28,190); border: 1px solid rgba(255,255,255,34); border-radius: 14px; }}
-QToolButton {{ color: #F5F7FF; background: transparent; border: 0; border-radius: 10px;
-              min-width: 34px; min-height: 34px; }}
-QToolButton:hover {{ background: rgba(255,255,255,22); }}
-QToolButton:pressed {{ background: rgba(255,255,255,10); }}
+QFrame#bar {{ background: rgba(16,18,30,214); border: 1px solid rgba(255,255,255,22); border-radius: 12px; }}
+QToolButton {{ background: transparent; border: 0; border-radius: 9px; min-width: 32px; min-height: 32px;
+              max-width: 32px; max-height: 32px; }}
+QToolButton:hover {{ background: rgba(255,255,255,18); }}
+QToolButton:pressed {{ background: rgba(255,255,255,8); }}
 QToolButton:focus {{ border: 1px solid {AQUA}; }}
-QToolButton#play {{ background: {GRAD}; border-radius: 17px; }}
-QToolButton#play:hover {{ background: {GRAD_HOVER}; }}
-QToolButton[on="true"] {{ background: rgba(64,232,208,38); }}
-QLabel#wpm {{ color: #C9D0E0; font-family: "{f['ui']}"; font-size: 12px; font-weight: 600; padding: 0 2px;
-             min-width: 54px; }}
-QFrame#sep {{ background: rgba(255,255,255,20); min-width: 1px; max-width: 1px; margin: 8px 3px; }}
+QToolButton#play {{ background: #F5F7FF; border-radius: 16px; }}
+QToolButton#play:hover {{ background: #FFFFFF; }}
+QToolButton[on="true"] {{ background: rgba(64,232,208,30); }}
+QToolButton::menu-indicator {{ image: none; width: 0; }}
+QLabel#wpm {{ color: #F5F7FF; font-family: "{f['ui']}"; font-size: 12px; padding: 0 2px; min-width: 58px; }}
+QFrame#sep {{ background: rgba(255,255,255,16); min-width: 1px; max-width: 1px; margin: 9px 4px; }}
 """
 
 
@@ -109,60 +123,61 @@ def app_qss():
     return f"""
 QDialog {{ background: #0C0E18; }}
 QDialog[glass="true"] {{ background: transparent; }}
-QLabel {{ color: #F5F7FF; font-family: "{f['ui']}"; font-size: 14px; }}
-QLabel[role="title"] {{ font-family: "{f['display']}"; font-size: 21px; font-weight: 600; }}
-QLabel[role="hero"] {{ font-family: "{f['display']}"; font-size: 28px; font-weight: 700; }}
-QLabel[role="section"] {{ color: {AQUA}; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; }}
-QLabel[role="muted"] {{ color: #9AA3B8; font-size: 12px; }}
+QLabel {{ color: #F2F4FA; font-family: "{f['ui']}"; font-size: 13px; }}
+QLabel[role="title"] {{ font-family: "{f['display']}"; font-size: 20px; font-weight: 600; }}
+QLabel[role="hero"] {{ font-family: "{f['display']}"; font-size: 26px; font-weight: 700; }}
+QLabel[role="section"] {{ color: #8C95AB; font-size: 11px; font-weight: 600; }}
+QLabel[role="muted"] {{ color: #A0A8BC; font-size: 12px; }}
 QLabel[role="warn"] {{ color: {EMBER}; font-size: 12px; }}
-QLabel[role="pin"] {{ font-family: "{f['display']}"; font-size: 28px; font-weight: 700; letter-spacing: 6px;
-                      color: {AQUA}; }}
-QLabel[role="dialogtitle"] {{ color: #C9D0E0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }}
-QFrame[role="card"] {{ background: rgba(255,255,255,10); border: 1px solid rgba(255,255,255,22); border-radius: 14px; }}
-QPlainTextEdit, QLineEdit, QSpinBox, QListWidget, QComboBox {{ background: rgba(255,255,255,12); color: #F5F7FF;
-    border: 1px solid rgba(255,255,255,24); border-radius: 10px; padding: 8px 10px; font-family: "{f['ui']}";
-    font-size: 14px; selection-background-color: {AQUA}; selection-color: #070910; }}
-QPlainTextEdit {{ font-size: 16px; padding: 12px; }}
+QLabel[role="pin"] {{ font-family: "{f['display']}"; font-size: 28px; font-weight: 700; color: #F5F7FF; }}
+QLabel[role="rowtitle"] {{ font-size: 13px; color: #F2F4FA; }}
+QLabel[role="value"] {{ color: #A0A8BC; font-size: 12px; }}
+QFrame[role="card"] {{ background: rgba(255,255,255,8); border: 1px solid rgba(255,255,255,16); border-radius: 12px; }}
+QFrame[role="hairline"] {{ background: rgba(255,255,255,12); min-height: 1px; max-height: 1px; border: 0; }}
+QPlainTextEdit, QLineEdit, QSpinBox, QListWidget, QComboBox {{ background: rgba(255,255,255,8); color: #F2F4FA;
+    border: 1px solid rgba(255,255,255,18); border-radius: 9px; padding: 7px 10px; font-family: "{f['ui']}";
+    font-size: 13px; selection-background-color: rgba(64,232,208,90); selection-color: #FFFFFF; }}
+QPlainTextEdit {{ font-size: 15px; padding: 14px; }}
 QPlainTextEdit:focus, QLineEdit:focus, QSpinBox:focus, QListWidget:focus, QComboBox:focus {{
-    border: 1px solid {AQUA}; }}
-QComboBox::drop-down {{ border: 0; width: 24px; }}
-QComboBox QAbstractItemView {{ background: #151826; color: #F5F7FF; border: 1px solid #2A2E44;
-    selection-background-color: rgba(64,232,208,60); outline: 0; }}
+    border: 1px solid rgba(64,232,208,160); }}
+QComboBox::drop-down {{ border: 0; width: 22px; }}
+QComboBox QAbstractItemView {{ background: #151826; color: #F2F4FA; border: 1px solid #262A3E; padding: 4px;
+    selection-background-color: rgba(64,232,208,46); outline: 0; }}
 QListWidget {{ padding: 4px; outline: 0; }}
-QListWidget::item {{ border-radius: 10px; padding: 8px; margin: 1px 0; color: #F5F7FF; }}
-QListWidget::item:selected {{ background: rgba(64,232,208,34); color: #F5F7FF; }}
-QListWidget::item:hover:!selected {{ background: rgba(255,255,255,12); }}
-QPushButton {{ background: rgba(255,255,255,16); color: #F5F7FF; border: 1px solid rgba(255,255,255,28);
-    border-radius: 10px; padding: 8px 16px; font-family: "{f['ui']}"; font-size: 14px; }}
-QPushButton:hover {{ background: rgba(255,255,255,28); }}
-QPushButton:pressed {{ background: rgba(255,255,255,10); }}
-QPushButton:focus {{ border: 1px solid {AQUA}; }}
+QListWidget::item {{ border-radius: 8px; padding: 8px 10px; margin: 1px 0; color: #F2F4FA; }}
+QListWidget::item:selected {{ background: rgba(255,255,255,20); color: #FFFFFF; }}
+QListWidget::item:hover:!selected {{ background: rgba(255,255,255,9); }}
+QPushButton {{ background: rgba(255,255,255,12); color: #F2F4FA; border: 1px solid rgba(255,255,255,18);
+    border-radius: 9px; padding: 7px 14px; min-height: 18px; font-family: "{f['ui']}"; font-size: 13px; }}
+QPushButton:hover {{ background: rgba(255,255,255,22); }}
+QPushButton:pressed {{ background: rgba(255,255,255,8); }}
+QPushButton:focus {{ border: 1px solid rgba(64,232,208,160); }}
 QPushButton:disabled {{ color: #5E6478; }}
-QPushButton[primary="true"] {{ background: {GRAD}; color: #070910; border: 0; font-weight: 700; }}
-QPushButton[primary="true"]:hover {{ background: {GRAD_HOVER}; }}
-QPushButton[primary="true"]:focus {{ border: 1px solid #F5F7FF; }}
-QPushButton[danger="true"] {{ color: #FF5C7A; }}
-QPushButton[compact="true"] {{ padding: 6px 10px; font-size: 13px; }}
-QPushButton#close {{ background: transparent; border: 0; border-radius: 14px; padding: 0; min-width: 28px;
-    min-height: 28px; max-width: 28px; max-height: 28px; }}
-QPushButton#close:hover {{ background: rgba(255,92,122,200); }}
-QCheckBox {{ color: #F5F7FF; font-family: "{f['ui']}"; font-size: 14px; spacing: 10px; }}
-QSlider {{ min-height: 24px; background: transparent; }}
-QSlider::groove:horizontal {{ border: 0; height: 24px; background: transparent; }}
-QSlider::sub-page:horizontal {{ margin: 10px 0 10px 0; background: {GRAD}; border-radius: 2px; }}
-QSlider::add-page:horizontal {{ margin: 10px 0 10px 0; background: #262A3E; border-radius: 2px; }}
-QSlider::handle:horizontal {{ background: #F5F7FF; width: 16px; margin: 4px 0; border-radius: 8px; }}
-QSlider::handle:horizontal:focus {{ background: {AQUA}; }}
-QToolTip {{ background: #151826; color: #F5F7FF; border: 1px solid #2A2E44; padding: 5px 9px;
+QPushButton[primary="true"] {{ background: #F5F7FF; color: #0A0C14; border: 1px solid #F5F7FF; font-weight: 600; padding: 7px 16px; }}
+QPushButton[primary="true"]:hover {{ background: #FFFFFF; }}
+QPushButton[primary="true"]:focus {{ border: 1px solid rgba(64,232,208,220); }}
+QPushButton[danger="true"] {{ color: #FF6B88; }}
+QPushButton[compact="true"] {{ padding: 5px 10px; font-size: 12px; }}
+QPushButton#close {{ background: transparent; border: 0; border-radius: 12px; padding: 0; min-width: 24px;
+    min-height: 24px; max-width: 24px; max-height: 24px; }}
+QPushButton#close:hover {{ background: rgba(255,255,255,26); }}
+QCheckBox {{ color: #F2F4FA; font-family: "{f['ui']}"; font-size: 13px; spacing: 10px; }}
+QSlider {{ min-height: 22px; background: transparent; }}
+QSlider::groove:horizontal {{ border: 0; height: 22px; background: transparent; }}
+QSlider::sub-page:horizontal {{ margin: 9px 0 9px 0; background: {AQUA}; border-radius: 2px; }}
+QSlider::add-page:horizontal {{ margin: 9px 0 9px 0; background: rgba(255,255,255,30); border-radius: 2px; }}
+QSlider::handle:horizontal {{ background: #FFFFFF; width: 16px; margin: 3px 0; border-radius: 8px; }}
+QToolTip {{ background: #151826; color: #F2F4FA; border: 1px solid #262A3E; padding: 5px 8px;
     font-family: "{f['ui']}"; font-size: 12px; }}
-QMenu {{ background: #121522; color: #F5F7FF; border: 1px solid #2A2E44; border-radius: 10px; padding: 5px;
+QMenu {{ background: #13162A; color: #F2F4FA; border: 1px solid #262A3E; border-radius: 10px; padding: 5px;
     font-family: "{f['ui']}"; font-size: 13px; }}
-QMenu::item {{ padding: 7px 22px 7px 14px; border-radius: 7px; }}
-QMenu::item:selected {{ background: rgba(64,232,208,40); }}
+QMenu::item {{ padding: 7px 28px 7px 12px; border-radius: 6px; }}
+QMenu::item:selected {{ background: rgba(255,255,255,16); }}
 QMenu::item:disabled {{ color: #5E6478; }}
-QMenu::separator {{ height: 1px; background: #2A2E44; margin: 4px 8px; }}
+QMenu::separator {{ height: 1px; background: #262A3E; margin: 4px 8px; }}
+QMenu::icon {{ padding-left: 8px; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; margin: 4px; }}
-QScrollBar::handle:vertical {{ background: #343A54; border-radius: 3px; min-height: 30px; }}
+QScrollBar::handle:vertical {{ background: rgba(255,255,255,40); border-radius: 3px; min-height: 30px; }}
 QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
 QMessageBox {{ background: #0C0E18; }}
 """

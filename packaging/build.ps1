@@ -21,6 +21,16 @@ if (-not (Test-Path $model)) {
   Remove-Item $zip
 }
 
+Write-Host "-- natural voice"
+$voices = Join-Path $env:LOCALAPPDATA "GlassPrompter-build\voices"
+New-Item -ItemType Directory -Force $voices | Out-Null
+foreach ($ext in @(".onnx", ".onnx.json")) {
+  $dst = Join-Path $voices "en_US-lessac-medium$ext"
+  if (-not (Test-Path $dst)) {
+    Invoke-WebRequest -UseBasicParsing "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium$ext" -OutFile $dst
+  }
+}
+
 Write-Host "-- assets"
 python packaging\make_assets.py
 if ($LASTEXITCODE -ne 0) { throw "Asset generation failed." }

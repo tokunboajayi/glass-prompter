@@ -107,8 +107,10 @@ class Controller(QObject):
         self.prompter.rehearsalFinished.connect(self._rehearsal_done)
         self.speaker = Speaker()
         self.speaker.finished.connect(self.prompter.on_read_aloud_done)
-        self.prompter.readAloudRequested.connect(
-            lambda on: self.speaker.speak(self.prompter.script_text, self.cfg.s.wpm) if on else self.speaker.stop())
+        self.speaker.progress.connect(self.prompter.on_tts_progress)
+        self.speaker.status.connect(self.prompter.on_tts_status)
+        self.speaker.failed.connect(lambda m: self.prompter.toast(m, theme.T.bad, 5))
+        self.prompter.readAloudRequested.connect(self._read_aloud)
 
         self.save_timer = QTimer(self, singleShot=True, interval=600, timeout=self.cfg.save)
         self.publish_timer = QTimer(self, singleShot=True, interval=80, timeout=self.publish)
@@ -128,6 +130,7 @@ class Controller(QObject):
             self.start_server()
         QTimer.singleShot(1200, self._probe_network)
         QTimer.singleShot(1500, self.voice.preload)             # first Space press starts listening instantly
+        QTimer.singleShot(2500, lambda: self.speaker.preload(self.cfg.s.tts_voice))
         QTimer.singleShot(4000, self._backup)
         if self.cfg.s.start_with_windows != native.is_autostart():
             native.set_autostart(self.cfg.s.start_with_windows)
@@ -151,6 +154,17 @@ class Controller(QObject):
             self.voice.start(self.prompter.vwords, self.cfg.s.mic_device)
         else:
             self.voice.stop()
+
+    def _read_aloud(self, on):
+        p = self.prompter
+        if not on:
+            self.speaker.stop()
+            return
+        if not self.speaker.speak(p.lines, self.cfg.s.wpm, self.cfg.s.tts_voice, p.read_start_word()):
+            p.stop_read_aloud()
+            p.toast("Nothing to read here", theme.T.bad)
+            return
+        p.set_tts_follow(self.speaker.natural)
 
     def _rehearsal_done(self, report):
         sid = report.get("script_id") or 0

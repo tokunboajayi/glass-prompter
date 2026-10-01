@@ -7,7 +7,7 @@ from PySide6.QtGui import QColor, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from .theme import font
 
 
-def _pen(p, color, w=1.7):
+def _pen(p, color, w=1.6):
     p.setPen(QPen(color, w, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin))
     p.setBrush(Qt.BrushStyle.NoBrush)
 
@@ -113,6 +113,11 @@ def draw(p, name, r, color):
         p.setPen(c)
         p.setFont(font("display", 11, font_weight()))
         p.drawText(QRectF(3, 3, 14, 14), Qt.AlignmentFlag.AlignCenter, "?")
+    elif name == "more":
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        for x in (5, 10, 15):
+            p.drawEllipse(QPointF(x, 10), 1.5, 1.5)
     elif name == "spark":                       # brand mark: four-point star
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(c)

@@ -19,6 +19,13 @@ if [ ! -f "${MODEL}/am/final.mdl" ]; then
   (cd "${BUILD}/models" && unzip -q -o model.zip && rm model.zip)
 fi
 
+echo "-- natural voice"
+mkdir -p "${BUILD}/voices"
+for ext in .onnx .onnx.json; do
+  [ -f "${BUILD}/voices/en_US-lessac-medium${ext}" ] || curl -fsSL -o "${BUILD}/voices/en_US-lessac-medium${ext}" \
+    "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium${ext}"
+done
+
 echo "-- assets"
 QT_QPA_PLATFORM=offscreen python3 packaging/make_assets.py
 iconutil -c icns assets/GlassPrompter.iconset -o assets/GlassPrompter.icns

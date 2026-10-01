@@ -5,17 +5,18 @@ from PySide6.QtWidgets import QCheckBox, QDialog, QPushButton
 
 from .. import platform as native
 from . import icons
-from .theme import T, aurora, font
+from .theme import T, font
 
 RADIUS = 14
-HEADER = 44
+HEADER = 40
 
 
-def paint_glass(p, rect, tint_alpha, frosted, radius=RADIUS, phase=0.0, rim=0.55, glow=0.0):
-    """Ink tint + top sheen + soft aurora underglow + living aurora rim.
+def paint_glass(p, rect, tint_alpha, frosted, radius=RADIUS, phase=0.0, rim=0.5, glow=0.0):
+    """Ink glass: tint, soft top sheen, 1px light edge, and a quiet accent rim that carries state.
 
-    rim:  0..1 strength of the gradient border (state: idle ~0.5, active ~0.85, voice adds level)
-    glow: 0..1 strength of the aurora light pooling at the bottom edge
+    rim:   0..1 strength of the aqua->violet edge (idle ~0.3, active ~0.7, voice adds its level)
+    phase: degrees; slides the rim gradient slowly while something is running
+    glow:  0..1 faint accent light pooled under the bottom edge
     """
     path = QPainterPath()
     path.addRoundedRect(rect, radius, radius)
@@ -23,30 +24,44 @@ def paint_glass(p, rect, tint_alpha, frosted, radius=RADIUS, phase=0.0, rim=0.55
     base.setAlpha(tint_alpha if frosted else min(255, tint_alpha + 40))
     p.fillPath(path, base)
     sheen = QLinearGradient(rect.topLeft(), rect.bottomLeft())
-    sheen.setColorAt(0.0, QColor(255, 255, 255, 20))
-    sheen.setColorAt(0.30, QColor(255, 255, 255, 5))
+    sheen.setColorAt(0.0, QColor(255, 255, 255, 14))
+    sheen.setColorAt(0.22, QColor(255, 255, 255, 3))
     sheen.setColorAt(1.0, QColor(255, 255, 255, 0))
     p.fillPath(path, sheen)
     if glow > 0:
-        g = QRadialGradient(QPointF(rect.center().x(), rect.bottom() + rect.height() * 0.15),
-                            max(rect.width(), rect.height()) * 0.55)
+        g = QRadialGradient(QPointF(rect.center().x(), rect.bottom() + rect.height() * 0.35),
+                            rect.width() * 0.42)
         a = QColor(T.violet)
-        a.setAlpha(int(46 * glow))
-        b = QColor(T.aqua)
-        b.setAlpha(int(18 * glow))
+        a.setAlpha(int(22 * glow))
         g.setColorAt(0.0, a)
-        g.setColorAt(0.5, b)
         g.setColorAt(1.0, QColor(0, 0, 0, 0))
         p.save()
         p.setClipPath(path)
         p.fillRect(rect, g)
         p.restore()
-    # inner hairline + aurora rim
     p.setBrush(Qt.BrushStyle.NoBrush)
-    p.setPen(QPen(QColor(255, 255, 255, 18), 1))
+    edge = QLinearGradient(rect.topLeft(), rect.bottomLeft())          # light from above
+    edge.setColorAt(0.0, QColor(255, 255, 255, 46))
+    edge.setColorAt(0.5, QColor(255, 255, 255, 14))
+    edge.setColorAt(1.0, QColor(255, 255, 255, 22))
+    p.setPen(QPen(edge, 1))
     p.drawPath(path)
-    p.setPen(QPen(aurora(rect.center(), phase, int(255 * max(0.0, min(1.0, rim)))), 1.4))
-    p.drawRoundedRect(rect.adjusted(0.6, 0.6, -0.6, -0.6), radius - 0.6, radius - 0.6)
+    if rim > 0:
+        import math
+        k = math.radians(phase)
+        cx, cy, rw = rect.center().x(), rect.center().y(), rect.width() * 0.6
+        acc = QLinearGradient(cx - rw * math.cos(k), cy - rw * math.sin(k) * 0.3,
+                              cx + rw * math.cos(k), cy + rw * math.sin(k) * 0.3)
+        a, v = QColor(T.aqua), QColor(T.violet)
+        alpha = int(200 * max(0.0, min(1.0, rim)))
+        a.setAlpha(alpha)
+        v.setAlpha(alpha)
+        mid = QColor(255, 255, 255, 0)
+        acc.setColorAt(0.0, a)
+        acc.setColorAt(0.5, mid)
+        acc.setColorAt(1.0, v)
+        p.setPen(QPen(acc, 1.2))
+        p.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), radius - 0.5, radius - 0.5)
     return path
 
 
@@ -77,6 +92,8 @@ class Switch(QCheckBox):
         self._pos = 1.0 if on else 0.0
 
     def sizeHint(self):
+        if not self.text():
+            return QSize(44, 26)
         fm = QFontMetricsF(self.font())
         return QSize(int(46 + 12 + fm.horizontalAdvance(self.text())), 28)
 
@@ -88,16 +105,12 @@ class Switch(QCheckBox):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         track = QRectF(1, (self.height() - 22) / 2, 40, 22)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(255, 255, 255, 40))
+        p.setBrush(QColor(255, 255, 255, 34))
         p.drawRoundedRect(track, 11, 11)
         if self._pos > 0:
-            g = QLinearGradient(track.left(), 0, track.right(), 0)
-            a, v = QColor(T.aqua), QColor(T.violet)
-            a.setAlphaF(self._pos)
-            v.setAlphaF(self._pos)
-            g.setColorAt(0, a)
-            g.setColorAt(1, v)
-            p.setBrush(g)
+            on = QColor(T.aqua)
+            on.setAlphaF(self._pos)
+            p.setBrush(on)
             p.drawRoundedRect(track, 11, 11)
         knob = QRectF(track.x() + 2 + self._pos * 18, track.y() + 2, 18, 18)
         p.setBrush(QColor(0, 0, 0, 50))
@@ -130,7 +143,7 @@ class GlassDialog(QDialog):
         self._shifted = False
         self.close_btn = QPushButton(self)
         self.close_btn.setObjectName("close")
-        self.close_btn.setIcon(icons.icon("close", "#F5F7FF", 16))
+        self.close_btn.setIcon(icons.icon("close", "#C9CFDD", 14))
         self.close_btn.setToolTip("Close  (Esc)")
         self.close_btn.setAccessibleName("Close")
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -157,20 +170,18 @@ class GlassDialog(QDialog):
         self._place_close()
 
     def _place_close(self):
-        self.close_btn.move(self.width() - 28 - 12, 10)
+        self.close_btn.move(self.width() - 24 - 12, 10)
         self.close_btn.raise_()
 
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
-        paint_glass(p, r, 165 if self.frosted else 250, self.frosted, phase=120, rim=0.45, glow=0.6)
-        icons.draw(p, "spark", QRectF(16, 15, 16, 16), T.aqua)
-        p.setPen(T.muted)
-        p.setFont(font("ui", 12, font_weight_semibold()))
-        p.drawText(QRectF(40, 10, self.width() - 100, 26), Qt.AlignmentFlag.AlignVCenter, self.header_title)
-        p.setPen(QPen(QColor(255, 255, 255, 16), 1))
-        p.drawLine(QPointF(14, HEADER), QPointF(self.width() - 14, HEADER))
+        paint_glass(p, r, 175 if self.frosted else 250, self.frosted, phase=0, rim=0.0, glow=0.0)
+        icons.draw(p, "spark", QRectF(18, 15, 14, 14), T.aqua)
+        p.setPen(T.on_surface)
+        p.setFont(font("ui", 13, font_weight_semibold()))
+        p.drawText(QRectF(40, 8, self.width() - 100, 28), Qt.AlignmentFlag.AlignVCenter, self.header_title)
 
     def _edges(self, pt):
         if not self.resizable:

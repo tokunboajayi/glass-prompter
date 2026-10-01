@@ -4,7 +4,7 @@ import time
 from PySide6.QtCore import QElapsedTimer, QEasingCurve, QPointF, QPropertyAnimation, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetricsF, QGuiApplication, QLinearGradient, QPainter,
                            QPainterPath, QPen, QPixmap, QPolygonF)
-from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QToolButton, QWidget
+from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMenu, QToolButton, QWidget
 
 from .. import coach as coachlib, engine, tracking
 from .. import platform as native
@@ -16,6 +16,10 @@ COUNTDOWN_STEP = 0.7
 
 
 class ControlBar(QFrame):
+    """Floating control strip: four groups, everything else one click away in the overflow menu."""
+
+    ICON = "#E9ECF5"
+
     def __init__(self, owner):
         super().__init__(owner)
         self.setObjectName("bar")
@@ -26,15 +30,16 @@ class ControlBar(QFrame):
 
         def btn(glyph, tip, fn, name=None):
             b = QToolButton(self)
-            b.setIcon(icons.icon(glyph, "#070910" if name == "play" else "#F5F7FF", 20))
-            b.setIconSize(QSize(20, 20))
+            b.setIcon(icons.icon(glyph, "#0A0C14" if name == "play" else self.ICON, 18))
+            b.setIconSize(QSize(18, 18))
             b.setToolTip(tip)
             b.setAccessibleName(tip.split("  (")[0])
             b.setFocusPolicy(Qt.FocusPolicy.TabFocus)        # clicking never steals keyboard focus
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             if name:
                 b.setObjectName(name)
-            b.clicked.connect(fn)
+            if fn:
+                b.clicked.connect(fn)
             lay.addWidget(b)
             return b
 
@@ -44,26 +49,37 @@ class ControlBar(QFrame):
             lay.addWidget(s)
 
         self.play = btn("play", "Play / pause  (Space, %s+Space)" % native.MOD, owner.toggle_play, "play")
-        btn("restart", "Restart  (Home)", owner.restart)
-        self.voice = btn("mic", "Voice Follow + Rehearsal Coach: scroll as you speak  (V, %s+V)" % native.MOD,
-                         owner.toggle_voice, "voice")
-        self.speak = btn("speaker", "Read aloud: hear your script at your pace  (L)", owner.toggle_read_aloud, "speak")
+        btn("restart", "Back to the top  (Home)", owner.restart)
+        sep()
+        self.voice = btn("mic", "Voice Follow: scrolls as you speak  (V)", owner.toggle_voice, "voice")
+        self.speak = btn("speaker", "Read aloud in a natural voice  (L)", owner.toggle_read_aloud, "speak")
         sep()
         btn("minus", "Slower  (Down)", lambda: owner.change_wpm(-10))
-        self.wpm = QLabel("140 wpm", self)
+        self.wpm = QLabel(self)
         self.wpm.setObjectName("wpm")
         self.wpm.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.wpm.setTextFormat(Qt.TextFormat.RichText)
         lay.addWidget(self.wpm)
         btn("plus", "Faster  (Up)", lambda: owner.change_wpm(+10))
         sep()
-        btn("text_smaller", "Smaller text  (-)", lambda: owner.change_font(-2))
-        btn("text_bigger", "Bigger text  (+)", lambda: owner.change_font(+2))
-        sep()
         btn("library", "Scripts  (E)", owner.requestLibrary.emit)
-        btn("phone", "Phone remote  (P)", owner.requestPhone.emit)
-        btn("settings", "Settings  (%s+,)" % native.CMD, owner.requestSettings.emit)
-        btn("close", "Hide  (%s+H)  %s  quit from the %s icon" % (native.MOD, DOT, native.TRAY.split(" (")[0]),
-            owner.hide_window)
+        more = btn("more", "More", None)
+        menu = QMenu(more)
+        for item in (("Bigger text\t+", lambda: owner.change_font(+2)),
+                         ("Smaller text\t-", lambda: owner.change_font(-2)), None,
+                         ("Phone remote" + ELLIPSIS + "\tP", owner.requestPhone.emit),
+                         ("Settings" + ELLIPSIS + "\t%s+," % native.CMD, owner.requestSettings.emit),
+                         ("Keyboard shortcuts\tF1", owner.toggle_help), None,
+                         ("Hide prompter\t%s+H" % native.MOD, owner.hide_window)):
+            if item is None:
+                menu.addSeparator()
+                continue
+            text, fn = item
+            act = menu.addAction(text)
+            act.triggered.connect(fn)
+        more.setMenu(menu)
+        more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.menu = menu
 
         self.effect = QGraphicsOpacityEffect(self)
         self.effect.setOpacity(1.0)
@@ -71,6 +87,11 @@ class ControlBar(QFrame):
         self.anim = QPropertyAnimation(self.effect, b"opacity", self)
         self.anim.finished.connect(self._finished)
         self.target = 1.0
+
+    def set_wpm(self, text, unit):
+        self.wpm.setText('<span style="font-weight:600">%s</span>'
+                         '<span style="color:#8C95AB">&nbsp;%s</span>' % (text, unit))
+
 
     def fade(self, show, instant=False):
         target = 1.0 if show else 0.0
@@ -127,9 +148,9 @@ class Prompter(QWidget):
         self.text_font.setWeight(QFont.Weight.DemiBold)
         self.fm = QFontMetricsF(self.text_font)
         self.cap_font = font("ui", T.caption)
-        self.badge_font = font("ui", T.caption, QFont.Weight.DemiBold)
-        self.toast_font = font("ui", 13, QFont.Weight.DemiBold)
-        self.count_font = font("display", 84, QFont.Weight.DemiBold)
+        self.badge_font = font("ui", 11, QFont.Weight.DemiBold)
+        self.toast_font = font("ui", 13, QFont.Weight.Medium)
+        self.count_font = font("display", 60, QFont.Weight.DemiBold)
         self.help_font = font("ui", 13)
 
         self.script_text, self.script_id, self.script_title = "", 0, ""
@@ -156,6 +177,7 @@ class Prompter(QWidget):
         self.ghost = False
         self.coach = None
         self.reading_aloud = False
+        self.tts_word, self.tts_follow, self.tts_preparing = -1, False, False
         self.frosted = ""
         self.cap_level, self.cap_note = native.capture_support()
         self.voice_latency = 0
@@ -326,7 +348,7 @@ class Prompter(QWidget):
                 self.counting = False
                 self.playing = True
                 self.sync_ui()
-        elif self.listening:
+        elif self.listening or self.tts_follow:
             busy = True
             # critically damped spring: glides to the voice target with no overshoot and no velocity jumps
             w0 = 9.0
@@ -366,8 +388,8 @@ class Prompter(QWidget):
         panel.addRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), rad, rad)
         active = self.playing or self.counting or self.listening or self.reading_aloud
         t = self.now()
-        phase = 0.0 if self.cfg.reduce_motion else (t * 28.0) % 360.0 if active else 210.0
-        rim = 0.42 + (0.38 if active else 0.0) + (0.25 * self.mic_level if self.listening else 0.0)
+        phase = 0.0 if (self.cfg.reduce_motion or not active) else (t * 18.0) % 360.0
+        rim = 0.28 + (0.36 if active else 0.0) + (0.3 * self.mic_level if self.listening else 0.0)
 
         if clear:
             p.fillPath(panel, QColor(0, 0, 0, 3))              # keeps the window clickable
@@ -378,24 +400,26 @@ class Prompter(QWidget):
             # frosted: lighter tint so the blur shows through; plain: deeper ink glass
             tint = int(255 * self.cfg.panel_alpha * (0.62 if self.frosted else 1.0))
             paint_glass(p, QRectF(0.5, 0.5, w - 1, h - 1), tint, bool(self.frosted), rad, phase, rim,
-                        glow=0.9 if active else 0.5)
+                        glow=0.8 if active else 0.0)
 
         ry, lh = self.read_y(), self.lh
         if not clear:
-            band = QRectF(12, ry - lh / 2, w - 24, lh)
-            g = aurora_line(band.left(), band.right(), alpha=30)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(g)
-            p.drawRoundedRect(band, 12, 12)
-        # reading-line markers: two glowing capsules at the edges
-        for x in (5.0, w - 8.0):
-            glow = QColor(T.aqua)
-            glow.setAlpha(60)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(glow)
-            p.drawRoundedRect(QRectF(x - 2, ry - lh * 0.34 - 2, 7, lh * 0.68 + 4), 3.5, 3.5)
-            p.setBrush(T.aqua)
-            p.drawRoundedRect(QRectF(x, ry - lh * 0.34, 3, lh * 0.68), 1.5, 1.5)
+            # reading band: a soft lift of light that fades out toward the edges (no hard box)
+            band = QRectF(0, ry - lh * 0.56, w, lh * 1.12)
+            g = QLinearGradient(0, 0, w, 0)
+            g.setColorAt(0.0, QColor(255, 255, 255, 0))
+            g.setColorAt(0.18, QColor(255, 255, 255, 13))
+            g.setColorAt(0.82, QColor(255, 255, 255, 13))
+            g.setColorAt(1.0, QColor(255, 255, 255, 0))
+            p.save()
+            p.setClipPath(panel)
+            p.fillRect(band, g)
+            p.restore()
+        # reading-line markers: two slim accent ticks
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(T.aqua)
+        for x in (7.0, w - 9.5):
+            p.drawRoundedRect(QRectF(x, ry - lh * 0.22, 2.5, lh * 0.44), 1.25, 1.25)
 
         # script layer off-screen so the edges can fade smoothly
         dpr = self.devicePixelRatioF()
@@ -410,7 +434,11 @@ class Prompter(QWidget):
             tp.translate(w, 0)
             tp.scale(-1, 1)
         top0 = ry - lh / 2
-        spoken_upto = self.aligner.cursor + 1 if (self.cfg.voice_follow and self.aligner) else 0
+        spoken_upto = 0
+        if self.tts_follow and self.tts_word >= 0:
+            spoken_upto = self.tts_word + 1
+        elif self.cfg.voice_follow and self.aligner and not self.reading_aloud:
+            spoken_upto = self.aligner.cursor + 1
         first = max(0, int((self.pos - ry) / lh) - 1)
         last = min(len(self.lines), first + int(h / lh) + 4)
         base_off = (lh - self.fm.height()) / 2 + self.fm.ascent()
@@ -422,17 +450,14 @@ class Prompter(QWidget):
                 continue
             y = top0 + i * lh - self.pos
             d = abs(y + lh / 2 - ry) / lh
-            alpha = 1.0 if d < 0.5 else max(0.22, 1.0 - (d - 0.5) * 0.75)
-            col = QColor(T.cue if ln.kind in ("cue", "pause") else T.section if ln.kind == "section"
-                         else (T.muted if ln.kind == "end" else T.on_surface))
+            alpha = 1.0 if d < 0.5 else max(0.30, 1.0 - (d - 0.5) * 0.6)
+            if ln.kind in ("cue", "pause", "section", "end"):
+                self._paint_marker(tp, ln, w, y, lh, alpha, clear)
+                continue
+            col = QColor(T.on_surface)
             col.setAlphaF(alpha)
             tw = self.fm.horizontalAdvance(ln.text)
             x = (w - tw) / 2
-            if ln.kind == "pause":
-                pill = QRectF(x - 18, y + lh * 0.12, tw + 36, lh * 0.76)
-                tp.setPen(QPen(col, 2))
-                tp.setBrush(Qt.BrushStyle.NoBrush)
-                tp.drawRoundedRect(pill, pill.height() / 2, pill.height() / 2)
             parts = [(ln.text, col)]
             ends = self.vtokens.get(i)
             if spoken_upto and ends:
@@ -440,7 +465,7 @@ class Prompter(QWidget):
                 if n:
                     toks = ln.text.split(" ")
                     said = QColor(col)
-                    said.setAlphaF(alpha * 0.42)
+                    said.setAlphaF(alpha * 0.36)
                     head = " ".join(toks[:n])
                     parts = [(head + (" " if n < len(toks) else ""), said), (" ".join(toks[n:]), col)]
             px = x
@@ -472,9 +497,8 @@ class Prompter(QWidget):
         p.drawPixmap(0, 0, pm)
         if self.progress() > 0:
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(aurora_line(0, w, alpha=230))
-            p.drawRoundedRect(QRectF(rad * 0.6, h - 3.5, max(3.0, (w - rad * 1.2) * self.progress()), 2.5),
-                              1.25, 1.25)
+            p.setBrush(aurora_line(0, w, alpha=210))
+            p.drawRect(QRectF(0, h - 2, w * self.progress(), 2))
         p.restore()
 
         self.paint_chrome(p, w, h, clear)
@@ -484,79 +508,140 @@ class Prompter(QWidget):
             self.paint_help(p, w, h, panel)
         p.end()
 
-    def pill(self, p, x, y, text, color, clear):
-        p.setFont(self.badge_font)
-        tw = QFontMetricsF(self.badge_font).horizontalAdvance(text)
-        r = QRectF(x, y, tw + 26, 22)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(12, 14, 24, 220 if clear else 150))
-        p.drawRoundedRect(r, 11, 11)
-        p.setPen(QPen(QColor(255, 255, 255, 22), 1))
-        p.setBrush(Qt.BrushStyle.NoBrush)
+    def _paint_marker(self, tp, ln, w, y, lh, alpha, clear):
+        """Sections read as editorial headings; cues and [PAUSE] as small chips - never confused with lines
+        you're meant to say."""
+        if ln.kind == "section":
+            f = QFont(self.text_font)
+            f.setPixelSize(max(11, int(self.cfg.font_px * 0.40)))
+            f.setWeight(QFont.Weight.Bold)
+            f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, max(1.5, self.cfg.font_px * 0.06))
+            fm = QFontMetricsF(f)
+            tw = fm.horizontalAdvance(ln.text)
+            cy = y + lh / 2
+            col = QColor(T.violet).lighter(125)
+            col.setAlphaF(alpha)
+            tp.setFont(f)
+            tp.setPen(col)
+            tp.drawText(QRectF(0, y, w, lh), Qt.AlignmentFlag.AlignCenter, ln.text)
+            rule = QColor(col)
+            rule.setAlphaF(alpha * 0.35)
+            tp.setPen(QPen(rule, 1))
+            gap, span = 14.0, min(64.0, w * 0.08)
+            tp.drawLine(QPointF((w - tw) / 2 - gap - span, cy), QPointF((w - tw) / 2 - gap, cy))
+            tp.drawLine(QPointF((w + tw) / 2 + gap, cy), QPointF((w + tw) / 2 + gap + span, cy))
+            tp.setFont(self.text_font)
+            return
+        f = QFont(self.text_font)
+        f.setPixelSize(max(11, int(self.cfg.font_px * 0.38)))
+        f.setWeight(QFont.Weight.DemiBold)
+        f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, 1.2)
+        fm = QFontMetricsF(f)
+        label = ("PAUSE  " + chr(0x2016)) if ln.kind == "pause" else ln.text
+        col = QColor(T.muted if ln.kind == "end" else T.ember)
+        col.setAlphaF(alpha)
+        tw = fm.horizontalAdvance(label)
+        chip = QRectF((w - tw) / 2 - 12, y + lh / 2 - fm.height() / 2 - 5, tw + 24, fm.height() + 10)
+        if ln.kind != "end":
+            bg = QColor(col)
+            bg.setAlphaF(alpha * 0.14)
+            tp.setPen(Qt.PenStyle.NoPen)
+            tp.setBrush(bg)
+            tp.drawRoundedRect(chip, chip.height() / 2, chip.height() / 2)
+        tp.setFont(f)
+        tp.setPen(col)
+        tp.drawText(chip, Qt.AlignmentFlag.AlignCenter, label)
+        tp.setFont(self.text_font)
+
+    def status_chip(self, p, x, y, segments, clear):
+        """One quiet capsule holding every live state: [(dot_color|None, text, text_color), ...].
+        Segments are separated by hairlines - one element instead of a row of competing badges."""
+        fm = QFontMetricsF(self.badge_font)
+        pad, gap = 10.0, 9.0
+        widths = []
+        for dot, text, _ in segments:
+            tw = 21.0 if text == "<level>" else fm.horizontalAdvance(text)
+            widths.append(tw + (11 if dot is not None else 0))
+        total = sum(widths) + gap * 2 * (len(segments) - 1) + pad * 2
+        r = QRectF(x, y, total, 22)
+        p.setPen(QPen(QColor(255, 255, 255, 20), 1))
+        p.setBrush(QColor(8, 10, 18, 215 if clear else 120))
         p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 10.5, 10.5)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(color)
-        p.drawEllipse(QPointF(r.x() + 11, r.center().y()), 3.5, 3.5)
-        p.setPen(color)
-        p.drawText(QRectF(r.x() + 19, r.y(), tw + 2, r.height()), Qt.AlignmentFlag.AlignVCenter, text)
+        p.setFont(self.badge_font)
+        cx = r.x() + pad
+        for i, ((dot, text, col), wd) in enumerate(zip(segments, widths)):
+            if i:
+                p.setPen(QPen(QColor(255, 255, 255, 26), 1))
+                p.drawLine(QPointF(cx - gap, r.y() + 6), QPointF(cx - gap, r.bottom() - 6))
+            tx = cx
+            if dot is not None:
+                p.setPen(Qt.PenStyle.NoPen)
+                p.setBrush(dot)
+                p.drawEllipse(QPointF(cx + 3, r.center().y()), 3, 3)
+                tx += 11
+            if text == "<level>":
+                for k in range(5):
+                    on = self.mic_level * 5 > k + 0.3
+                    bh = 3 + k * 1.8
+                    p.setPen(Qt.PenStyle.NoPen)
+                    p.setBrush(T.aqua if on else QColor(255, 255, 255, 40))
+                    p.drawRoundedRect(QRectF(tx + k * 4.5, r.center().y() + 5 - bh, 2.5, bh), 1.2, 1.2)
+            else:
+                p.setPen(col)
+                p.drawText(QRectF(tx, r.y(), wd, r.height()), Qt.AlignmentFlag.AlignVCenter, text)
+            cx += wd + gap * 2
         return r.right()
 
     def paint_chrome(self, p, w, h, clear):
-        by = h - 30
+        by = h - 32
+        on, mute = T.on_surface, T.muted
         if not self.cfg.hide_from_capture:
-            right = self.pill(p, 12, by, "VISIBLE in screen share  (C)", T.bad, clear)
+            segs = [(T.bad, "Visible to viewers", on)]
         elif self.cap_state and self.cap_level == "full":
-            right = self.pill(p, 12, by, "Hidden from screen share", T.ok, clear)
+            segs = [(T.ok, "Private", on)]
         elif self.cap_state and self.cap_level == "partial":
-            right = self.pill(p, 12, by, "Share a window, not your screen", T.warn, clear)
+            segs = [(T.warn, "Share a window, not your screen", on)]
         else:
-            right = self.pill(p, 12, by, "VISIBLE " + DASH + " this system can't hide it", T.bad, clear)
-        if self.remote_connected:
-            right = self.pill(p, right + 6, by, "Phone connected", T.accent, clear)
-        if self.ghost:
-            right = self.pill(p, right + 6, by, "Ghost mode  " + DOT + "  " + native.MOD + "+G", T.muted, clear)
-        if self.cfg.voice_follow:
+            segs = [(T.bad, "Visible " + DASH + " can't hide here", on)]
+        if self.cfg.voice_follow and (self.listening or self.voice_loading):
             if self.voice_loading:
-                right = self.pill(p, right + 6, by, "Loading voice" + ELLIPSIS, T.accent, clear)
-            elif self.listening:
-                right = self.pill(p, right + 6, by, "Listening", T.accent, clear)
-                # live microphone level: five bars
-                for k in range(5):
-                    on = self.mic_level * 5 > k + 0.3
-                    bh = 4 + k * 2.2
-                    c = QColor(T.accent if on else T.outline)
-                    p.setPen(Qt.PenStyle.NoPen)
-                    p.setBrush(c)
-                    p.drawRoundedRect(QRectF(right + 8 + k * 5, by + 17 - bh, 3, bh), 1.5, 1.5)
-                right += 34
+                segs.append((None, "Starting mic" + ELLIPSIS, mute))
+            else:
+                segs.append((T.aqua, "Listening", on))
+                segs.append((None, "<level>", on))
                 pace = coachlib.pace_label(self.live_wpm)
                 if pace:
-                    col = {"good": T.ok, "fast": T.bad, "slow": T.accent}[pace]
-                    right = self.pill(p, right + 4, by, {"good": "Pace good", "fast": "Slow down",
-                                                         "slow": "Pick it up"}[pace], col, clear)
-                if self.coach and self.coach.fillers:
-                    right = self.pill(p, right + 6, by, "%d filler%s" % (sum(self.coach.fillers.values()),
-                                      "" if sum(self.coach.fillers.values()) == 1 else "s"), T.muted, clear)
+                    segs.append((None, {"good": "Good pace", "fast": "Slow down", "slow": "Pick it up"}[pace],
+                                 {"good": T.ok, "fast": T.bad, "slow": T.warn}[pace]))
+                n = sum(self.coach.fillers.values()) if self.coach else 0
+                if n:
+                    segs.append((None, "%d filler%s" % (n, "" if n == 1 else "s"), mute))
         if self.reading_aloud:
-            right = self.pill(p, right + 6, by, "Reading aloud", T.accent, clear)
+            segs.append((T.violet, "Preparing voice" + ELLIPSIS if self.tts_preparing else "Reading aloud", on))
+        if self.ghost:
+            segs.append((None, "Ghost  " + native.MOD + "+G", mute))
+        if self.remote_connected:
+            segs.append((T.aqua, "Phone", on))
+        right = self.status_chip(p, 12, by, segs, clear)
+
         p.setFont(self.cap_font)
-        if not self.playing and not self.counting and not self.listening:
-            p.setPen(T.muted)
-            left = "Space to start listening" if self.cfg.voice_follow else "F1 shortcuts"
+        if not (self.playing or self.counting or self.listening or self.reading_aloud):
+            p.setPen(mute)
+            hint = "Press Space and start talking" if self.cfg.voice_follow else "Space to start  " + DOT + "  F1 shortcuts"
             if self.pending:
-                left = "New script from %s waiting  %s  press Space to load" % (self.pending[3], DOT)
-                p.setPen(T.accent)
-            room = w * 0.62 - right - 12
-            if QFontMetricsF(self.cap_font).horizontalAdvance(left) <= room:      # never cut words in half
-                p.drawText(QRectF(right + 12, by, room, 22), Qt.AlignmentFlag.AlignVCenter, left)
-        p.setPen(T.muted)
-        right_txt = "%s left" % engine.fmt_secs(self.time_left())
+                hint = "New script from %s  %s  Space to load" % (self.pending[3], DOT)
+                p.setPen(T.aqua)
+            room = w * 0.66 - right - 14
+            if QFontMetricsF(self.cap_font).horizontalAdvance(hint) <= room:      # never cut words in half
+                p.drawText(QRectF(right + 14, by, room, 22), Qt.AlignmentFlag.AlignVCenter, hint)
+        meta = ["%s left" % engine.fmt_secs(self.time_left())]
         if self.cfg.voice_follow and self.live_wpm:
-            right_txt = "You: %d wpm  %s  %s" % (self.live_wpm, DOT, right_txt)
+            meta.insert(0, "%d wpm" % self.live_wpm)
         if self.listening and self.voice_latency:
-            right_txt = "%d ms  %s  %s" % (self.voice_latency, DOT, right_txt)
-        p.drawText(QRectF(w * 0.4, by, w * 0.6 - 16, 22),
-                   Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, right_txt)
+            meta.insert(0, "%d ms" % self.voice_latency)
+        p.setPen(mute)
+        p.drawText(QRectF(w * 0.4, by, w * 0.6 - 16, 22), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+                   ("  %s  " % DOT).join(meta))
 
         el = self.now() - self.toast_t0
         if self.toast_msg and el < self.toast_dur + 0.3:
@@ -570,18 +655,18 @@ class Prompter(QWidget):
                 a = max(0.0, 1 - (el - self.toast_dur) / 0.3)
             p.setFont(self.toast_font)
             tw = QFontMetricsF(self.toast_font).horizontalAdvance(self.toast_msg)
-            tw = min(tw, w - 60)
-            r = QRectF((w - tw) / 2 - 14, h - 64 + (1 - a) * 6, tw + 28, 30)
+            tw = min(tw, w - 80)
+            r = QRectF((w - tw) / 2 - 24, h - 70 + (1 - a) * 6, tw + 42, 30)
             p.setOpacity(a)
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor(14, 16, 28, 245))
-            p.drawRoundedRect(r, 15, 15)
-            p.setPen(QPen(aurora_line(r.left(), r.right(), alpha=120), 1))
-            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.setPen(QPen(QColor(255, 255, 255, 26), 1))
+            p.setBrush(QColor(18, 20, 32, 240))
             p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 14.5, 14.5)
-            p.setPen(self.toast_color)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(self.toast_color if self.toast_color != T.on_surface else T.aqua)
+            p.drawEllipse(QPointF(r.x() + 15, r.center().y()), 3, 3)
+            p.setPen(T.on_surface)
             elided = QFontMetricsF(self.toast_font).elidedText(self.toast_msg, Qt.TextElideMode.ElideRight, tw)
-            p.drawText(r, Qt.AlignmentFlag.AlignCenter, elided)
+            p.drawText(QRectF(r.x() + 26, r.y(), tw + 4, r.height()), Qt.AlignmentFlag.AlignVCenter, elided)
             p.setOpacity(1.0)
 
     def paint_countdown(self, p, w, h, panel):
@@ -598,11 +683,11 @@ class Prompter(QWidget):
         alpha = 1.0 if rm else min(1.0, (1 - f) * 1.8 + 0.15)
         p.save()
         p.translate(w / 2, h / 2)
-        ring = min(h * 0.62, 132.0)
-        p.setPen(QPen(QColor(255, 255, 255, 26), 4))
+        ring = min(h * 0.56, 120.0)
+        p.setPen(QPen(QColor(255, 255, 255, 22), 3))
         p.setBrush(Qt.BrushStyle.NoBrush)
         p.drawEllipse(QRectF(-ring / 2, -ring / 2, ring, ring))
-        p.setPen(QPen(aurora_line(-ring / 2, ring / 2), 4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.setPen(QPen(T.aqua, 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         p.drawArc(QRectF(-ring / 2, -ring / 2, ring, ring), 90 * 16, int(-360 * 16 * (1 - f)))
         p.scale(scale, scale)
         p.setOpacity(alpha)
@@ -611,38 +696,55 @@ class Prompter(QWidget):
         p.drawText(QRectF(-100, -70, 200, 140), Qt.AlignmentFlag.AlignCenter, str(n))
         p.restore()
 
+    def _keycaps(self, p, x, cy, combo, font_):
+        """Draw 'Ctrl+Alt+Space' as keycaps; returns the right edge."""
+        fm = QFontMetricsF(font_)
+        p.setFont(font_)
+        keys = ["+"] if combo == "+" else combo.split("+")
+        for i, key in enumerate(keys):
+            if i:
+                p.setPen(T.muted)
+                p.drawText(QRectF(x, cy - 10, 10, 20), Qt.AlignmentFlag.AlignCenter, "+")
+                x += 10
+            kw = max(20.0, fm.horizontalAdvance(key) + 12)
+            r = QRectF(x, cy - 10, kw, 20)
+            p.setPen(QPen(QColor(255, 255, 255, 34), 1))
+            p.setBrush(QColor(255, 255, 255, 14))
+            p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 5, 5)
+            p.setPen(T.on_surface)
+            p.drawText(r, Qt.AlignmentFlag.AlignCenter, key)
+            x += kw
+        return x
+
     def paint_help(self, p, w, h, panel):
         p.fillPath(panel, QColor(T.surface))
         m = native.MOD
         cols = [
-            ("From any app", [(m + "+Space", "Play / pause"), (m + "+Up / Down", "Faster / slower"),
-                              (m + "+Left / Right", "Back / ahead"), (m + "+R", "Restart"),
-                              ("%s+V  %s  G" % (m, DOT), "Voice Follow  %s  ghost" % DOT),
-                              (m + "+PgUp / PgDn", "Previous / next section")]),
-            ("On the prompter", [("Space  %s  Up / Down" % DOT, "Play  %s  speed" % DOT),
-                                 ("+ / -   %s  [ / ]" % DOT, "Text size  %s  glass" % DOT),
-                                 ("E  %s  %s+O  %s  %s+V" % (DOT, native.CMD, DOT, native.CMD), "Scripts  %s  open  %s  paste" % (DOT, DOT)),
-                                 ("P  %s  %s+," % (DOT, native.CMD), "Phone  %s  settings" % DOT),
-                                 ("T  %s  C  %s  L" % (DOT, DOT), "Text only  %s  share hiding  %s  read aloud" % (DOT, DOT)),
-                                 ("V  %s  M  %s  PgUp/PgDn" % (DOT, DOT), "Voice  %s  mirror  %s  sections" % (DOT, DOT))]),
+            ("Anywhere", [(m + "+Space", "Play / pause"), (m + "+Up", "Faster"), (m + "+Down", "Slower"),
+                          (m + "+V", "Voice Follow"), (m + "+H", "Show / hide"), (m + "+G", "Ghost mode")]),
+            ("On the prompter", [("Space", "Play / pause"), ("L", "Read aloud"), ("E", "Scripts"),
+                                 ("+", "Bigger text"), ("PgDn", "Next section"), ("C", "Share privacy")]),
         ]
-        colw = (w - 48) / 2
-        for ci, (title, rows) in enumerate(cols):
-            x = 24 + ci * colw
+        colw = (w - 64) / 2
+        kf = font("ui", 11, QFont.Weight.DemiBold)
+        rows = max(len(r) for _, r in cols)
+        rh = min(26.0, (h - 74) / rows)
+        for ci, (title, items) in enumerate(cols):
+            x = 32 + ci * (colw + 0)
             p.setFont(self.badge_font)
-            p.setPen(T.accent)
-            p.drawText(QRectF(x, 16, colw, 20), Qt.AlignmentFlag.AlignVCenter, title.upper())
-            p.setFont(self.help_font)
-            for ri, (keys, what) in enumerate(rows):
-                y = 42 + ri * 22
+            p.setPen(T.muted)
+            p.drawText(QRectF(x, 16, colw, 18), Qt.AlignmentFlag.AlignVCenter, title.upper())
+            for ri, (keys, what) in enumerate(items):
+                cy = 46 + ri * rh + rh / 2 - 6
+                self._keycaps(p, x, cy, keys, kf)
+                p.setFont(self.help_font)
                 p.setPen(T.on_surface)
-                p.drawText(QRectF(x, y, colw * 0.44, 20), Qt.AlignmentFlag.AlignVCenter, keys)
-                p.setPen(T.muted)
-                p.drawText(QRectF(x + colw * 0.44, y, colw * 0.56 - 8, 20), Qt.AlignmentFlag.AlignVCenter, what)
+                p.drawText(QRectF(x + colw * 0.48, cy - 10, colw * 0.52 - 12, 20), Qt.AlignmentFlag.AlignVCenter,
+                           what)
         p.setFont(self.cap_font)
         p.setPen(T.muted)
-        p.drawText(QRectF(24, h - 28, w - 48, 20), Qt.AlignmentFlag.AlignVCenter,
-                   "In your script: # Heading = section  %s  [PAUSE] stops  %s  [CUE] shows in orange  %s  Esc closes"
+        p.drawText(QRectF(32, h - 30, w - 64, 20), Qt.AlignmentFlag.AlignVCenter,
+                   "In a script:  # Heading = section   %s   [PAUSE] stops   %s   [Smile] = cue   %s   Esc to close"
                    % (DOT, DOT, DOT))
 
     # ------------------------------------------------------------ feedback
@@ -652,19 +754,26 @@ class Prompter(QWidget):
         self.kick()
 
     def sync_ui(self):
-        running = (self.playing or self.counting) if not (self.cfg.voice_follow and not self.reading_aloud) \
-            else self.listening
+        if self.reading_aloud:
+            running = True
+        elif self.cfg.voice_follow:
+            running = self.listening
+        else:
+            running = self.playing or self.counting
         if running != getattr(self, "_shown_running", None):
             self._shown_running = running
-            self.bar.play.setIcon(icons.icon("pause" if running else "play", "#070910", 20))
-        self.bar.wpm.setText("Voice" if self.cfg.voice_follow else "%d wpm" % self.cfg.wpm)
+            self.bar.play.setIcon(icons.icon("pause" if running else "play", "#0A0C14", 18))
+        if self.cfg.voice_follow:
+            self.bar.set_wpm("Voice", "follow")
+        else:
+            self.bar.set_wpm(str(self.cfg.wpm), "wpm")
         self.bar.speak.setProperty("on", self.reading_aloud)
         self.bar.speak.style().unpolish(self.bar.speak)
         self.bar.speak.style().polish(self.bar.speak)
         self.bar.voice.setProperty("on", self.cfg.voice_follow)
         self.bar.voice.style().unpolish(self.bar.voice)
         self.bar.voice.style().polish(self.bar.voice)
-        active = self.playing or self.counting or self.listening
+        active = self.playing or self.counting or self.listening or self.reading_aloud
         show = (self.hovered or not active) and not self.show_help and not self.ghost
         self.bar.fade(show, instant=self.cfg.reduce_motion)
         if self.playing or self.counting:
@@ -771,14 +880,43 @@ class Prompter(QWidget):
             self.stop_listening(summary=False)
         self.reading_aloud = True
         self.counting = False
-        self.playing = True                                     # scroll along with the voice
+        self.tts_word, self.tts_follow, self.tts_preparing = -1, False, True
+        self.playing = True                                     # system voice: scroll at wpm
         self.last = self.now()
         self.readAloudRequested.emit(True)
-        self.toast("Reading aloud at %d wpm  %s  L to stop" % (self.cfg.wpm, DOT), T.accent, 3)
         self.sync_ui()
+
+    def read_start_word(self):
+        """First word on the line at the reading band, so Read Aloud starts where you are."""
+        if self.pos <= 0.5 or not self.vline:
+            return 0
+        cur = engine.line_index(self.pos, self.lh)
+        return next((k for k, ln in enumerate(self.vline) if ln >= cur), 0)
+
+    def set_tts_follow(self, natural):
+        """Natural voice: the band follows the spoken word instead of a fixed wpm."""
+        self.tts_follow = bool(natural)
+        if natural:
+            self.playing = False
+            self.v_target, self.v_vel = self.pos, 0.0
+        self.kick()
+
+    def on_tts_progress(self, word):
+        if not self.reading_aloud:
+            return
+        self.tts_preparing = False
+        self.tts_word = word
+        if self.vline:
+            self.v_target = min(self.maxpos(), engine.voice_target(self.vline, word) * self.lh)
+        self.kick()
+
+    def on_tts_status(self, status):
+        self.tts_preparing = status == "preparing"
+        self.update()
 
     def stop_read_aloud(self):
         self.reading_aloud = False
+        self.tts_follow = False
         self.playing = False
         self.readAloudRequested.emit(False)
         self.sync_ui()
@@ -786,8 +924,9 @@ class Prompter(QWidget):
     def on_read_aloud_done(self):
         if self.reading_aloud:
             self.reading_aloud = False
+            self.tts_follow = False
             self.playing = False
-            self.toast("Finished reading aloud", T.ok)
+            self.toast("Finished reading", T.ok)
             self.sync_ui()
 
     def on_voice_status(self, status):

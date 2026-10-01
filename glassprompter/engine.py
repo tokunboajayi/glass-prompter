@@ -181,3 +181,45 @@ def find_pause(lines, old_pos, new_pos, line_height):
 def fmt_secs(s):
     s = max(0, int(round(s)))
     return "%d:%02d" % (s // 60, s % 60)
+
+
+_SENTENCE_END = re.compile(r"(?<=[.!?…])[\"')\]”’]*\s+")
+
+
+def speech_plan(lines):
+    """Turn wrapped prompter lines into what Read Aloud says, in order.
+
+    Returns a list of ("say", text, first_word, word_weights) and ("rest", seconds) items. first_word is the
+    index into word_map()'s word list, so playback can light up the exact word being spoken; weights are
+    per-word relative durations (longer words take longer to say).
+    """
+    from .tracking import norm_words
+    plan, para, wi = [], [], 0
+
+    def flush():
+        nonlocal wi
+        if not para:
+            return
+        for sentence in _SENTENCE_END.split(" ".join(para)):
+            sentence = sentence.strip()
+            words = norm_words(sentence)
+            if not words:
+                continue
+            plan.append(("say", sentence, wi, [len(w) + 2 for w in words]))
+            wi += len(words)
+        para.clear()
+        plan.append(("rest", 0.35))
+
+    for ln in lines:
+        if ln.kind == "text":
+            para.append(ln.text)
+            continue
+        flush()
+        if ln.kind == "pause":
+            plan.append(("rest", 1.2))
+        elif ln.kind == "section":
+            plan.append(("rest", 0.6))
+    flush()
+    while plan and plan[-1][0] == "rest":
+        plan.pop()
+    return plan

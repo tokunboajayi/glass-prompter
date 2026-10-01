@@ -42,7 +42,7 @@ class BaseDialog(GlassDialog):
     """Frosted glass, top-most dialog that is also hidden from screen sharing (scripts and PINs stay private)."""
 
     def __init__(self, parent, title, resizable=False):
-        super().__init__(parent, resizable=resizable, title="%s  %s  %s" % (APP_NAME, DOT, title))
+        super().__init__(parent, resizable=resizable, title=title)
         self.setWindowTitle("%s %s %s" % (APP_NAME, DASH, title))
 
     def confirm(self, title, text, ok_text):
@@ -74,7 +74,6 @@ class LibraryDialog(BaseDialog):
         # left: list
         left = QVBoxLayout()
         left.setSpacing(10)
-        left.addWidget(label("Scripts", "title"))
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search" + ELLIPSIS)
         self.search.setClearButtonEnabled(True)
@@ -290,131 +289,185 @@ def _ago(ts):
 
 
 # ====================================================================== settings
+class Card(QFrame):
+    """Grouped settings surface: rows separated by hairlines (System-Settings style)."""
+
+    def __init__(self, title=None):
+        super().__init__()
+        self.setProperty("role", "card")
+        self.lay = QVBoxLayout(self)
+        self.lay.setContentsMargins(14, 4, 14, 4)
+        self.lay.setSpacing(0)
+        self.title = title
+        self._rows = 0
+
+    def _add(self, w):
+        if self._rows:
+            line = QFrame()
+            line.setProperty("role", "hairline")
+            self.lay.addWidget(line)
+        self.lay.addWidget(w)
+        self._rows += 1
+
+    def row(self, title, control=None, hint=None):
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 9, 0, 9)
+        h.setSpacing(12)
+        txt = QVBoxLayout()
+        txt.setSpacing(2)
+        txt.addWidget(label(title, "rowtitle"))
+        hint_lbl = None
+        if hint:
+            hint_lbl = label(hint, "muted", True)
+            txt.addWidget(hint_lbl)
+        h.addLayout(txt, 1)
+        if control is not None:
+            h.addWidget(control, 0, Qt.AlignmentFlag.AlignVCenter)
+        self._add(w)
+        return hint_lbl
+
+    def slider(self, title, lo, hi, val, fmt, apply):
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 7, 0, 7)
+        h.setSpacing(12)
+        name = label(title, "rowtitle")
+        name.setFixedWidth(92)
+        h.addWidget(name)
+        sl = QSlider(Qt.Orientation.Horizontal)
+        sl.setRange(lo, hi)
+        sl.setValue(val)
+        sl.setAccessibleName(title)
+        val_lbl = label(fmt(val), "value")
+        val_lbl.setFixedWidth(64)
+        val_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+
+        def changed(v):
+            val_lbl.setText(fmt(v))
+            apply(v)
+        sl.valueChanged.connect(changed)
+        h.addWidget(sl, 1)
+        h.addWidget(val_lbl)
+        self._add(w)
+        return sl
+
+
+def _section(lay, card, name):
+    head = label(name.upper(), "section")
+    head.setContentsMargins(4, 0, 0, 0)
+    lay.addWidget(head)
+    lay.addSpacing(-2)
+    lay.addWidget(card)
+    lay.addSpacing(14)
+
+
+def switch(val, apply):
+    sw = Switch()
+    sw.setChecked(val)
+    sw.toggled.connect(apply)
+    return sw
+
+
 class SettingsDialog(BaseDialog):
     def __init__(self, parent, controller):
         super().__init__(parent, "Settings")
         self.c = controller
         s = controller.cfg.s
-        self.setFixedWidth(820)
+        self.setFixedWidth(860)
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(28, 24, 28, 24)
-        outer.setSpacing(14)
-        outer.addWidget(label("Settings", "title"))
+        outer.setContentsMargins(24, 20, 24, 20)
+        outer.setSpacing(0)
         cols = QHBoxLayout()
-        cols.setSpacing(36)
+        cols.setSpacing(20)
         left, right = QVBoxLayout(), QVBoxLayout()
-        left.setSpacing(10)
-        right.setSpacing(10)
+        left.setSpacing(6)
+        right.setSpacing(6)
         cols.addLayout(left, 1)
         cols.addLayout(right, 1)
         outer.addLayout(cols)
 
-        def section(lay, name, first=False):
-            if not first:
-                lay.addSpacing(8)
-            lay.addWidget(label(name.upper(), "section"))
+        # ---- left: reading, voice, read aloud
+        card = Card()
+        card.slider("Speed", 40, 400, s.wpm, lambda v: "%d wpm" % v, lambda v: self._set("wpm", v))
+        card.row("3-2-1 countdown", switch(s.countdown, lambda v: self._set("countdown", v)))
+        _section(left, card, "Reading")
 
-        def slider_row(lay, text, lo, hi, val, fmt, apply):
-            row = QHBoxLayout()
-            name = label(text)
-            name.setFixedWidth(96)
-            row.addWidget(name)
-            sl = QSlider(Qt.Orientation.Horizontal)
-            sl.setRange(lo, hi)
-            sl.setValue(val)
-            sl.setAccessibleName(text)
-            val_lbl = label(fmt(val), "muted")
-            val_lbl.setFixedWidth(68)
-
-            def changed(v):
-                val_lbl.setText(fmt(v))
-                apply(v)
-            sl.valueChanged.connect(changed)
-            row.addWidget(sl, 1)
-            row.addWidget(val_lbl)
-            lay.addLayout(row)
-            return sl
-
-        def check(lay, text, val, apply, hint=None):
-            cb = Switch(text)
-            cb.setChecked(val)
-            cb.toggled.connect(apply)
-            lay.addWidget(cb)
-            if hint:
-                h = label(hint, "muted", True)
-                h.setContentsMargins(54, 0, 0, 2)
-                lay.addWidget(h)
-            return cb
-
-        section(left, "Reading", first=True)
-        slider_row(left, "Speed", 40, 400, s.wpm, lambda v: "%d wpm" % v, lambda v: self._set("wpm", v))
-        check(left, "3-2-1 countdown before scrolling", s.countdown, lambda v: self._set("countdown", v))
-        section(left, "Voice")
-        check(left, "Voice Follow: scroll as I speak", s.voice_follow,
-              lambda v: v != s.voice_follow and controller.prompter.toggle_voice(),
-              "Follows your words, not a timer. Runs 100% offline " + DASH + " no audio leaves this computer.")
-        check(left, "Rehearsal Coach report after Voice Follow", s.coach, lambda v: self._set("coach", v))
-        mrow = QHBoxLayout()
-        name = label("Microphone")
-        name.setFixedWidth(96)
-        mrow.addWidget(name)
+        card = Card()
+        card.row("Voice Follow", switch(s.voice_follow, lambda v: v != s.voice_follow and controller.prompter.toggle_voice()),
+                 "Scrolls with your words. 100% offline.")
+        card.row("Coach report after each run", switch(s.coach, lambda v: self._set("coach", v)))
         self.mic = QComboBox()
         self.mic.setAccessibleName("Microphone")
+        self.mic.setMinimumWidth(190)
+        self.mic.setMaximumWidth(220)
         self.mic.addItem("System default", "")
         from ..voice import list_microphones
         for m in list_microphones():
             self.mic.addItem(m, m)
         i = self.mic.findData(s.mic_device)
         if i < 0 and s.mic_device:
-            self.mic.addItem(s.mic_device + "  (not connected)", s.mic_device)
+            self.mic.addItem(s.mic_device + " (unplugged)", s.mic_device)
             i = self.mic.count() - 1
         self.mic.setCurrentIndex(max(0, i))
         self.mic.currentIndexChanged.connect(lambda _: self._set("mic_device", self.mic.currentData() or ""))
-        mrow.addWidget(self.mic, 1)
-        left.addLayout(mrow)
         lat = controller.voice.latency_ms
-        left.addWidget(label(("Last measured voice latency: %d ms" % lat) if lat else
-                             "Tip: a wired or built-in mic reacts faster than Bluetooth.", "muted", True))
-        section(left, "Look")
-        slider_row(left, "Text size", 14, 96, s.font_px, lambda v: "%d px" % v, lambda v: self._set("font_px", v))
-        slider_row(left, "Glass", 20, 100, int(s.panel_alpha * 100), lambda v: "%d%%" % v,
-                   lambda v: self._set("panel_alpha", v / 100))
-        slider_row(left, "Reading line", 20, 70, int(s.read_line * 100), lambda v: "%d%% down" % v,
-                   lambda v: self._set("read_line", v / 100))
-        check(left, "Text only (no glass panel)", s.clear_mode, lambda v: self._set("clear_mode", v))
-        check(left, "Reduce motion", s.reduce_motion, lambda v: self._set("reduce_motion", v))
-        check(left, "Mirror text (for teleprompter glass)", s.mirror, lambda v: self._set("mirror", v))
-        row = QHBoxLayout()
-        row.addWidget(button("Move back under the camera", controller.prompter.reset_position))
-        row.addStretch(1)
-        left.addLayout(row)
+        card.row("Microphone", self.mic, ("Measured latency %d ms" % lat) if lat else
+                 "Wired or built-in mics react fastest.")
+        _section(left, card, "Voice Follow")
+
+        from .. import tts
+        card = Card()
+        self.voice_box = QComboBox()
+        self.voice_box.setAccessibleName("Read aloud voice")
+        self.voice_box.setMinimumWidth(220)
+        self.voice_box.setMaximumWidth(250)
+        for vid, (name, _, _, _) in tts.VOICES.items():
+            have = tts.voice_file(vid) is not None
+            self.voice_box.addItem(name if have else name + "  (download)", vid)
+        self.voice_box.addItem("System voice", tts.SYSTEM)
+        i = self.voice_box.findData(s.tts_voice)
+        self.voice_box.setCurrentIndex(max(0, i))
+        self.voice_box.currentIndexChanged.connect(self._voice_changed)
+        self.voice_hint = card.row("Voice", self.voice_box, "Natural neural voices, offline. Pace follows your speed.")
+        self.preview = button("Play sample", self._preview)
+        self.preview.setProperty("compact", True)
+        card.row("Hear it", self.preview)
+        _section(left, card, "Read aloud")
+        level, note = native.capture_support()
+        card = Card()
+        card.row("Hide from screen share", switch(s.hide_from_capture, lambda v: self._set("hide_from_capture", v)),
+                 note)
+        card.row("Phone remote on this Wi-Fi", switch(s.remote_enabled, self._remote), "Protected by a PIN.")
+        _section(left, card, "Privacy")
         left.addStretch(1)
 
-        section(right, "Privacy", first=True)
-        level, note = native.capture_support()
-        check(right, "Hide from screen sharing and recordings", s.hide_from_capture,
-              lambda v: self._set("hide_from_capture", v), note)
-        if level != "full":
-            right.addWidget(label("Glass Prompter tells you the truth here: the badge on the prompter shows what "
-                                  "viewers can actually see.", "warn", True))
-        check(right, "Phone remote on this Wi-Fi", s.remote_enabled, self._remote,
-              "A phone on the same network can send scripts and control playback, protected by a PIN.")
-        section(right, "System")
-        check(right, "Start at login (in the %s)" % native.TRAY.split(" (")[0], native.is_autostart(),
-              self._autostart)
-        right.addWidget(label("Drop folder", None))
-        drop = label(s.drop_dir, "muted", True)
-        drop.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        right.addWidget(drop)
-        right.addWidget(label("Save a .txt, .md or .docx here (from any device via OneDrive or iCloud Drive) and "
-                              "it's added to your library and loaded automatically.", "muted", True))
-        row = QHBoxLayout()
-        row.addWidget(button("Open drop folder", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(s.drop_dir))))
-        row.addWidget(button("Open backups", lambda: QDesktopServices.openUrl(
-            QUrl.fromLocalFile(paths.backup_dir()))))
-        row.addStretch(1)
-        right.addLayout(row)
-        right.addWidget(label("Your library is backed up automatically every day (last 7 kept).", "muted", True))
+        # ---- right: appearance, privacy, system
+        card = Card()
+        card.slider("Text size", 14, 96, s.font_px, lambda v: "%d px" % v, lambda v: self._set("font_px", v))
+        card.slider("Glass", 20, 100, int(s.panel_alpha * 100), lambda v: "%d%%" % v,
+                    lambda v: self._set("panel_alpha", v / 100))
+        card.slider("Reading line", 20, 70, int(s.read_line * 100), lambda v: "%d%%" % v,
+                    lambda v: self._set("read_line", v / 100))
+        card.row("Text only, no panel", switch(s.clear_mode, lambda v: self._set("clear_mode", v)))
+        card.row("Mirror for teleprompter glass", switch(s.mirror, lambda v: self._set("mirror", v)))
+        card.row("Reduce motion", switch(s.reduce_motion, lambda v: self._set("reduce_motion", v)))
+        _section(right, card, "Appearance")
+
+
+        card = Card()
+        card.row("Start at login", switch(native.is_autostart(), self._autostart),
+                 "Waits quietly in the %s." % native.TRAY.split(" (")[0])
+        b = button("Open", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(s.drop_dir)))
+        b.setProperty("compact", True)
+        card.row("Drop folder", b, "Drop a .txt, .md or .docx here to load it.")
+        b = button("Open", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(paths.backup_dir())))
+        b.setProperty("compact", True)
+        card.row("Backups", b, "Your library is saved every day. Last 7 kept.")
+        b = button("Move", controller.prompter.reset_position)
+        b.setProperty("compact", True)
+        card.row("Prompter position", b, "Put it back under the camera.")
+        _section(right, card, "System")
         hk = controller.hotkey_report() if hasattr(controller, "hotkey_report") else ""
         if hk:
             right.addWidget(label(hk, "muted", True))
@@ -424,6 +477,7 @@ class SettingsDialog(BaseDialog):
         foot.addStretch(1)
         foot.addWidget(button("Done", self.accept, primary=True))
         outer.addLayout(foot)
+        self._dl = None
 
     def _set(self, key, value):
         setattr(self.c.cfg.s, key, value)
@@ -437,6 +491,62 @@ class SettingsDialog(BaseDialog):
         self.c.cfg.s.start_with_windows = on
         native.set_autostart(on)
         self.c.settings_changed()
+
+    # ---- natural voices
+    def _voice_changed(self, _):
+        from .. import tts
+        vid = self.voice_box.currentData()
+        if vid != tts.SYSTEM and tts.voice_file(vid) is None:
+            return self._download(vid)
+        self._set("tts_voice", vid)
+        self.c.speaker.preload(vid)
+
+    def _download(self, vid):
+        import threading
+        from .. import tts
+        if self._dl:
+            return
+        state = {"p": 0.0, "done": False, "err": None}
+
+        def run():
+            try:
+                tts.download_voice(vid, lambda f: state.__setitem__("p", f))
+            except Exception as ex:
+                state["err"] = str(ex)
+            state["done"] = True
+
+        self._dl = threading.Thread(target=run, daemon=True)
+        self._dl.start()
+        self.voice_box.setEnabled(False)
+
+        def poll():
+            if not state["done"]:
+                self.voice_hint.setText("Downloading %s  %d%%" % (tts.VOICES[vid][0].split(" ")[0],
+                                                                  int(state["p"] * 100)))
+                return
+            timer.stop()
+            self._dl = None
+            self.voice_box.setEnabled(True)
+            if state["err"]:
+                self.voice_hint.setText("Download failed: %s" % state["err"][:80])
+                return
+            i = self.voice_box.findData(vid)
+            self.voice_box.setItemText(i, tts.VOICES[vid][0])
+            self.voice_hint.setText("Ready. Natural neural voice, offline.")
+            self._set("tts_voice", vid)
+            self.c.speaker.preload(vid)
+
+        timer = QTimer(self, interval=150, timeout=poll)
+        timer.start()
+
+    def _preview(self):
+        from .. import engine
+        sample = ("Hi, I'm your Glass Prompter voice. I read at your pace, and the prompter follows every word.")
+        lines = engine.wrap(sample, 10000, len)
+        if self.c.speaker.speaking:
+            self.c.speaker.stop()
+            return
+        self.c.speaker.speak(lines, self.c.cfg.s.wpm, self.c.cfg.s.tts_voice)
 
 
 # ====================================================================== phone
@@ -695,8 +805,7 @@ class ReportDialog(BaseDialog):
         head.setSpacing(20)
         head.addWidget(ScoreRing(report["score"]))
         txt = QVBoxLayout()
-        txt.addWidget(label("Rehearsal report", "title"))
-        txt.addWidget(label(report.get("title", ""), "muted"))
+        txt.addWidget(label(report.get("title", "") or "Your run", "title", True))
         trend = report.get("trend")
         if trend is not None:
             t = label(("+%d" % trend if trend >= 0 else "%d" % trend) + " vs your last run", None)
