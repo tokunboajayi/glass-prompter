@@ -1,4 +1,5 @@
-# Build Glass Prompter: tests -> assets -> PyInstaller bundle -> Inno Setup installer.
+# Build Glass Prompter for Windows: tests -> assets -> PyInstaller bundle -> Inno Setup installer.
+# (macOS: packaging/build_mac.sh)
 # Usage (from the project root):  powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -34,6 +35,10 @@ if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed." }
 Write-Host "-- installer"
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") |
   Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $iscc -and $env:CI) {
+  choco install innosetup -y --no-progress | Out-Null
+  $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+}
 if (-not $iscc) { throw "Inno Setup 6 not found. Install it with: winget install JRSoftware.InnoSetup" }
 & $iscc /Q "/DAppVersion=$version" "/DBundleDir=$build\dist\GlassPrompter" packaging\installer.iss
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed." }

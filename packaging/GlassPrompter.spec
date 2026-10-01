@@ -1,12 +1,19 @@
-# PyInstaller spec - run from the project root:  python -m PyInstaller packaging/GlassPrompter.spec
+# PyInstaller spec for Windows and macOS - run from the project root:
+#   python -m PyInstaller packaging/GlassPrompter.spec
 import os
-from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files
+import sys
 
-MODEL = os.path.join(os.environ["LOCALAPPDATA"], "GlassPrompter-build", "models", "vosk-model-small-en-us-0.15")
-if not os.path.isdir(MODEL):
-    raise SystemExit("Speech model missing: " + MODEL)
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))
+sys.path.insert(0, ROOT)
+from glassprompter import __version__  # noqa: E402
+from glassprompter.paths import MODEL_NAME, build_dir  # noqa: E402
+
+MAC = sys.platform == "darwin"
+MODEL = os.environ.get("GLASSPROMPTER_MODEL") or os.path.join(build_dir(), "models", MODEL_NAME)
+if not os.path.isfile(os.path.join(MODEL, "am", "final.mdl")):
+    raise SystemExit("Speech model missing: " + MODEL)
 
 # Qt modules the app never imports - excluding them keeps the install small.
 QT_EXCLUDES = [
@@ -17,15 +24,20 @@ QT_EXCLUDES = [
     "PySide6.QtSvg", "PySide6.QtSvgWidgets", "PySide6.QtXml", "PySide6.QtDBus", "PySide6.QtDesigner",
     "PySide6.QtHelp", "PySide6.QtPrintSupport", "PySide6.QtConcurrent", "PySide6.QtStateMachine",
 ]
+hidden = ["qrcode", "qrcode.constants", "vosk", "sounddevice", "_sounddevice_data", "cffi"]
+if MAC:
+    hidden += ["objc", "AppKit", "Foundation", "glassprompter.platform.macos"]
+else:
+    hidden += ["glassprompter.platform.windows"]
 
 a = Analysis(
     [os.path.join(ROOT, "glass_prompter.pyw")],
     pathex=[ROOT],
     binaries=collect_dynamic_libs("vosk"),
     datas=[(os.path.join(ROOT, "glassprompter", "server", "static"), os.path.join("glassprompter", "server", "static")),
-           (MODEL, os.path.join("glassprompter", "models", "vosk-model-small-en-us-0.15"))]
+           (MODEL, os.path.join("glassprompter", "models", MODEL_NAME))]
           + collect_data_files("_sounddevice_data"),
-    hiddenimports=["qrcode", "qrcode.constants", "vosk", "sounddevice", "_sounddevice_data", "cffi"],
+    hiddenimports=hidden,
     excludes=QT_EXCLUDES + ["tkinter", "unittest", "pytest", "pydoc", "PIL", "numpy"],
     noarchive=False,
     optimize=1,
@@ -37,10 +49,34 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="GlassPrompter",
-    icon=os.path.join(ROOT, "assets", "glassprompter.ico"),
-    version=os.path.join(ROOT, "assets", "version_info.txt"),
+    icon=None if MAC else os.path.join(ROOT, "assets", "glassprompter.ico"),
+    version=None if MAC else os.path.join(ROOT, "assets", "version_info.txt"),
     console=False,
     disable_windowed_traceback=False,
+    argv_emulation=False,
     upx=False,
 )
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="GlassPrompter")
+
+if MAC:
+    app = BUNDLE(
+        coll,
+        name="Glass Prompter.app",
+        icon=os.path.join(ROOT, "assets", "GlassPrompter.icns"),
+        bundle_identifier="app.glassprompter",
+        version=__version__,
+        info_plist={
+            "CFBundleName": "Glass Prompter",
+            "CFBundleDisplayName": "Glass Prompter",
+            "CFBundleShortVersionString": __version__,
+            "CFBundleVersion": __version__,
+            "LSUIElement": True,                         # lives in the menu bar, no Dock icon
+            "LSMinimumSystemVersion": "12.0",
+            "NSHighResolutionCapable": True,
+            "NSMicrophoneUsageDescription": "Voice Follow listens to you read so the script scrolls with your "
+                                            "voice. Audio is processed on this Mac and never leaves it.",
+            "NSLocalNetworkUsageDescription": "The phone remote lets your phone on the same Wi-Fi send scripts "
+                                              "and control playback.",
+            "NSHumanReadableCopyright": "Copyright (c) 2026 Olatokunbo Ajayi",
+        },
+    )

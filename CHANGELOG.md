@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.0.0 - 2026-10-01
+Cross-platform release. Built from research into where competing prompters fail: voice-scroll lag and jumps,
+freezes mid-take, Mac-only notch apps, false "invisible" claims on macOS 15+, and lost scripts.
+
+- **macOS support** alongside Windows, with one codebase and one look. New `glassprompter/platform` layer:
+  - **Windows:** display affinity, DWM acrylic, RegisterHotKey with a polling fallback, Run-key autostart, SAPI voice.
+  - **macOS:** NSWindow sharing type, vibrancy, Carbon global hotkeys (no Accessibility permission),
+    floats over full-screen apps on all Spaces, LaunchAgent autostart, the `say` voice, and a menu-bar icon.
+- **Aurora Glass UI** replaces the macOS-style chrome:
+  - No more traffic lights.
+  - A living aurora rim that shows state.
+  - Gradient reading band and progress bar.
+  - A vector icon set drawn in code.
+  - New app icon.
+  - Branded dialog headers with a single close button.
+  - A countdown ring.
+  - The phone app is restyled to match.
+- **Faster, steadier Voice Follow:**
+  - 16 kHz capture in 40 ms blocks (was 100 ms).
+  - Catch-up when the recognizer falls behind.
+  - The model preloads at startup.
+  - A continuous glide on a critically damped spring replaces line-by-line jumps.
+  - A watchdog reopens a stalled microphone.
+  - Live latency readout.
+  - A microphone picker.
+- **Honest screen-share badge:** green only when the OS really hides the prompter. On macOS 15+ it says
+  "Share a window, not your screen".
+- **Never lose a script:** an automatic daily library backup (last 7 kept) and one-click export to Markdown.
+- Fixed: file titles from Windows paths on macOS/Linux.
+- **CI:**
+  - Tests run on Windows, macOS and Linux.
+  - Tagged releases build the Windows installer plus Apple silicon and Intel disk images.
+- 67 automated tests.
+
 ## 1.2.0 - 2026-10-01
 Audio release.
 

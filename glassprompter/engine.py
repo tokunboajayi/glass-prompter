@@ -124,6 +124,30 @@ def word_map(lines):
     return words, word_line, line_tokens
 
 
+def voice_target(word_line, cursor):
+    """Scroll position (in lines) for Voice Follow when `cursor` is the last word spoken.
+
+    Instead of snapping a whole line at a time, the text glides continuously: the current line passes
+    through the reading band as you read it (slightly low as you start it, centred mid-line, slightly
+    high as you finish), so the next words are always where your eyes already are.
+    """
+    if not word_line:
+        return 0.0
+    c = min(max(cursor, -1), len(word_line) - 1)
+    if c < 0:
+        return float(word_line[0])
+    line = word_line[c]
+    start = c
+    while start > 0 and word_line[start - 1] == line:
+        start -= 1
+    end = c
+    while end + 1 < len(word_line) and word_line[end + 1] == line:
+        end += 1
+    n = end - start + 1
+    frac = (c - start + 1) / n                      # 0..1 through this line
+    return max(0.0, line + (frac - 0.5) * 0.6)      # drift within +-0.3 line: smooth, never straddling
+
+
 def words_per_line(lines):
     text_lines = [ln.text for ln in lines if ln.kind == "text"]
     if not text_lines:

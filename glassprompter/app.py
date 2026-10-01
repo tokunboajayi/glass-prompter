@@ -1,24 +1,25 @@
 """Application bootstrap and controller: wires the prompter, library, remote server, tray,
 global hotkeys, drop folder and single-instance handling together."""
 import argparse
-import ctypes
 import getpass
 import logging
 import os
 import sys
+import threading
 
-from PySide6.QtCore import QAbstractNativeEventFilter, QObject, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QGuiApplication
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
-from . import APP_ID, APP_NAME, ORG, __version__, config, engine, paths, scripts, win32
+from . import APP_ID, APP_NAME, ORG, __version__, config, engine, paths, scripts
 from . import log as logsetup
+from . import platform as native
 from .server import RemoteServer
 from .voice import VoiceEngine
 from .tts import Speaker
 from .ui import icon as appicon
-from .ui import theme
+from .ui import icons, theme
 from .ui.dialogs import AboutDialog, LibraryDialog, PhoneDialog, ReportDialog, SettingsDialog, WelcomeDialog
 from .ui.prompter import Prompter
 
@@ -27,20 +28,25 @@ log = logging.getLogger("glassprompter")
 HOTKEYS = {1: ("SPACE", "play"), 2: ("UP", "faster"), 3: ("DOWN", "slower"), 4: ("LEFT", "back"),
            5: ("RIGHT", "ahead"), 6: ("R", "restart"), 7: ("H", "toggle"), 8: ("E", "library"),
            9: ("V", "voice"), 10: ("G", "ghost"), 11: ("PGUP", "prev_section"), 12: ("PGDN", "next_section")}
+assert all(k in native.HOTKEY_KEYS for k, _ in HOTKEYS.values())
 DROP_EXT = (".txt", ".md", ".docx")
 WELCOME_SCRIPT = """Welcome to Glass Prompter.
 
-Read the line in the amber band. It sits right under your camera, so your eyes stay on your audience.
+Read the line in the glowing band. It sits right under your camera, so your eyes stay on your audience.
 
 [LOOK AT THE CAMERA]
 
-Press Space, or Ctrl+Alt+Space from any app, to play and pause. Up and Down change the speed.
+Press Space, or %s+Space from any app, to play and pause. Up and Down change the speed.
 
 [PAUSE]
 
 Put [PAUSE] on its own line and the prompter waits for you. Anything else in square brackets shows up as a cue.
 
-Press E to open your script library, or P to send scripts from your phone."""
+Press E to open your script library, or P to send scripts from your phone.
+
+# Voice Follow
+
+Press V, then Space, and just talk. The script follows your voice, word by word, entirely offline.""" % native.MOD
 
 DROP_README = """Glass Prompter drop folder
 ==========================
@@ -48,7 +54,7 @@ DROP_README = """Glass Prompter drop folder
 Save a .txt, .md or .docx file in this folder and Glass Prompter adds it to your
 script library and loads it automatically. Saving the same file again updates it.
 
-If this folder is inside OneDrive, you can edit scripts from your phone or any computer.
+If this folder syncs with OneDrive or iCloud Drive, you can edit scripts from your phone or any computer.
 Files whose names start with an underscore (like this one) are ignored.
 """
 
@@ -69,20 +75,6 @@ class Bridge(QObject):
         self.scriptChanged.emit(int(sid))
 
 
-class HotkeyFilter(QAbstractNativeEventFilter):
-    def __init__(self, callback):
-        super().__init__()
-        self.callback = callback
-
-    def nativeEventFilter(self, event_type, message):
-        if bytes(event_type) in (b"windows_generic_MSG", b"windows_dispatcher_MSG"):
-            hid = win32.parse_hotkey_msg(message)
-            if hid is not None:
-                QTimer.singleShot(0, lambda: self.callback(hid))
-                return True, 0
-        return False, 0
-
-
 class Controller(QObject):
     def __init__(self, app, args):
         super().__init__()
@@ -91,10 +83,9 @@ class Controller(QObject):
         self.cfg.load()
         self.store = scripts.ScriptStore(paths.database_path())
         self.server = None
-        self.network_category = ""
         self.dialog = None
         self.drop_mtimes = {}
-        self.hotkeys_ok = []
+        self.network_note = ""
 
         self.prompter = Prompter(self.cfg.s)
         self.prompter.paste_requested = self.paste_text
@@ -112,6 +103,7 @@ class Controller(QObject):
         self.voice.failed.connect(self._voice_failed)
         self.prompter.listenRequested.connect(self._listen)
         self.voice.utterance.connect(self.prompter.on_utterance)
+        self.voice.stats.connect(self.prompter.on_voice_stats)
         self.prompter.rehearsalFinished.connect(self._rehearsal_done)
         self.speaker = Speaker()
         self.speaker.finished.connect(self.prompter.on_read_aloud_done)
@@ -135,11 +127,12 @@ class Controller(QObject):
         if self.cfg.s.remote_enabled:
             self.start_server()
         QTimer.singleShot(1200, self._probe_network)
-        if self.cfg.s.start_with_windows != win32.is_autostart():
-            win32.set_autostart(self.cfg.s.start_with_windows)
+        QTimer.singleShot(1500, self.voice.preload)             # first Space press starts listening instantly
+        QTimer.singleShot(4000, self._backup)
+        if self.cfg.s.start_with_windows != native.is_autostart():
+            native.set_autostart(self.cfg.s.start_with_windows)
 
-        self.hotkey_filter = HotkeyFilter(self.on_hotkey)
-        app.installNativeEventFilter(self.hotkey_filter)
+        self.hotkeys = native.make_hotkeys(app, self.on_hotkey, self.prompter)
         self.register_hotkeys()
 
         if not args.background:
@@ -148,13 +141,14 @@ class Controller(QObject):
             QTimer.singleShot(400, self.first_run)
         if args.file:
             QTimer.singleShot(300, lambda: self.import_path(args.file))
-        log.info("Ready (remote=%s, hotkeys=%d/%d)", bool(self.server and self.server.running),
-                 sum(self.hotkeys_ok), len(HOTKEYS))
+        log.info("Ready on %s (remote=%s, hotkeys=%d/%d, capture=%s)", native.OS,
+                 bool(self.server and self.server.running), sum(self.hotkeys.ok.values()), len(HOTKEYS),
+                 native.capture_support()[0])
 
     # ------------------------------------------------------------ voice follow
     def _listen(self, on):
         if on:
-            self.voice.start(self.prompter.vwords)
+            self.voice.start(self.prompter.vwords, self.cfg.s.mic_device)
         else:
             self.voice.stop()
 
@@ -202,8 +196,15 @@ class Controller(QObject):
         self.cfg.save()
 
     def _probe_network(self):
-        self.network_category = win32.network_category()
-        log.info("Network category: %s", self.network_category or "unknown")
+        def probe():                                   # may shell out (Windows) - never block the UI
+            self.network_note = native.network_note()
+        threading.Thread(target=probe, name="netprobe", daemon=True).start()
+
+    def _backup(self):
+        try:
+            self.store.backup(paths.backup_dir())
+        except Exception as ex:
+            log.warning("Library backup failed: %s", ex)
 
     # ------------------------------------------------------------ settings & state
     def settings_changed(self, live=False):
@@ -363,37 +364,23 @@ class Controller(QObject):
 
     # ------------------------------------------------------------ hotkeys
     def register_hotkeys(self):
-        hwnd = self.prompter.hwnd()
-        self.hotkeys_ok = [win32.register_hotkey(hwnd, hid, win32.VK[key]) for hid, (key, _) in HOTKEYS.items()]
-        # Another app owns some combos? Fall back to watching the keyboard for those so they still work.
-        self.poll_ids = [hid for hid, ok in zip(HOTKEYS, self.hotkeys_ok) if not ok]
-        self._poll_prev = {}
-        if self.poll_ids:
-            self.poll_timer = QTimer(self, interval=30, timeout=self.poll_hotkeys)
-            self.poll_timer.start()
-
-    def poll_hotkeys(self):
-        held = win32.key_down(win32.VK_CONTROL) and win32.key_down(win32.VK_MENU)
-        for hid in self.poll_ids:
-            down = held and win32.key_down(win32.VK[HOTKEYS[hid][0]])
-            if down and not self._poll_prev.get(hid):
-                self.on_hotkey(hid)
-            self._poll_prev[hid] = down
+        for hid, (key, _) in HOTKEYS.items():
+            self.hotkeys.register(hid, key)
 
     def hotkey_report(self):
-        names = {"SPACE": "Space", "UP": "Up", "DOWN": "Down", "LEFT": "Left", "RIGHT": "Right",
-                 "PGUP": "PgUp", "PGDN": "PgDn"}
-        taken = ["Ctrl+Alt+" + names.get(HOTKEYS[h][0], HOTKEYS[h][0]) for h in getattr(self, "poll_ids", [])]
-        if not taken:
-            return "All Ctrl+Alt shortcuts are active."
-        return ("%s %s also used by another app on this PC. Glass Prompter still responds to %s, "
-                "but that app may react too." % (", ".join(taken), "is" if len(taken) == 1 else "are",
-                                                   "it" if len(taken) == 1 else "them"))
+        failed = [native.hotkey_label(native.MOD, HOTKEYS[h][0]) for h in self.hotkeys.failed()]
+        if not failed:
+            return "All %s shortcuts are active." % native.MOD
+        if len(failed) == len(HOTKEYS) and native.OS != "windows":
+            return "Global shortcuts aren't available on this system; the keys still work on the prompter."
+        if native.OS == "windows":
+            return ("%s %s also used by another app on this PC. Glass Prompter still responds, but that app may "
+                    "react too." % (", ".join(failed), "is" if len(failed) == 1 else "are"))
+        return "%s couldn't be registered (another app owns %s)." % (", ".join(failed),
+                                                                    "it" if len(failed) == 1 else "them")
 
     def unregister_hotkeys(self):
-        hwnd = self.prompter.hwnd()
-        for hid in HOTKEYS:
-            win32.unregister_hotkey(hwnd, hid)
+        self.hotkeys.unregister_all()
 
     def on_hotkey(self, hid):
         action = HOTKEYS.get(hid, (None, None))[1]
@@ -447,7 +434,12 @@ class Controller(QObject):
 
     # ------------------------------------------------------------ tray
     def setup_tray(self):
-        self.tray = QSystemTrayIcon(appicon.app_icon(), self)
+        if native.OS == "macos":                        # monochrome template icon, like every menu-bar app
+            ic = icons.icon("spark", "#000000", 18)
+            ic.setIsMask(True)
+        else:
+            ic = appicon.app_icon()
+        self.tray = QSystemTrayIcon(ic, self)
         m = QMenu()
         self.act_show = QAction("Hide prompter", m, triggered=self.prompter.toggle_window)
         self.act_play = QAction("Play", m, triggered=self.prompter.toggle_play)
@@ -484,6 +476,8 @@ class Controller(QObject):
         self.update_tray()
 
     def _tray_activated(self, reason):
+        if native.OS == "macos":
+            return                                      # a click opens the menu on macOS
         if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
             self.prompter.toggle_window()
 
@@ -547,10 +541,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     logsetup.setup()
-    try:
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("GlassPrompter.App")
-    except Exception:
-        pass
+    native.set_app_id()
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv[:1])
     app.setApplicationName(APP_NAME)

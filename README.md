@@ -1,45 +1,55 @@
 # Glass Prompter
 
-A see-through teleprompter that sits right under your webcam, so you can read your script and keep eye contact on calls, demos and videos. It is hidden from screen sharing and recordings.
+A see-through teleprompter that sits right under your webcam on **Windows and macOS**, follows your voice word by word, and coaches you after every run. Your eyes stay on the camera, your script stays off the screen share.
 
-**Install:** download the latest installer from Releases. It installs per user (no admin rights), adds Start menu and desktop shortcuts, and lives in the tray.
+**Install:** grab the latest build from [Releases](../../releases/latest):
+
+- **Windows 10/11:** `GlassPrompter-Setup-x.y.z.exe`. Per-user install, no admin rights, lives in the tray.
+- **macOS 12+:** `GlassPrompter-x.y.z-macOS-arm64.dmg` (Apple silicon) or `-x86_64.dmg` (Intel). Drag to Applications. It lives in the menu bar.
+
+## Why it's different
+
+| Common complaint about other prompters | What Glass Prompter does |
+|---|---|
+| Voice scroll **lags seconds behind** or **jumps paragraphs** on a mishear | 16 kHz capture in 40 ms blocks, catch-up when behind, a grammar limited to your script's words, and multi-word evidence before any jump. The text glides on a critically damped spring instead of snapping line to line. Live latency is shown in ms. |
+| Voice tracking **freezes mid-take** | A watchdog reopens the microphone if audio stops (Bluetooth hiccup, device switch) and you keep your place. |
+| **Mac-only** (notch apps) or **Windows-first** | Same app, same look, same phone remote on both. |
+| "Invisible on screen share" claims that **aren't true on macOS 15+** | An honest badge. Green only when the OS really hides it. On macOS 15+ it says *share a window, not your screen*, because Apple's ScreenCaptureKit ignores window privacy flags. |
+| Scripts **lost after an update** | SQLite library, a daily automatic backup (last 7 kept), and one-click export of everything to Markdown. |
+| **Bluetooth / external mics** not picked up | A microphone picker. A device that's unplugged falls back to the default instead of failing. |
+| No feedback on delivery | A Rehearsal Coach report after each run: score, pace, fillers, pauses, skipped lines, and your trend. |
 
 ## Features
 
-- **Rehearsal Coach:** a report card after every practice run: score, pace, filler words, pauses and skipped lines, with a trend over time. Plus a live pace light while you speak.
-- **Read Aloud:** hear your script in a natural voice at your target pace while it scrolls.
-- **Voice Follow:** the script scrolls as you speak. It runs 100% offline and only listens for your script's own words, so it's accurate. Spoken words fade so your eye lands on the next one, it shows your live words per minute, and you get a summary at the end.
-- **macOS-style glass:** real frosted blur on Windows 11, traffic-light window buttons, frameless glass dialogs and iOS-style switches.
-- **Ghost mode:** clicks pass through the prompter to the app behind it.
-- **Sections:** `# Heading` lines become jump points, handy for interviews and Q&A.
-- **Mirror mode:** for teleprompter glass.
-- **Glass overlay:** frameless, always on top, see-through panel with crisp text. The reading line is highlighted and the edges fade out.
-- **Hidden from screen share:** uses Windows display affinity. It re-checks with Windows every 1.5 seconds and re-applies the setting if anything reset it. A badge shows the real state.
-- **Words-per-minute pacing:** the speed holds at any text size or window width. A 3-2-1 countdown runs before scrolling starts. `[PAUSE]` and `[CUE]` markers are supported.
-- **Script library:** SQLite storage with search, autosave, and import of .txt/.md/.docx files.
-- **Phone remote:** works over Wi-Fi with a QR code to pair. Live state updates over Server-Sent Events. You can manage the library and upload files from the phone.
-- **Drop folder:** `Documents\Glass Prompter`, which works with OneDrive. Save a file there from any device and it loads automatically.
-- **Global hotkeys:** Ctrl+Alt+Space/Up/Down/Left/Right/R/H/E. If another app has taken a shortcut, Glass Prompter falls back to listening for the keys directly.
-- **Desktop app basics:** tray menu, settings, a first-run welcome, single instance, start with Windows, crash and rotating logs, and atomic settings writes with migration from older versions.
+- **Aurora Glass UI:** deep-ink frosted glass (Windows 11 acrylic, macOS vibrancy) with a living aurora rim that shows state. It's calm when idle, flows while you read and pulses with your voice. Vector icons, frameless dialogs, one design system on both OSes and the phone.
+- **Voice Follow:** offline (Vosk) and tuned for low latency. Spoken words dim so your eye lands on the next one. Shows live wpm and latency.
+- **Rehearsal Coach + live pace light**, plus **Read Aloud** (Windows SAPI / macOS `say`) at your target pace.
+- **Hidden from screen share** where the OS allows it. It re-checks every 1.5 s and the badge always shows the real state.
+- **Ghost mode** (click-through), **mirror mode**, **sections** (`# Heading`), `[PAUSE]` and `[CUE]` markers, a 3-2-1 countdown, and pacing in words per minute.
+- **Phone remote** over Wi-Fi: pair with a QR code, PIN-protected, with live state over SSE. Manage and upload scripts from the phone.
+- **Drop folder** in `Documents/Glass Prompter`: works with OneDrive or iCloud Drive.
+- **Global shortcuts:** Ctrl+Alt (Windows) or Control+Option (macOS) plus Space/Up/Down/Left/Right/R/H/E/V/G/PgUp/PgDn. On macOS these use Carbon hotkeys, so no Accessibility permission is needed.
+- **On macOS** the prompter floats over full-screen apps on every Space and never hides when Zoom takes focus.
 
 ## Architecture
 
 ```
 glassprompter/
-  app.py          controller: wiring, tray, hotkeys, drop folder, single instance
-  engine.py       pure prompter logic (wrap, markers, pacing) - no Qt
-  scripts.py      SQLite library + .txt/.md/.docx import (thread-safe)
-  config.py       versioned, validated settings with atomic writes + migration
-  win32.py        display affinity, RegisterHotKey, autostart
-  log.py          rotating logs, crash capture
-  server/api.py   REST /api/v1 + SSE, sessions, rate limiting, security headers
-  server/static/  phone web app (no inline code; strict CSP)
-  ui/             prompter overlay, dialogs, design tokens, icon
-tests/            pytest: engine, config, library, API security & realtime
-packaging/        PyInstaller spec, Inno Setup script, build.ps1
+  app.py            controller: wiring, tray/menu bar, hotkeys, drop folder, backups, single instance
+  platform/         one API over the OS: windows.py (Win32/DWM), macos.py (PyObjC/Carbon), generic.py
+  engine.py         pure prompter logic (wrap, markers, pacing, voice glide) - no Qt
+  tracking.py       fuzzy script aligner for Voice Follow
+  voice.py          mic -> Vosk, low-latency loop, watchdog, latency stats
+  coach.py          rehearsal scoring
+  scripts.py        SQLite library, import, backup, Markdown export (thread-safe)
+  config.py         versioned, validated settings with atomic writes + migration
+  server/api.py     REST /api/v1 + SSE, sessions, rate limiting, security headers
+  server/static/    phone web app (strict CSP, no inline code)
+  ui/               prompter overlay, glass toolkit, vector icons, dialogs, design tokens
+tests/              pytest (runs on Windows, macOS and Linux in CI)
+packaging/          PyInstaller spec (Win + Mac), Inno Setup, build.ps1, build_mac.sh
+.github/workflows/  CI on all three OSes; tagged releases build the .exe and both .dmg files
 ```
-
-The server runs on background threads and never touches the UI. It reaches the UI only through a Qt bridge that queues signals across threads.
 
 ## Remote API (v1)
 
@@ -47,8 +57,8 @@ The server runs on background threads and never touches the UI. It reaches the U
 |---|---|---|
 | GET | `/api/v1/health` | public |
 | POST | `/api/v1/session` | `{"pin": "123456"}` returns a token and an HttpOnly cookie |
-| GET | `/api/v1/state` Â· `/api/v1/events` (SSE) | live prompter state |
-| POST | `/api/v1/control` | `{"action": "play"/"restart"/"faster"/"slower"/"back"/"ahead"/"bigger"/"smaller"/"hide"}` |
+| GET | `/api/v1/state` · `/api/v1/events` (SSE) | live prompter state, including voice latency |
+| POST | `/api/v1/control` | `{"action": "play"}` plus restart, faster, slower, back, ahead, bigger, smaller, hide, voice, ghost, read_aloud, next_section, prev_section |
 | GET/POST | `/api/v1/scripts` | list (`?q=` search) / create (`load: true` to show it) |
 | GET/PUT/DELETE | `/api/v1/scripts/{id}` | read, update, delete |
 | POST | `/api/v1/scripts/{id}/load` | show it on the prompter |
@@ -56,31 +66,40 @@ The server runs on background threads and never touches the UI. It reaches the U
 
 **Security:**
 
-- The PIN is exchanged once for a session token. The PIN is never accepted on data endpoints.
+- The PIN is exchanged for a session token and is never accepted on data endpoints.
 - 5 wrong PINs locks that device out for 5 minutes.
 - The Host header is checked to block DNS rebinding.
-- JSON-only writes, so ordinary web forms can't post to the API.
-- No CORS, so other websites can't call it from a browser.
-- Strict CSP and security headers.
-- Request size limits.
-- Generating a new PIN signs out every phone.
+- Writes are JSON-only, there's no CORS, and a strict CSP applies.
+- Request size limits are enforced.
+- A new PIN signs out every phone.
 
 ## Develop
 
-```powershell
+```bash
 python -m pip install -r requirements.txt
-python glass_prompter.pyw                     # run from source
-python -m pytest --basetemp=.pytest_tmp tests # 58 tests
-powershell -ExecutionPolicy Bypass -File packaging\build.ps1   # test -> bundle -> installer
-python tools\smoke.py .smoke --visible        # UI smoke test with screenshots
+python glass_prompter.pyw                        # run from source
+python -m pytest -q tests                        # 67 tests
+QT_QPA_PLATFORM=offscreen python tools/shots.py shots   # render every screen to PNG
+# Windows build:  powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+# macOS build:    bash packaging/build_mac.sh
 ```
+
+Pushing a tag `vX.Y.Z` builds the Windows installer and both Mac disk images in GitHub Actions and attaches them to the release.
 
 ## Data and privacy
 
-Scripts and settings stay on the PC in `%APPDATA%\GlassPrompter` (`library.db`, `settings.json`, `logs\`). Uninstalling keeps them. Nothing is sent to the internet.
+Scripts, settings, backups and logs stay on your computer:
+
+- Windows: `%APPDATA%\GlassPrompter`
+- macOS: `~/Library/Application Support/GlassPrompter`
+
+Audio is processed on-device and never sent anywhere.
 
 ## Known limits
 
-- The installer is not code-signed yet, so Windows SmartScreen shows "Windows protected your PC". Click *More info â†’ Run anyway*. Signing (about $10/month via Azure Artifact Signing) or a Microsoft Store listing removes this.
-- Windows only (Windows 10 2004 or later for screen-share hiding).
-- The phone remote needs the same Wi-Fi. If Windows marks the network Public, allow the firewall prompt or switch the network to Private.
+- **Unsigned builds:**
+  - Windows SmartScreen: click *More info → Run anyway*.
+  - macOS: the first time, right-click the app and choose **Open**. On macOS 15+, go to System Settings → Privacy & Security and click **Open Anyway**.
+  - Code signing removes these warnings: Azure Artifact Signing for Windows, an Apple Developer ID ($99/yr) for macOS.
+- **macOS 15+ screen sharing:** share a window or app, not the entire screen. Apple gives apps no way to hide from full-screen capture.
+- **Phone remote** needs the same Wi-Fi. Allow the firewall prompt the first time.

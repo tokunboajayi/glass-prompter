@@ -1,7 +1,7 @@
 :root{
-  --bg:#0e0e12; --surface:#17171d; --surface-2:#202029; --outline:#2e2e3a;
-  --on:#f4f4f7; --muted:#9a9aa8; --accent:#ffb020; --on-accent:#16120a;
-  --ok:#3ddc84; --bad:#ff5a5a; --r:16px;
+  --bg:#0c0e18; --surface:#121522; --surface-2:#1a1e30; --outline:#2a2e44;
+  --on:#f5f7ff; --muted:#9aa3b8; --accent:#40e8d0; --violet:#8b6cff; --ember:#ffa64d; --on-accent:#070910;
+  --ok:#3ddc97; --bad:#ff5c7a; --r:16px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--on);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -12,7 +12,7 @@ h2{font-size:18px;margin:0 0 4px}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;
   background:var(--surface-2);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
 .pill i{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
-.pill.ok{color:var(--ok)} .pill.bad{color:var(--bad)} .pill.warn{color:var(--accent)}
+.pill.ok{color:var(--ok)} .pill.bad{color:var(--bad)} .pill.warn{color:var(--ember)}
 .card{background:var(--surface);border:1px solid var(--outline);border-radius:var(--r);padding:16px;margin-bottom:16px}
 .row-between{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
 .status b{font-size:28px;font-weight:600}
@@ -20,7 +20,7 @@ h2{font-size:18px;margin:0 0 4px}
 .script-title{color:var(--muted);font-size:14px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bar{height:4px;border-radius:4px;background:var(--surface-2);margin-top:12px;overflow:hidden}
 .bar>div{height:100%;width:0;background:var(--accent);transition:width .3s ease-out}
-.note{margin-top:10px;font-size:14px;color:var(--accent)}
+.note{margin-top:10px;font-size:14px;color:var(--ember)}
 .hint{font-size:13px;color:var(--muted);margin:6px 2px 0}
 .center{text-align:center;margin-top:24px}
 .tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border:1px solid var(--outline);border-radius:12px;padding:4px;margin-bottom:16px}
@@ -74,12 +74,12 @@ textarea.field{min-height:40vh;resize:vertical}
   --surface:rgba(255,255,255,.07); --surface-2:rgba(255,255,255,.10); --outline:rgba(255,255,255,.14);
   --blur:saturate(180%) blur(22px); --r:20px;
 }
-html{background:#07070b}
+html{background:#06070d}
 body{min-height:100vh;background:
-  radial-gradient(60% 45% at 12% 8%, rgba(255,176,32,.32), transparent 70%),
-  radial-gradient(55% 40% at 92% 22%, rgba(120,90,255,.30), transparent 70%),
-  radial-gradient(70% 50% at 50% 100%, rgba(0,190,255,.18), transparent 70%),
-  #07070b;background-attachment:fixed;
+  radial-gradient(60% 45% at 10% 6%, rgba(64,232,208,.26), transparent 70%),
+  radial-gradient(55% 40% at 95% 20%, rgba(139,108,255,.34), transparent 70%),
+  radial-gradient(70% 50% at 50% 105%, rgba(255,166,77,.14), transparent 70%),
+  #06070d;background-attachment:fixed;
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
   -webkit-font-smoothing:antialiased}
 h1,.status b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI Variable Display",system-ui,sans-serif;letter-spacing:-.02em}
@@ -91,13 +91,14 @@ h1,.status b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Sego
 .tabs{border-radius:14px}
 .tabs button[aria-selected=true]{background:rgba(255,255,255,.16);box-shadow:0 1px 4px rgba(0,0,0,.3)}
 .btn{border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
-.btn.primary{background:linear-gradient(180deg,#ffc24a,#ffa514);color:#1a1205;border:0;
-  box-shadow:0 8px 24px rgba(255,170,30,.35),inset 0 1px 0 rgba(255,255,255,.5)}
+.btn.primary{background:linear-gradient(120deg,#40e8d0,#8b6cff);color:#070910;border:0;
+  box-shadow:0 8px 28px rgba(139,108,255,.38),inset 0 1px 0 rgba(255,255,255,.45)}
+.btn.primary small{color:rgba(7,9,16,.7)}
 .bar{background:rgba(255,255,255,.12)}
-.bar>div{background:linear-gradient(90deg,#ffb020,#ffd27a)}
+.bar>div{background:linear-gradient(90deg,#40e8d0,#8b6cff)}
 .pin{background:rgba(255,255,255,.06);border:1px solid var(--outline)}
-.item.current{border-color:rgba(255,176,32,.8);box-shadow:0 0 0 1px rgba(255,176,32,.35),0 8px 30px rgba(0,0,0,.25)}
+.item.current{border-color:rgba(64,232,208,.8);box-shadow:0 0 0 1px rgba(64,232,208,.35),0 8px 30px rgba(0,0,0,.25)}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .card,.tabs,.item,.field,.btn,.pill,#toast{background:#17171d}
+  .card,.tabs,.item,.field,.btn,.pill,#toast{background:#121522}
 }
 .grid .btn.full-soft{grid-column:1/-1}

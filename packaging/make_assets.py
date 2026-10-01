@@ -8,12 +8,14 @@ sys.path.insert(0, ROOT)
 from PySide6.QtGui import QGuiApplication  # noqa: E402
 
 from glassprompter import APP_NAME, __version__  # noqa: E402
-from glassprompter.ui.icon import write_ico  # noqa: E402
+from glassprompter.ui.icon import render, write_ico, write_iconset  # noqa: E402
 
 app = QGuiApplication([])
 assets = os.path.join(ROOT, "assets")
 os.makedirs(assets, exist_ok=True)
 write_ico(os.path.join(assets, "glassprompter.ico"))
+write_iconset(os.path.join(assets, "GlassPrompter.iconset"))
+render(512).save(os.path.join(assets, "icon-512.png"))
 
 v = tuple(int(x) for x in __version__.split(".")) + (0,)
 version_info = f"""# UTF-8

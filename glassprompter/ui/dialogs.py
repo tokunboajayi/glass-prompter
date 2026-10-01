@@ -4,13 +4,14 @@ import time
 
 from PySide6.QtCore import QRectF, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QGuiApplication, QKeySequence, QPainter, QShortcut
-from PySide6.QtWidgets import (QCheckBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton,
                                QSlider, QSpinBox, QVBoxLayout, QWidget)
 
-from .. import APP_NAME, __version__, engine, paths, scripts, win32
+from .. import APP_NAME, __version__, engine, paths, scripts
+from .. import platform as native
 from .glass import GlassDialog, Switch
-from .theme import DASH, DOT, ELLIPSIS
+from .theme import AQUA, DASH, DOT, ELLIPSIS, T, VIOLET
 
 try:
     import qrcode
@@ -41,7 +42,7 @@ class BaseDialog(GlassDialog):
     """Frosted glass, top-most dialog that is also hidden from screen sharing (scripts and PINs stay private)."""
 
     def __init__(self, parent, title, resizable=False):
-        super().__init__(parent, resizable=resizable)
+        super().__init__(parent, resizable=resizable, title="%s  %s  %s" % (APP_NAME, DOT, title))
         self.setWindowTitle("%s %s %s" % (APP_NAME, DASH, title))
 
     def confirm(self, title, text, ok_text):
@@ -86,15 +87,19 @@ class LibraryDialog(BaseDialog):
         self.list.currentItemChanged.connect(self._picked)
         left.addWidget(self.list, 1)
         row = QHBoxLayout()
-        row.addWidget(button("New", self.new_script))
-        row.addWidget(button("Import" + ELLIPSIS, self.import_files))
+        row.setSpacing(6)
+        for b in (button("New", self.new_script), button("Import", self.import_files),
+                  button("Export", self.export_all)):
+            b.setProperty("compact", True)
+            row.addWidget(b)
         row.addStretch(1)
         self.del_btn = button("Delete", self.delete_script, danger=True)
+        self.del_btn.setProperty("compact", True)
         row.addWidget(self.del_btn)
         left.addLayout(row)
         lw = QWidget()
         lw.setLayout(left)
-        lw.setFixedWidth(300)
+        lw.setFixedWidth(320)
         root.addWidget(lw)
 
         # right: editor
@@ -105,8 +110,8 @@ class LibraryDialog(BaseDialog):
         self.title.setMaxLength(scripts.MAX_TITLE)
         self.title.textEdited.connect(self._edited)
         right.addWidget(self.title)
-        right.addWidget(label("[PAUSE] on its own line stops the scroll  %s  [ANY CUE] on its own line shows in amber"
-                              % DOT, "muted"))
+        right.addWidget(label("# Heading = section  %s  [PAUSE] on its own line stops the scroll  %s  [ANY CUE] shows "
+                              "in orange" % (DOT, DOT), "muted"))
         self.body = QPlainTextEdit()
         self.body.setPlaceholderText("Paste or type your script" + ELLIPSIS)
         self.body.textChanged.connect(self._edited)
@@ -251,6 +256,20 @@ class LibraryDialog(BaseDialog):
         if errors:
             self.info.setText("; ".join(errors)[:200])
 
+    def export_all(self):
+        """Every script as a Markdown file - your words are never locked in."""
+        if self.dirty:
+            self.save(quiet=True)
+        folder = QFileDialog.getExistingDirectory(self, "Export all scripts to", paths.documents_dir())
+        if not folder:
+            return
+        try:
+            n = scripts.export_markdown(self.store, folder)
+        except OSError as ex:
+            self.info.setText("Export failed: %s" % ex)
+            return
+        self.info.setText("Exported %d script%s to %s" % (n, "" if n == 1 else "s", folder))
+
     def done(self, r):
         if self.dirty:
             self.save(quiet=True)          # never lose typing
@@ -330,11 +349,32 @@ class SettingsDialog(BaseDialog):
         section(left, "Reading", first=True)
         slider_row(left, "Speed", 40, 400, s.wpm, lambda v: "%d wpm" % v, lambda v: self._set("wpm", v))
         check(left, "3-2-1 countdown before scrolling", s.countdown, lambda v: self._set("countdown", v))
-        check(left, "Rehearsal Coach report after Voice Follow", s.coach, lambda v: self._set("coach", v))
+        section(left, "Voice")
         check(left, "Voice Follow: scroll as I speak", s.voice_follow,
               lambda v: v != s.voice_follow and controller.prompter.toggle_voice(),
-              "Listens on your microphone and keeps your place. Runs 100% offline " + DASH + " no audio leaves "
-              "this PC.")
+              "Follows your words, not a timer. Runs 100% offline " + DASH + " no audio leaves this computer.")
+        check(left, "Rehearsal Coach report after Voice Follow", s.coach, lambda v: self._set("coach", v))
+        mrow = QHBoxLayout()
+        name = label("Microphone")
+        name.setFixedWidth(96)
+        mrow.addWidget(name)
+        self.mic = QComboBox()
+        self.mic.setAccessibleName("Microphone")
+        self.mic.addItem("System default", "")
+        from ..voice import list_microphones
+        for m in list_microphones():
+            self.mic.addItem(m, m)
+        i = self.mic.findData(s.mic_device)
+        if i < 0 and s.mic_device:
+            self.mic.addItem(s.mic_device + "  (not connected)", s.mic_device)
+            i = self.mic.count() - 1
+        self.mic.setCurrentIndex(max(0, i))
+        self.mic.currentIndexChanged.connect(lambda _: self._set("mic_device", self.mic.currentData() or ""))
+        mrow.addWidget(self.mic, 1)
+        left.addLayout(mrow)
+        lat = controller.voice.latency_ms
+        left.addWidget(label(("Last measured voice latency: %d ms" % lat) if lat else
+                             "Tip: a wired or built-in mic reacts faster than Bluetooth.", "muted", True))
         section(left, "Look")
         slider_row(left, "Text size", 14, 96, s.font_px, lambda v: "%d px" % v, lambda v: self._set("font_px", v))
         slider_row(left, "Glass", 20, 100, int(s.panel_alpha * 100), lambda v: "%d%%" % v,
@@ -351,23 +391,30 @@ class SettingsDialog(BaseDialog):
         left.addStretch(1)
 
         section(right, "Privacy", first=True)
+        level, note = native.capture_support()
         check(right, "Hide from screen sharing and recordings", s.hide_from_capture,
-              lambda v: self._set("hide_from_capture", v),
-              "Zoom, Teams, Meet, OBS and screenshots won't see the prompter.")
+              lambda v: self._set("hide_from_capture", v), note)
+        if level != "full":
+            right.addWidget(label("Glass Prompter tells you the truth here: the badge on the prompter shows what "
+                                  "viewers can actually see.", "warn", True))
         check(right, "Phone remote on this Wi-Fi", s.remote_enabled, self._remote,
               "A phone on the same network can send scripts and control playback, protected by a PIN.")
         section(right, "System")
-        check(right, "Start with Windows (in the tray)", win32.is_autostart(), self._autostart)
+        check(right, "Start at login (in the %s)" % native.TRAY.split(" (")[0], native.is_autostart(),
+              self._autostart)
         right.addWidget(label("Drop folder", None))
         drop = label(s.drop_dir, "muted", True)
         drop.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         right.addWidget(drop)
-        right.addWidget(label("Save a .txt, .md or .docx here (from any device via OneDrive) and it's added to "
-                              "your library and loaded automatically.", "muted", True))
+        right.addWidget(label("Save a .txt, .md or .docx here (from any device via OneDrive or iCloud Drive) and "
+                              "it's added to your library and loaded automatically.", "muted", True))
         row = QHBoxLayout()
         row.addWidget(button("Open drop folder", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(s.drop_dir))))
+        row.addWidget(button("Open backups", lambda: QDesktopServices.openUrl(
+            QUrl.fromLocalFile(paths.backup_dir()))))
         row.addStretch(1)
         right.addLayout(row)
+        right.addWidget(label("Your library is backed up automatically every day (last 7 kept).", "muted", True))
         hk = controller.hotkey_report() if hasattr(controller, "hotkey_report") else ""
         if hk:
             right.addWidget(label(hk, "muted", True))
@@ -388,7 +435,7 @@ class SettingsDialog(BaseDialog):
 
     def _autostart(self, on):
         self.c.cfg.s.start_with_windows = on
-        win32.set_autostart(on)
+        native.set_autostart(on)
         self.c.settings_changed()
 
 
@@ -454,8 +501,8 @@ class PhoneDialog(BaseDialog):
                                 % (err, self.c.cfg.s.remote_port), "warn", True))
         else:
             url = srv.url()
-            lay.addWidget(label("Scan with your phone's camera. Your phone must be on the same Wi-Fi as this PC.",
-                                "muted", True))
+            lay.addWidget(label("Scan with your phone's camera. Your phone must be on the same Wi-Fi as this "
+                                "computer.", "muted", True))
             row = QHBoxLayout()
             row.addStretch(1)
             row.addWidget(QrWidget(url))
@@ -477,13 +524,11 @@ class PhoneDialog(BaseDialog):
             prow.addWidget(button("New PIN", self._new_pin))
             lay.addLayout(prow)
             lay.addWidget(label("A new PIN disconnects every paired phone.", "muted"))
-            if self.c.network_category == "Public":
-                lay.addWidget(label("This Wi-Fi is set to Public in Windows. If your phone can't connect, allow "
-                                    "Glass Prompter through the firewall when Windows asks, or set this network to "
-                                    "Private: Settings > Network & internet > Wi-Fi > your network.", "warn", True))
+            if self.c.network_note:
+                lay.addWidget(label(self.c.network_note, "warn", True))
         lay.addWidget(label("Different network? Save a .txt or .docx into your Glass Prompter drop folder "
-                            "(Documents) from any device through OneDrive. It loads here automatically.",
-                            "muted", True))
+                            "(Documents) from any device through OneDrive or iCloud Drive. It loads here "
+                            "automatically.", "muted", True))
         foot = QHBoxLayout()
         foot.addStretch(1)
         foot.addWidget(button("Done", self.accept, primary=True))
@@ -515,7 +560,7 @@ class AboutDialog(BaseDialog):
         lay.addWidget(label("Version %s" % __version__, "muted"))
         lay.addWidget(label("A see-through teleprompter that sits under your webcam, so you can read your script "
                             "and keep eye contact on calls, demos and videos.", None, True))
-        lay.addWidget(label("Your scripts and settings stay on this PC:\n" + paths.data_dir(), "muted", True))
+        lay.addWidget(label("Your scripts and settings stay on this computer:\n" + paths.data_dir(), "muted", True))
         row = QHBoxLayout()
         row.addWidget(button("Open data folder", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(paths.data_dir()))))
         row.addWidget(button("Open logs", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(paths.log_dir()))))
@@ -539,9 +584,9 @@ class WelcomeDialog(BaseDialog):
             ("1", "It sits under your camera", "The glass bar at the top of your screen is the prompter. Drag it "
                                               "anywhere, or drag an edge to resize it."),
             ("2", "Add a script", "Press E for your script library, send one from your phone (P), or drop a file "
-                                  "into Documents\\Glass Prompter."),
-            ("3", "Read from any app", "Ctrl+Alt+Space plays and pauses even while Zoom or Teams is in front. "
-                                       "Turn on Voice Follow (V) and the script scrolls as you speak."),
+                                  "into the Glass Prompter folder in Documents."),
+            ("3", "Read from any app", "%s+Space plays and pauses even while Zoom or Teams is in front. "
+                                       "Turn on Voice Follow (V) and the script follows your voice." % native.MOD),
         ]
         for num, head, body in steps:
             card = QFrame()
@@ -551,16 +596,16 @@ class WelcomeDialog(BaseDialog):
             g.setHorizontalSpacing(14)
             n = label(num, "title")
             n.setFixedWidth(22)
-            n.setStyleSheet("color: #FFB020;")
+            n.setStyleSheet("color: %s;" % (AQUA if num != "2" else VIOLET))
             g.addWidget(n, 0, 0, 2, 1, Qt.AlignmentFlag.AlignTop)
             hl = label(head)
             hl.setStyleSheet("font-weight: 600;")
             g.addWidget(hl, 0, 1)
             g.addWidget(label(body, "muted", True), 1, 1)
             lay.addWidget(card)
-        lay.addWidget(label("The green \"Hidden from screen share\" badge means viewers can't see the prompter. "
-                            "Glass Prompter lives in the tray (bottom-right of the taskbar) " + DASH +
-                            " right-click it for everything else.", "muted", True))
+        lay.addWidget(label("The badge in the corner always tells you the truth about what viewers can see. "
+                            "Glass Prompter lives in the " + native.TRAY + " " + DASH +
+                            " click its icon for everything else.", "muted", True))
         foot = QHBoxLayout()
         foot.addStretch(1)
         foot.addWidget(button("Get started", self.accept, primary=True))
@@ -586,7 +631,7 @@ class ScoreRing(QWidget):
 
     def color(self):
         from .theme import T
-        return T.ok if self.score >= 85 else (T.accent if self.score >= 65 else T.bad)
+        return T.ok if self.score >= 85 else (T.warn if self.score >= 65 else T.bad)
 
     def paintEvent(self, e):
         from PySide6.QtGui import QPen
@@ -596,7 +641,11 @@ class ScoreRing(QWidget):
         r = QRectF(10, 10, 130, 130)
         p.setPen(QPen(QColor(255, 255, 255, 28), 11, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
         p.drawArc(r, 225 * 16, -270 * 16)
-        p.setPen(QPen(self.color(), 11, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        from .theme import aurora_line
+        pen = QPen(self.color(), 11, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap)
+        if self.score >= 85:
+            pen.setBrush(aurora_line(10, 140))
+        p.setPen(pen)
         p.drawArc(r, 225 * 16, int(-270 * 16 * self._shown / 100.0))
         p.setPen(QColor("#FFFFFF"))
         p.setFont(font("display", 44, QFont.Weight.DemiBold))
@@ -651,7 +700,7 @@ class ReportDialog(BaseDialog):
         trend = report.get("trend")
         if trend is not None:
             t = label(("+%d" % trend if trend >= 0 else "%d" % trend) + " vs your last run", None)
-            t.setStyleSheet("color: %s; font-weight: 600;" % ("#3DDC84" if trend >= 0 else "#FF5A5A"))
+            t.setStyleSheet("color: %s; font-weight: 600;" % ("#3DDC97" if trend >= 0 else "#FF5C7A"))
             txt.addWidget(t)
         tip = label(report["tip"], None, True)
         tip.setStyleSheet("font-size: 15px;")
@@ -668,12 +717,12 @@ class ReportDialog(BaseDialog):
         fill = report["fillers"]
         top = ", ".join("%s %d" % (k, v) for k, v in sorted(fill.items(), key=lambda kv: -kv[1])[:3]) or "none"
         tiles = [
-            ("PACE", "%d wpm" % report["wpm"], {"good": "right in the zone", "fast": "too fast",
-                                                "slow": "a bit slow"}[pace] + "  (%d-%d)" % GOOD_PACE),
+            ("PACE", "%d wpm" % report["wpm"], {"good": "in the zone", "fast": "too fast",
+                                                "slow": "a bit slow"}[pace] + "  %s  %d-%d" % ((DOT,) + GOOD_PACE)),
             ("FILLERS", str(report["filler_count"]), top),
             ("PAUSES", str(report["long_pauses"]), "longest %.1fs" % report["longest_pause"]
              if report["long_pauses"] else "no long gaps"),
-            ("SKIPPED", "%d words" % report["skipped"], "%d%% of script covered" % int(report["coverage"] * 100)),
+            ("SKIPPED", "%d words" % report["skipped"], "%d%% covered" % int(report["coverage"] * 100)),
             ("TIME", engine.fmt_secs(report["seconds"]), "spoken"),
         ]
         for i, (k, v, sub) in enumerate(tiles):
@@ -686,14 +735,14 @@ class ReportDialog(BaseDialog):
             big = label(v)
             big.setStyleSheet("font-size: 21px; font-weight: 600;")
             cl.addWidget(big)
-            cl.addWidget(label(sub, "muted", True))
+            cl.addWidget(label(sub, "muted"))
             grid.addWidget(card, i // 3, i % 3)
         lay.addLayout(grid)
         if len(history) > 1:
             lay.addWidget(label("YOUR LAST %d RUNS" % len(history), "section"))
             lay.addWidget(HistoryBars([h["score"] for h in history]))
         foot = QHBoxLayout()
-        foot.addWidget(label("Everything stays on this PC.", "muted"))
+        foot.addWidget(label("Everything stays on this computer.", "muted"))
         foot.addStretch(1)
         foot.addWidget(button("Done", self.accept))
         foot.addWidget(button("Practice again", self._again, primary=True))

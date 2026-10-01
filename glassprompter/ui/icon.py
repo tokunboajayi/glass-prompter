@@ -10,27 +10,40 @@ SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 
 
 def render(size, playing=False):
+    """Ink tile, aurora rim and the four-point 'spark' (same mark as the phone app's icon)."""
+    import math
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QLinearGradient, QPainterPath
     img = QImage(size, size, QImage.Format.Format_ARGB32_Premultiplied)
     img.fill(Qt.GlobalColor.transparent)
     p = QPainter(img)
     p.setRenderHint(QPainter.RenderHint.Antialiasing)
     s = size / 64.0
     p.scale(s, s)
-    p.setPen(QPen(T.accent, 3.2))
-    p.setBrush(QColor(23, 23, 29))
-    p.drawRoundedRect(QRectF(4, 10, 56, 44), 12, 12)
+    g = QLinearGradient(0, 0, 64, 64)
+    g.setColorAt(0.0, T.aqua)
+    g.setColorAt(0.55, T.violet)
+    g.setColorAt(1.0, T.ember)
     p.setPen(Qt.PenStyle.NoPen)
-    p.setBrush(T.accent)
-    p.drawEllipse(QRectF(27, 5, 10, 10))                          # the webcam dot
-    p.setBrush(QColor(255, 255, 255))
-    p.drawRoundedRect(QRectF(14, 26, 36, 5.5), 2.75, 2.75)        # the reading line
-    p.setBrush(QColor(154, 154, 168))
-    p.drawRoundedRect(QRectF(18, 36, 28, 4.5), 2.25, 2.25)
-    p.setBrush(QColor(85, 85, 95))
-    p.drawRoundedRect(QRectF(22, 44.5, 20, 3.5), 1.75, 1.75)
+    p.setBrush(QColor(12, 14, 24))
+    p.drawRoundedRect(QRectF(3, 3, 58, 58), 16, 16)
+    pen = QPen(g, 3.0)
+    p.setPen(pen)
+    p.setBrush(Qt.BrushStyle.NoBrush)
+    p.drawRoundedRect(QRectF(4.5, 4.5, 55, 55), 14.5, 14.5)
+    star = QPainterPath()
+    for i in range(8):
+        a = math.pi / 4 * i - math.pi / 2
+        r = 19.0 if i % 2 == 0 else 4.6
+        pt = QPointF(32 + r * math.cos(a), 32 + r * math.sin(a))
+        star.moveTo(pt) if i == 0 else star.lineTo(pt)
+    star.closeSubpath()
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(g)
+    p.drawPath(star)
     if playing:
         p.setBrush(T.ok)
-        p.drawEllipse(QRectF(46, 40, 16, 16))
+        p.drawEllipse(QRectF(44, 44, 14, 14))
     p.end()
     return img
 
@@ -64,3 +77,12 @@ def write_ico(path, sizes=(16, 24, 32, 48, 64, 128, 256)):
         offset += len(data)
     with open(path, "wb") as f:
         f.write(header + entries + blobs)
+
+
+def write_iconset(folder):
+    """PNG set for macOS `iconutil -c icns` (build_mac.sh turns it into GlassPrompter.icns)."""
+    import os
+    os.makedirs(folder, exist_ok=True)
+    for base in (16, 32, 128, 256, 512):
+        render(base).save(os.path.join(folder, "icon_%dx%d.png" % (base, base)))
+        render(base * 2).save(os.path.join(folder, "icon_%dx%d@2x.png" % (base, base)))

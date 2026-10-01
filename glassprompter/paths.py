@@ -1,9 +1,9 @@
 """Filesystem locations. No Qt imports here so tests and the server can use it headless."""
-import ctypes
 import os
 import sys
 
 from . import APP_ID, APP_NAME
+from . import platform as native
 
 
 def is_frozen():
@@ -31,8 +31,7 @@ def data_dir():
     override = os.environ.get("GLASSPROMPTER_HOME")
     if override:
         return ensure(override)
-    base = os.environ.get("APPDATA") or os.path.expanduser("~")
-    return ensure(os.path.join(base, APP_ID))
+    return ensure(os.path.join(native.data_base(), APP_ID))
 
 
 def log_dir():
@@ -54,26 +53,31 @@ def database_path():
 
 
 def documents_dir():
-    """The user's real Documents folder (follows OneDrive folder redirection)."""
-    try:
-        buf = ctypes.create_unicode_buffer(260)
-        # CSIDL_PERSONAL = 5, SHGFP_TYPE_CURRENT = 0
-        if ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, buf) == 0 and buf.value:
-            return buf.value
-    except Exception:
-        pass
-    return os.path.join(os.path.expanduser("~"), "Documents")
+    """The user's real Documents folder (follows OneDrive redirection on Windows)."""
+    return native.documents_dir()
 
 
 MODEL_NAME = "vosk-model-small-en-us-0.15"
 
 
+def build_dir():
+    """Where the build scripts keep downloads and PyInstaller output (outside OneDrive / iCloud)."""
+    if os.environ.get("LOCALAPPDATA"):
+        base = os.environ["LOCALAPPDATA"]
+    elif sys.platform == "darwin":
+        base = os.path.join(os.path.expanduser("~"), "Library", "Caches")
+    else:
+        base = os.path.join(os.path.expanduser("~"), ".cache")
+    return os.path.join(base, "GlassPrompter-build")
+
+
 def model_dir():
     """Offline speech model for Voice Follow: bundled with the app, or a dev copy."""
     candidates = [
+        os.environ.get("GLASSPROMPTER_MODEL", ""),
         os.path.join(package_dir(), "models", MODEL_NAME),
         os.path.join(data_dir(), "models", MODEL_NAME),
-        os.path.join(os.environ.get("LOCALAPPDATA", ""), "GlassPrompter-build", "models", MODEL_NAME),
+        os.path.join(build_dir(), "models", MODEL_NAME),
     ]
     for c in candidates:
         if os.path.isfile(os.path.join(c, "am", "final.mdl")):
@@ -83,3 +87,7 @@ def model_dir():
 
 def default_drop_dir():
     return os.path.join(documents_dir(), APP_NAME)
+
+
+def backup_dir():
+    return ensure(os.path.join(data_dir(), "backups"))

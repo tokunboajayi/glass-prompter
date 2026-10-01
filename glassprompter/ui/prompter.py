@@ -6,9 +6,11 @@ from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetricsF, QGuiApplication
                            QPainterPath, QPen, QPixmap, QPolygonF)
 from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QToolButton, QWidget
 
-from .. import coach as coachlib, engine, tracking, win32
-from .glass import RADIUS, light_at, paint_glass, paint_lights
-from .theme import DASH, DOT, ICON, T, bar_qss, font, fonts
+from .. import coach as coachlib, engine, tracking
+from .. import platform as native
+from . import icons
+from .glass import RADIUS, paint_glass
+from .theme import DASH, DOT, ELLIPSIS, T, aurora_line, bar_qss, font, fonts
 
 COUNTDOWN_STEP = 0.7
 
@@ -24,7 +26,8 @@ class ControlBar(QFrame):
 
         def btn(glyph, tip, fn, name=None):
             b = QToolButton(self)
-            b.setText(ICON[glyph])
+            b.setIcon(icons.icon(glyph, "#070910" if name == "play" else "#F5F7FF", 20))
+            b.setIconSize(QSize(20, 20))
             b.setToolTip(tip)
             b.setAccessibleName(tip.split("  (")[0])
             b.setFocusPolicy(Qt.FocusPolicy.TabFocus)        # clicking never steals keyboard focus
@@ -40,9 +43,9 @@ class ControlBar(QFrame):
             s.setObjectName("sep")
             lay.addWidget(s)
 
-        self.play = btn("play", "Play / pause  (Space, Ctrl+Alt+Space)", owner.toggle_play, "play")
+        self.play = btn("play", "Play / pause  (Space, %s+Space)" % native.MOD, owner.toggle_play, "play")
         btn("restart", "Restart  (Home)", owner.restart)
-        self.voice = btn("mic", "Voice Follow + Rehearsal Coach: scroll as you speak  (V, Ctrl+Alt+V)",
+        self.voice = btn("mic", "Voice Follow + Rehearsal Coach: scroll as you speak  (V, %s+V)" % native.MOD,
                          owner.toggle_voice, "voice")
         self.speak = btn("speaker", "Read aloud: hear your script at your pace  (L)", owner.toggle_read_aloud, "speak")
         sep()
@@ -53,13 +56,14 @@ class ControlBar(QFrame):
         lay.addWidget(self.wpm)
         btn("plus", "Faster  (Up)", lambda: owner.change_wpm(+10))
         sep()
-        btn("font_down", "Smaller text  (-)", lambda: owner.change_font(-2))
-        btn("font_up", "Bigger text  (+)", lambda: owner.change_font(+2))
+        btn("text_smaller", "Smaller text  (-)", lambda: owner.change_font(-2))
+        btn("text_bigger", "Bigger text  (+)", lambda: owner.change_font(+2))
         sep()
         btn("library", "Scripts  (E)", owner.requestLibrary.emit)
         btn("phone", "Phone remote  (P)", owner.requestPhone.emit)
-        btn("settings", "Settings  (Ctrl+,)", owner.requestSettings.emit)
-        btn("close", "Hide  (Ctrl+Alt+H)  " + DOT + "  quit from the tray icon", owner.hide_window)
+        btn("settings", "Settings  (%s+,)" % native.CMD, owner.requestSettings.emit)
+        btn("close", "Hide  (%s+H)  %s  quit from the %s icon" % (native.MOD, DOT, native.TRAY.split(" (")[0]),
+            owner.hide_window)
 
         self.effect = QGraphicsOpacityEffect(self)
         self.effect.setOpacity(1.0)
@@ -109,6 +113,7 @@ class Prompter(QWidget):
                          | Qt.WindowType.Tool)
         self.cfg = settings
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_MacAlwaysShowToolWindow)     # stay visible when Zoom is focused
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setWindowTitle("Glass Prompter")
@@ -117,7 +122,7 @@ class Prompter(QWidget):
         self._place()
 
         self.text_font = QFont()
-        self.text_font.setFamilies([self.cfg.font_family, fonts()["display"], "Segoe UI"])
+        self.text_font.setFamilies([f for f in (self.cfg.font_family, fonts()["display"]) if f])
         self.text_font.setPixelSize(self.cfg.font_px)
         self.text_font.setWeight(QFont.Weight.DemiBold)
         self.fm = QFontMetricsF(self.text_font)
@@ -144,6 +149,7 @@ class Prompter(QWidget):
         self.vwords, self.vline, self.vtokens = [], [], {}
         self.aligner = None
         self.v_target = 0.0
+        self.v_vel = 0.0
         self.v_t0 = None
         self.v_count = 0
         self.live_wpm = 0
@@ -151,7 +157,8 @@ class Prompter(QWidget):
         self.coach = None
         self.reading_aloud = False
         self.frosted = ""
-        self.lights_hover = False
+        self.cap_level, self.cap_note = native.capture_support()
+        self.voice_latency = 0
 
         self.clock = QElapsedTimer()
         self.clock.start()
@@ -197,6 +204,7 @@ class Prompter(QWidget):
 
     def showEvent(self, e):
         super().showEvent(e)
+        native.prepare_window(self)
         QTimer.singleShot(0, self.apply_capture)
         QTimer.singleShot(0, self.apply_backdrop)
         self.stateChanged.emit()
@@ -206,31 +214,31 @@ class Prompter(QWidget):
         self.stateChanged.emit()
 
     def apply_backdrop(self):
-        """Real frosted blur behind the panel (Windows 11); none in text-only mode."""
+        """Real frosted blur behind the panel (Windows 11 acrylic, macOS vibrancy); none in text-only mode."""
         if self.cfg.clear_mode:
-            win32.apply_backdrop(self.hwnd(), "none")
+            native.apply_backdrop(self, "none")
             self.frosted = ""
         else:
-            self.frosted = win32.apply_backdrop(self.hwnd(), "acrylic")
+            self.frosted = native.apply_backdrop(self, "acrylic")
         self.update()
 
     # ------------------------------------------------------------ screen-share protection
     def apply_capture(self):
-        win32.set_capture_excluded(self.hwnd(), self.cfg.hide_from_capture)
-        st = win32.is_capture_excluded(self.hwnd())
+        native.set_capture_excluded(self, self.cfg.hide_from_capture)
+        st = native.is_capture_excluded(self)
         if st != self.cap_state:
             self.cap_state = st
             self.stateChanged.emit()
         self.update()
 
     def guard(self):
-        """Every 1.5 s ask Windows for the real state and re-apply if anything reset it."""
+        """Every 1.5 s ask the OS for the real state and re-apply if anything reset it."""
         if not self.isVisible():
             return
-        st = win32.is_capture_excluded(self.hwnd())
-        if st != self.cfg.hide_from_capture:
-            win32.set_capture_excluded(self.hwnd(), self.cfg.hide_from_capture)
-            st = win32.is_capture_excluded(self.hwnd())
+        st = native.is_capture_excluded(self)
+        if st != self.cfg.hide_from_capture and self.cap_level != "none":
+            native.set_capture_excluded(self, self.cfg.hide_from_capture)
+            st = native.is_capture_excluded(self)
         if st != self.cap_state:
             self.cap_state = st
             self.stateChanged.emit()
@@ -320,7 +328,11 @@ class Prompter(QWidget):
                 self.sync_ui()
         elif self.listening:
             busy = True
-            self.pos += (self.v_target - self.pos) * min(1.0, dt * 5.0)
+            # critically damped spring: glides to the voice target with no overshoot and no velocity jumps
+            w0 = 9.0
+            acc = w0 * w0 * (self.v_target - self.pos) - 2 * w0 * self.v_vel
+            self.v_vel += acc * dt
+            self.pos += self.v_vel * dt
         elif self.playing and self.lines:
             busy = True
             newp = self.pos + self.px_per_sec() * dt
@@ -352,26 +364,38 @@ class Prompter(QWidget):
         rad = RADIUS if self.frosted else T.radius
         panel = QPainterPath()
         panel.addRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), rad, rad)
+        active = self.playing or self.counting or self.listening or self.reading_aloud
+        t = self.now()
+        phase = 0.0 if self.cfg.reduce_motion else (t * 28.0) % 360.0 if active else 210.0
+        rim = 0.42 + (0.38 if active else 0.0) + (0.25 * self.mic_level if self.listening else 0.0)
 
         if clear:
             p.fillPath(panel, QColor(0, 0, 0, 3))              # keeps the window clickable
+            if self.hovered:
+                p.setPen(QPen(QColor(255, 255, 255, 40), 1, Qt.PenStyle.DashLine))
+                p.drawPath(panel)
         else:
-            # frosted: lighter tint so the blur shows through (macOS vibrancy); plain: classic dark glass
+            # frosted: lighter tint so the blur shows through; plain: deeper ink glass
             tint = int(255 * self.cfg.panel_alpha * (0.62 if self.frosted else 1.0))
-            paint_glass(p, QRectF(0.5, 0.5, w - 1, h - 1), tint, bool(self.frosted), rad)
+            paint_glass(p, QRectF(0.5, 0.5, w - 1, h - 1), tint, bool(self.frosted), rad, phase, rim,
+                        glow=0.9 if active else 0.5)
 
         ry, lh = self.read_y(), self.lh
         if not clear:
-            band = QColor(T.accent)
-            band.setAlpha(24)
+            band = QRectF(12, ry - lh / 2, w - 24, lh)
+            g = aurora_line(band.left(), band.right(), alpha=30)
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(band)
-            p.drawRoundedRect(QRectF(10, ry - lh / 2, w - 20, lh), 10, 10)
-        p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(T.accent)
-        m = 7.0
-        p.drawPolygon(QPolygonF([QPointF(4, ry - m), QPointF(4, ry + m), QPointF(4 + m * 1.2, ry)]))
-        p.drawPolygon(QPolygonF([QPointF(w - 4, ry - m), QPointF(w - 4, ry + m), QPointF(w - 4 - m * 1.2, ry)]))
+            p.setBrush(g)
+            p.drawRoundedRect(band, 12, 12)
+        # reading-line markers: two glowing capsules at the edges
+        for x in (5.0, w - 8.0):
+            glow = QColor(T.aqua)
+            glow.setAlpha(60)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(glow)
+            p.drawRoundedRect(QRectF(x - 2, ry - lh * 0.34 - 2, 7, lh * 0.68 + 4), 3.5, 3.5)
+            p.setBrush(T.aqua)
+            p.drawRoundedRect(QRectF(x, ry - lh * 0.34, 3, lh * 0.68), 1.5, 1.5)
 
         # script layer off-screen so the edges can fade smoothly
         dpr = self.devicePixelRatioF()
@@ -399,7 +423,7 @@ class Prompter(QWidget):
             y = top0 + i * lh - self.pos
             d = abs(y + lh / 2 - ry) / lh
             alpha = 1.0 if d < 0.5 else max(0.22, 1.0 - (d - 0.5) * 0.75)
-            col = QColor(T.accent if ln.kind in ("cue", "pause", "section")
+            col = QColor(T.cue if ln.kind in ("cue", "pause") else T.section if ln.kind == "section"
                          else (T.muted if ln.kind == "end" else T.on_surface))
             col.setAlphaF(alpha)
             tw = self.fm.horizontalAdvance(ln.text)
@@ -446,14 +470,14 @@ class Prompter(QWidget):
         p.save()
         p.setClipPath(panel)
         p.drawPixmap(0, 0, pm)
-        pc = QColor(T.accent)
-        pc.setAlpha(200)
-        p.fillRect(QRectF(0, h - 3, w * self.progress(), 3), pc)
+        if self.progress() > 0:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(aurora_line(0, w, alpha=230))
+            p.drawRoundedRect(QRectF(rad * 0.6, h - 3.5, max(3.0, (w - rad * 1.2) * self.progress()), 2.5),
+                              1.25, 1.25)
         p.restore()
 
         self.paint_chrome(p, w, h, clear)
-        if self.hovered and not self.ghost and not self.show_help:
-            paint_lights(p, self.lights_hover)
         if self.counting:
             self.paint_countdown(p, w, h, panel)
         if self.show_help:
@@ -465,8 +489,12 @@ class Prompter(QWidget):
         tw = QFontMetricsF(self.badge_font).horizontalAdvance(text)
         r = QRectF(x, y, tw + 26, 22)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(20, 20, 26, 215 if clear else 150))
+        p.setBrush(QColor(12, 14, 24, 220 if clear else 150))
         p.drawRoundedRect(r, 11, 11)
+        p.setPen(QPen(QColor(255, 255, 255, 22), 1))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 10.5, 10.5)
+        p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(color)
         p.drawEllipse(QPointF(r.x() + 11, r.center().y()), 3.5, 3.5)
         p.setPen(color)
@@ -475,19 +503,21 @@ class Prompter(QWidget):
 
     def paint_chrome(self, p, w, h, clear):
         by = h - 30
-        if self.cap_state:
-            right = self.pill(p, 12, by, "Hidden from screen share", T.ok, clear)
-        elif self.cfg.hide_from_capture:
-            right = self.pill(p, 12, by, "VISIBLE " + DASH + " Windows could not hide it", T.bad, clear)
-        else:
+        if not self.cfg.hide_from_capture:
             right = self.pill(p, 12, by, "VISIBLE in screen share  (C)", T.bad, clear)
+        elif self.cap_state and self.cap_level == "full":
+            right = self.pill(p, 12, by, "Hidden from screen share", T.ok, clear)
+        elif self.cap_state and self.cap_level == "partial":
+            right = self.pill(p, 12, by, "Share a window, not your screen", T.warn, clear)
+        else:
+            right = self.pill(p, 12, by, "VISIBLE " + DASH + " this system can't hide it", T.bad, clear)
         if self.remote_connected:
             right = self.pill(p, right + 6, by, "Phone connected", T.accent, clear)
         if self.ghost:
-            right = self.pill(p, right + 6, by, "Ghost mode  " + DOT + "  Ctrl+Alt+G", T.muted, clear)
+            right = self.pill(p, right + 6, by, "Ghost mode  " + DOT + "  " + native.MOD + "+G", T.muted, clear)
         if self.cfg.voice_follow:
             if self.voice_loading:
-                right = self.pill(p, right + 6, by, "Loading voice" + chr(0x2026), T.accent, clear)
+                right = self.pill(p, right + 6, by, "Loading voice" + ELLIPSIS, T.accent, clear)
             elif self.listening:
                 right = self.pill(p, right + 6, by, "Listening", T.accent, clear)
                 # live microphone level: five bars
@@ -523,6 +553,8 @@ class Prompter(QWidget):
         right_txt = "%s left" % engine.fmt_secs(self.time_left())
         if self.cfg.voice_follow and self.live_wpm:
             right_txt = "You: %d wpm  %s  %s" % (self.live_wpm, DOT, right_txt)
+        if self.listening and self.voice_latency:
+            right_txt = "%d ms  %s  %s" % (self.voice_latency, DOT, right_txt)
         p.drawText(QRectF(w * 0.4, by, w * 0.6 - 16, 22),
                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, right_txt)
 
@@ -541,9 +573,12 @@ class Prompter(QWidget):
             tw = min(tw, w - 60)
             r = QRectF((w - tw) / 2 - 14, h - 64 + (1 - a) * 6, tw + 28, 30)
             p.setOpacity(a)
-            p.setPen(QPen(QColor(255, 255, 255, 30), 1))
-            p.setBrush(QColor(28, 28, 36, 245))
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QColor(14, 16, 28, 245))
             p.drawRoundedRect(r, 15, 15)
+            p.setPen(QPen(aurora_line(r.left(), r.right(), alpha=120), 1))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 14.5, 14.5)
             p.setPen(self.toast_color)
             elided = QFontMetricsF(self.toast_font).elidedText(self.toast_msg, Qt.TextElideMode.ElideRight, tw)
             p.drawText(r, Qt.AlignmentFlag.AlignCenter, elided)
@@ -563,25 +598,32 @@ class Prompter(QWidget):
         alpha = 1.0 if rm else min(1.0, (1 - f) * 1.8 + 0.15)
         p.save()
         p.translate(w / 2, h / 2)
+        ring = min(h * 0.62, 132.0)
+        p.setPen(QPen(QColor(255, 255, 255, 26), 4))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(QRectF(-ring / 2, -ring / 2, ring, ring))
+        p.setPen(QPen(aurora_line(-ring / 2, ring / 2), 4, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        p.drawArc(QRectF(-ring / 2, -ring / 2, ring, ring), 90 * 16, int(-360 * 16 * (1 - f)))
         p.scale(scale, scale)
         p.setOpacity(alpha)
         p.setFont(self.count_font)
-        p.setPen(T.accent)
+        p.setPen(T.on_surface)
         p.drawText(QRectF(-100, -70, 200, 140), Qt.AlignmentFlag.AlignCenter, str(n))
         p.restore()
 
     def paint_help(self, p, w, h, panel):
         p.fillPath(panel, QColor(T.surface))
+        m = native.MOD
         cols = [
-            ("From any app", [("Ctrl+Alt+Space", "Play / pause"), ("Ctrl+Alt+Up / Down", "Faster / slower"),
-                              ("Ctrl+Alt+Left / Right", "Back / ahead"), ("Ctrl+Alt+R", "Restart"),
-                              ("Ctrl+Alt+V  %s  G" % DOT, "Voice Follow  %s  ghost" % DOT),
-                              ("Ctrl+Alt+PgUp / PgDn", "Previous / next section")]),
+            ("From any app", [(m + "+Space", "Play / pause"), (m + "+Up / Down", "Faster / slower"),
+                              (m + "+Left / Right", "Back / ahead"), (m + "+R", "Restart"),
+                              ("%s+V  %s  G" % (m, DOT), "Voice Follow  %s  ghost" % DOT),
+                              (m + "+PgUp / PgDn", "Previous / next section")]),
             ("On the prompter", [("Space  %s  Up / Down" % DOT, "Play  %s  speed" % DOT),
                                  ("+ / -   %s  [ / ]" % DOT, "Text size  %s  glass" % DOT),
-                                 ("E  %s  Ctrl+O  %s  Ctrl+V" % (DOT, DOT), "Scripts  %s  open  %s  paste" % (DOT, DOT)),
-                                 ("P  %s  Ctrl+," % DOT, "Phone  %s  settings" % DOT),
-                                 ("T  %s  C" % DOT, "Text only  %s  share hiding" % DOT),
+                                 ("E  %s  %s+O  %s  %s+V" % (DOT, native.CMD, DOT, native.CMD), "Scripts  %s  open  %s  paste" % (DOT, DOT)),
+                                 ("P  %s  %s+," % (DOT, native.CMD), "Phone  %s  settings" % DOT),
+                                 ("T  %s  C  %s  L" % (DOT, DOT), "Text only  %s  share hiding  %s  read aloud" % (DOT, DOT)),
                                  ("V  %s  M  %s  PgUp/PgDn" % (DOT, DOT), "Voice  %s  mirror  %s  sections" % (DOT, DOT))]),
         ]
         colw = (w - 48) / 2
@@ -594,13 +636,13 @@ class Prompter(QWidget):
             for ri, (keys, what) in enumerate(rows):
                 y = 42 + ri * 22
                 p.setPen(T.on_surface)
-                p.drawText(QRectF(x, y, colw * 0.50, 20), Qt.AlignmentFlag.AlignVCenter, keys)
+                p.drawText(QRectF(x, y, colw * 0.44, 20), Qt.AlignmentFlag.AlignVCenter, keys)
                 p.setPen(T.muted)
-                p.drawText(QRectF(x + colw * 0.50, y, colw * 0.50 - 8, 20), Qt.AlignmentFlag.AlignVCenter, what)
+                p.drawText(QRectF(x + colw * 0.44, y, colw * 0.56 - 8, 20), Qt.AlignmentFlag.AlignVCenter, what)
         p.setFont(self.cap_font)
         p.setPen(T.muted)
         p.drawText(QRectF(24, h - 28, w - 48, 20), Qt.AlignmentFlag.AlignVCenter,
-                   "In your script: # Heading = section  %s  [PAUSE] stops  %s  [CUE] in amber  %s  Esc closes"
+                   "In your script: # Heading = section  %s  [PAUSE] stops  %s  [CUE] shows in orange  %s  Esc closes"
                    % (DOT, DOT, DOT))
 
     # ------------------------------------------------------------ feedback
@@ -610,10 +652,12 @@ class Prompter(QWidget):
         self.kick()
 
     def sync_ui(self):
-        self.bar.play.setText(ICON["pause"] if (self.playing or self.counting) else ICON["play"])
+        running = (self.playing or self.counting) if not (self.cfg.voice_follow and not self.reading_aloud) \
+            else self.listening
+        if running != getattr(self, "_shown_running", None):
+            self._shown_running = running
+            self.bar.play.setIcon(icons.icon("pause" if running else "play", "#070910", 20))
         self.bar.wpm.setText("Voice" if self.cfg.voice_follow else "%d wpm" % self.cfg.wpm)
-        if self.cfg.voice_follow and not self.reading_aloud:
-            self.bar.play.setText(ICON["pause"] if self.listening else ICON["play"])
         self.bar.speak.setProperty("on", self.reading_aloud)
         self.bar.speak.style().unpolish(self.bar.speak)
         self.bar.speak.style().polish(self.bar.speak)
@@ -791,10 +835,12 @@ class Prompter(QWidget):
                            else "End of script", T.ok, 4)
 
     def _retarget(self):
-        c = max(0, self.aligner.cursor)
         if self.vline:
-            self.v_target = min(self.maxpos(), self.vline[min(c, len(self.vline) - 1)] * self.lh)
+            self.v_target = min(self.maxpos(), engine.voice_target(self.vline, self.aligner.cursor) * self.lh)
         self.kick()
+
+    def on_voice_stats(self, stats):
+        self.voice_latency = int(stats.get("latency_ms", 0))
 
     # ---- sections
     def jump_section(self, direction):
@@ -817,10 +863,10 @@ class Prompter(QWidget):
 
     # ---- ghost (click-through) & mirror
     def set_ghost(self, on):
-        self.ghost = bool(on) and win32.set_click_through(self.hwnd(), True)
+        self.ghost = bool(on) and native.set_click_through(self, True)
         if not on:
-            win32.set_click_through(self.hwnd(), False)
-        self.toast("Ghost mode: clicks pass through  %s  Ctrl+Alt+G to undo" % DOT if self.ghost
+            native.set_click_through(self, False)
+        self.toast("Ghost mode: clicks pass through  %s  %s+G to undo" % (DOT, native.MOD) if self.ghost
                    else "Ghost mode off", T.accent if self.ghost else None, 3.5)
         self.sync_ui()
 
@@ -932,13 +978,6 @@ class Prompter(QWidget):
         if self.show_help:
             self.show_help = False
             self.sync_ui()
-        hit = light_at(ev.position().toPoint())
-        if hit == "close":
-            return self.hide_window()
-        if hit == "mid":
-            return self.set_ghost(True)
-        if hit == "max":
-            return self.reset_position()
         edges = self.edges_at(ev.position().toPoint())
         wh = self.windowHandle()
         if edges != Qt.Edge(0):
@@ -950,13 +989,6 @@ class Prompter(QWidget):
         self.toggle_play()
 
     def mouseMoveEvent(self, ev):
-        lh = QRectF(4, 4, 66, 26).contains(ev.position())
-        if lh != self.lights_hover:
-            self.lights_hover = lh
-            self.update(0, 0, 80, 34)
-        if light_at(ev.position().toPoint()):
-            self.setCursor(Qt.CursorShape.PointingHandCursor)
-            return
         e = self.edges_at(ev.position().toPoint())
         L, R, Tp, B = Qt.Edge.LeftEdge, Qt.Edge.RightEdge, Qt.Edge.TopEdge, Qt.Edge.BottomEdge
         if e in (L | Tp, R | B):
@@ -979,7 +1011,6 @@ class Prompter(QWidget):
 
     def leaveEvent(self, ev):
         self.hovered = False
-        self.lights_hover = False
         self.sync_ui()
 
     def resizeEvent(self, ev):
@@ -1000,7 +1031,8 @@ class Prompter(QWidget):
     # ------------------------------------------------------------ keyboard
     def keyPressEvent(self, ev):
         mods = ev.modifiers()
-        if mods & Qt.KeyboardModifier.ControlModifier and mods & Qt.KeyboardModifier.AltModifier:
+        if (mods & Qt.KeyboardModifier.ControlModifier or mods & Qt.KeyboardModifier.MetaModifier) \
+                and mods & Qt.KeyboardModifier.AltModifier:
             return                                      # global hotkeys handle these
         k, K = ev.key(), Qt.Key
         ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
@@ -1047,6 +1079,7 @@ class Prompter(QWidget):
             "voice_follow": self.cfg.voice_follow, "listening": self.listening, "live_wpm": self.live_wpm,
             "ghost": self.ghost, "mirror": self.cfg.mirror, "reading_aloud": self.reading_aloud,
             "fillers": sum(self.coach.fillers.values()) if self.coach else 0,
+            "voice_latency_ms": self.voice_latency if self.listening else 0,
             "sections": [t for _, t in engine.sections(self.lines)],
             "script": {"id": self.script_id, "title": self.script_title} if self.script_text else None,
         }

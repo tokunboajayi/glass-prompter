@@ -89,7 +89,8 @@ def read_file(path):
 
 
 def title_from_filename(name):
-    stem = os.path.splitext(os.path.basename(name))[0]
+    base = re.split(r"[\\/]", name)[-1]          # Windows or POSIX path, whatever OS we run on
+    stem = os.path.splitext(base)[0]
     return re.sub(r"[_-]+", " ", stem).strip()[:MAX_TITLE] or "Imported script"
 
 
@@ -230,9 +231,55 @@ class ScriptStore:
                                     "ORDER BY at DESC, id DESC LIMIT ?", (int(script_id or 0), int(limit))).fetchall()
         return [dict(r) for r in rows]
 
+    def backup(self, folder, keep=7):
+        """Consistent snapshot of the library (sqlite online backup), one per day, newest `keep` kept.
+        Protects against the 'my scripts vanished after an update' failure users report elsewhere."""
+        os.makedirs(folder, exist_ok=True)
+        name = time.strftime("library-%Y%m%d.db")
+        dest = os.path.join(folder, name)
+        if not os.path.exists(dest):
+            with self._lock:
+                out = sqlite3.connect(dest)
+                try:
+                    self._db.backup(out)
+                finally:
+                    out.close()
+        snaps = sorted(f for f in os.listdir(folder) if f.startswith("library-") and f.endswith(".db"))
+        for old in snaps[:-keep]:
+            try:
+                os.remove(os.path.join(folder, old))
+            except OSError:
+                pass
+        return dest
+
     def close(self):
         with self._lock:
             try:
                 self._db.close()
             except Exception:
                 pass
+
+
+def safe_filename(title):
+    name = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", title).strip(" .")
+    return (name or "Script")[:80]
+
+
+def export_markdown(store, folder):
+    """Write every script to `folder` as .md (unique names). Returns how many were written."""
+    os.makedirs(folder, exist_ok=True)
+    used, n = set(), 0
+    for summary in store.list(limit=100000):
+        s = store.get(summary["id"])
+        if not s:
+            continue
+        base = safe_filename(s["title"])
+        name, k = base, 2
+        while name.lower() in used or os.path.exists(os.path.join(folder, name + ".md")):
+            name = "%s (%d)" % (base, k)
+            k += 1
+        used.add(name.lower())
+        with open(os.path.join(folder, name + ".md"), "w", encoding="utf-8", newline="\n") as f:
+            f.write(s["body"].rstrip() + "\n")
+        n += 1
+    return n

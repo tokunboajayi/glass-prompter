@@ -22,9 +22,10 @@ class Settings:
     click_through: bool = False
     mirror: bool = False
     coach: bool = True
+    mic_device: str = ""                               # "" = system default microphone
     # look
     font_px: int = 34
-    font_family: str = "Segoe UI Variable Display"
+    font_family: str = ""                              # "" = the platform's display font
     panel_alpha: float = 0.90
     clear_mode: bool = False
     read_line: float = 0.40
@@ -36,7 +37,7 @@ class Settings:
     remote_port: int = 8765
     pin: str = ""
     # system
-    start_with_windows: bool = False
+    start_with_windows: bool = False                   # "start at login" on every OS (name kept for old files)
     drop_dir: str = ""
     first_run_done: bool = False
 
