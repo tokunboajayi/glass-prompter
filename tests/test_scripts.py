@@ -95,5 +95,13 @@ def test_bad_files_rejected():
         scripts.read_bytes("broken.docx", b"not a zip")
 
 
+def test_rehearsal_history(store):
+    s = store.create("Pitch", "hello world")
+    for score in (60, 72, 85):
+        store.add_rehearsal(s["id"], {"seconds": 30, "wpm": 150, "filler_count": 2, "score": score})
+    hist = store.rehearsals(s["id"])
+    assert [h["score"] for h in hist] == [85, 72, 60]
+
+
 def test_title_from_filename():
     assert scripts.title_from_filename(r"C:\x\my_big-talk.docx") == "my big talk"

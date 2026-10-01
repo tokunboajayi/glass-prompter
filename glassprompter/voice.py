@@ -30,6 +30,7 @@ except Exception:
 
 class VoiceEngine(QObject):
     heard = Signal(list)          # most recent recognized words (normalized)
+    utterance = Signal(list)      # a finished phrase (for the Rehearsal Coach)
     level = Signal(float)         # 0..1 microphone level, ~10x per second
     status = Signal(str)          # "loading" | "listening" | "stopped"
     failed = Signal(str)          # human-readable error
@@ -84,6 +85,8 @@ class VoiceEngine(QObject):
             dev = sd.query_devices(kind="input")
             rate = int(dev["default_samplerate"]) or 16000
             # Restricting the recognizer to the script's own words makes it far more accurate.
+            from .coach import FILLERS
+            vocab = sorted(set(vocab) | FILLERS | {"you", "know", "i", "mean", "sort", "kind", "of"})
             grammar = json.dumps(vocab + ["[unk]"]) if vocab else None
             rec = vosk.KaldiRecognizer(model, rate, grammar) if grammar else vosk.KaldiRecognizer(model, rate)
 
@@ -109,6 +112,8 @@ class VoiceEngine(QObject):
                         self.level.emit(min(1.0, peak / 12000.0))
                     if rec.AcceptWaveform(data):
                         words = norm_words(json.loads(rec.Result()).get("text", "").replace("[unk]", ""))
+                        if words:
+                            self.utterance.emit(words)
                     else:
                         words = norm_words(json.loads(rec.PartialResult()).get("partial", "").replace("[unk]", ""))
                     if words and words != last:

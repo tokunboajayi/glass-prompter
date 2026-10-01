@@ -6,7 +6,7 @@ from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetricsF, QGuiApplication
                            QPainterPath, QPen, QPixmap, QPolygonF)
 from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QToolButton, QWidget
 
-from .. import engine, tracking, win32
+from .. import coach as coachlib, engine, tracking, win32
 from .glass import RADIUS, light_at, paint_glass, paint_lights
 from .theme import DASH, DOT, ICON, T, bar_qss, font, fonts
 
@@ -42,7 +42,9 @@ class ControlBar(QFrame):
 
         self.play = btn("play", "Play / pause  (Space, Ctrl+Alt+Space)", owner.toggle_play, "play")
         btn("restart", "Restart  (Home)", owner.restart)
-        self.voice = btn("mic", "Voice Follow: scroll as you speak  (V, Ctrl+Alt+V)", owner.toggle_voice, "voice")
+        self.voice = btn("mic", "Voice Follow + Rehearsal Coach: scroll as you speak  (V, Ctrl+Alt+V)",
+                         owner.toggle_voice, "voice")
+        self.speak = btn("speaker", "Read aloud: hear your script at your pace  (L)", owner.toggle_read_aloud, "speak")
         sep()
         btn("minus", "Slower  (Down)", lambda: owner.change_wpm(-10))
         self.wpm = QLabel("140 wpm", self)
@@ -99,6 +101,8 @@ class Prompter(QWidget):
     settingsChanged = Signal()
     pendingConsumed = Signal()
     listenRequested = Signal(bool)
+    readAloudRequested = Signal(bool)
+    rehearsalFinished = Signal(dict)
 
     def __init__(self, settings):
         super().__init__(None, Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
@@ -144,6 +148,8 @@ class Prompter(QWidget):
         self.v_count = 0
         self.live_wpm = 0
         self.ghost = False
+        self.coach = None
+        self.reading_aloud = False
         self.frosted = ""
         self.lights_hover = False
 
@@ -493,6 +499,16 @@ class Prompter(QWidget):
                     p.setBrush(c)
                     p.drawRoundedRect(QRectF(right + 8 + k * 5, by + 17 - bh, 3, bh), 1.5, 1.5)
                 right += 34
+                pace = coachlib.pace_label(self.live_wpm)
+                if pace:
+                    col = {"good": T.ok, "fast": T.bad, "slow": T.accent}[pace]
+                    right = self.pill(p, right + 4, by, {"good": "Pace good", "fast": "Slow down",
+                                                         "slow": "Pick it up"}[pace], col, clear)
+                if self.coach and self.coach.fillers:
+                    right = self.pill(p, right + 6, by, "%d filler%s" % (sum(self.coach.fillers.values()),
+                                      "" if sum(self.coach.fillers.values()) == 1 else "s"), T.muted, clear)
+        if self.reading_aloud:
+            right = self.pill(p, right + 6, by, "Reading aloud", T.accent, clear)
         p.setFont(self.cap_font)
         if not self.playing and not self.counting and not self.listening:
             p.setPen(T.muted)
@@ -596,8 +612,11 @@ class Prompter(QWidget):
     def sync_ui(self):
         self.bar.play.setText(ICON["pause"] if (self.playing or self.counting) else ICON["play"])
         self.bar.wpm.setText("Voice" if self.cfg.voice_follow else "%d wpm" % self.cfg.wpm)
-        if self.cfg.voice_follow:
+        if self.cfg.voice_follow and not self.reading_aloud:
             self.bar.play.setText(ICON["pause"] if self.listening else ICON["play"])
+        self.bar.speak.setProperty("on", self.reading_aloud)
+        self.bar.speak.style().unpolish(self.bar.speak)
+        self.bar.speak.style().polish(self.bar.speak)
         self.bar.voice.setProperty("on", self.cfg.voice_follow)
         self.bar.voice.style().unpolish(self.bar.voice)
         self.bar.voice.style().polish(self.bar.voice)
@@ -611,6 +630,8 @@ class Prompter(QWidget):
 
     # ------------------------------------------------------------ actions (also called by hotkeys/remote)
     def toggle_play(self):
+        if self.reading_aloud:
+            return self.stop_read_aloud()
         if self.cfg.voice_follow:
             if self.pending and not self.listening:
                 self._take_pending()
@@ -665,9 +686,13 @@ class Prompter(QWidget):
             cur_line = engine.line_index(self.pos, self.lh)
             first = next((k for k, ln in enumerate(self.vline) if ln >= cur_line), 0)
             self.aligner.reset(first - 1)
+        if self.reading_aloud:
+            self.stop_read_aloud()
         self.listening = True
         self.voice_loading = True
         self.v_t0, self.v_count, self.live_wpm = None, 0, 0
+        self.coach = coachlib.Coach(self.vwords)
+        self.coach.start(time.monotonic(), self.aligner.cursor)
         self.v_target = self.pos
         self.listenRequested.emit(True)
         self.kick()
@@ -679,11 +704,47 @@ class Prompter(QWidget):
         self.voice_loading = False
         self.mic_level = 0.0
         self.listenRequested.emit(False)
-        if was and summary and self.v_t0 and self.v_count > 5:
-            secs = time.monotonic() - self.v_t0
-            self.toast("Nice.  %s spoken  %s  %d wpm average" % (engine.fmt_secs(secs), DOT, self.live_wpm),
-                       T.ok, 4)
+        if was and summary and self.coach and self.v_count > 5:
+            report = self.coach.report(time.monotonic())
+            report["script_id"], report["title"] = self.script_id, self.script_title
+            if self.cfg.coach:
+                self.rehearsalFinished.emit(report)
+            else:
+                self.toast("Nice.  %s  %s  %d wpm" % (engine.fmt_secs(report["seconds"]), DOT, report["wpm"]), T.ok, 4)
+        self.coach = None
         self.sync_ui()
+
+    def on_utterance(self, words):
+        if self.listening and self.coach:
+            self.coach.on_utterance(words, time.monotonic())
+            self.update()
+
+    # ---- read aloud (text-to-speech rehearsal)
+    def toggle_read_aloud(self):
+        if self.reading_aloud:
+            return self.stop_read_aloud()
+        if self.listening:
+            self.stop_listening(summary=False)
+        self.reading_aloud = True
+        self.counting = False
+        self.playing = True                                     # scroll along with the voice
+        self.last = self.now()
+        self.readAloudRequested.emit(True)
+        self.toast("Reading aloud at %d wpm  %s  L to stop" % (self.cfg.wpm, DOT), T.accent, 3)
+        self.sync_ui()
+
+    def stop_read_aloud(self):
+        self.reading_aloud = False
+        self.playing = False
+        self.readAloudRequested.emit(False)
+        self.sync_ui()
+
+    def on_read_aloud_done(self):
+        if self.reading_aloud:
+            self.reading_aloud = False
+            self.playing = False
+            self.toast("Finished reading aloud", T.ok)
+            self.sync_ui()
 
     def on_voice_status(self, status):
         self.voice_loading = status == "loading"
@@ -703,6 +764,8 @@ class Prompter(QWidget):
         self.voice_loading = False
         before = self.aligner.cursor
         c = self.aligner.update(words)
+        if c > before and self.coach:
+            self.coach.on_cursor(before, c)
         if c > before:
             now = time.monotonic()
             if self.v_t0 is None:
@@ -714,10 +777,18 @@ class Prompter(QWidget):
         if c != before:
             self._retarget()
             self.stateChanged.emit()
-        if self.aligner.done:
+        if self.aligner.done and not getattr(self, "_finishing", False):
+            # wait a moment so the recognizer's final phrase (and any last filler) reaches the coach
+            self._finishing = True
+            QTimer.singleShot(1300, self._finish_run)
+
+    def _finish_run(self):
+        self._finishing = False
+        if self.listening:
             self.stop_listening()
-            self.toast("End of script  %s  %d wpm average" % (DOT, self.live_wpm) if self.live_wpm
-                       else "End of script", T.ok, 4)
+            if not self.cfg.coach:
+                self.toast("End of script  %s  %d wpm average" % (DOT, self.live_wpm) if self.live_wpm
+                           else "End of script", T.ok, 4)
 
     def _retarget(self):
         c = max(0, self.aligner.cursor)
@@ -948,6 +1019,7 @@ class Prompter(QWidget):
             K.Key_Right: lambda: self.nudge(1), K.Key_PageUp: lambda: self.jump_section(-1),
             K.Key_PageDown: lambda: self.jump_section(1), K.Key_Home: self.restart, K.Key_R: self.restart,
             K.Key_V: self.toggle_voice, K.Key_G: self.toggle_ghost, K.Key_M: self.toggle_mirror,
+            K.Key_L: self.toggle_read_aloud,
             K.Key_Plus: lambda: self.change_font(2), K.Key_Equal: lambda: self.change_font(2),
             K.Key_Minus: lambda: self.change_font(-2), K.Key_BracketLeft: lambda: self.change_glass(-0.05),
             K.Key_BracketRight: lambda: self.change_glass(0.05), K.Key_T: self.toggle_clear,
@@ -973,7 +1045,8 @@ class Prompter(QWidget):
             "queued": self.pending is not None, "capture_hidden": self.cap_state,
             "window_visible": self.isVisible(), "font_px": self.cfg.font_px,
             "voice_follow": self.cfg.voice_follow, "listening": self.listening, "live_wpm": self.live_wpm,
-            "ghost": self.ghost, "mirror": self.cfg.mirror,
+            "ghost": self.ghost, "mirror": self.cfg.mirror, "reading_aloud": self.reading_aloud,
+            "fillers": sum(self.coach.fillers.values()) if self.coach else 0,
             "sections": [t for _, t in engine.sections(self.lines)],
             "script": {"id": self.script_id, "title": self.script_title} if self.script_text else None,
         }

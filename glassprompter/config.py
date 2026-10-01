@@ -21,6 +21,7 @@ class Settings:
     voice_follow: bool = False
     click_through: bool = False
     mirror: bool = False
+    coach: bool = True
     # look
     font_px: int = 34
     font_family: str = "Segoe UI Variable Display"

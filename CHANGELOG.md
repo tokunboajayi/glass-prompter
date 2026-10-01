@@ -1,4 +1,19 @@
-﻿# Changelog
+# Changelog
+
+## 1.2.0 - 2026-10-01
+Audio release.
+
+- **Rehearsal Coach:** practice with Voice Follow and get a report card when you finish:
+  - A 0-100 score.
+  - Your pace against the 130-165 wpm presenting range.
+  - Filler words ("um", "uh", "like", "you know" and more), counted only when they're not part of your script.
+  - Long pauses and skipped lines.
+  - One focused tip, plus your score trend over your last 8 runs.
+- **Live pace light** while you speak ("Pace good", "Slow down" or "Pick it up"), with a live filler counter.
+- **Read Aloud:** Windows' built-in voice reads your script at your words-per-minute setting while the prompter
+  scrolls along, so you can learn the rhythm. Use L, the speaker button, the tray or the phone.
+- The library stores rehearsal history (database schema v2, migrated automatically).
+- 58 automated tests.
 
 ## 1.1.0 - 2026-10-01
 The "best version possible" release, shaped by research on GhostPrompter, Speakflow, PromptSmart, ShareSpeak and

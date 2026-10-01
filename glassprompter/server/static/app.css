@@ -100,3 +100,4 @@ h1,.status b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Sego
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   .card,.tabs,.item,.field,.btn,.pill,#toast{background:#17171d}
 }
+.grid .btn.full-soft{grid-column:1/-1}

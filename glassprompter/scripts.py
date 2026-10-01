@@ -17,7 +17,7 @@ MAX_TITLE = 120
 MAX_BODY = 1_000_000          # characters; ~150k words, far beyond any real script
 MAX_DOCX_XML = 25_000_000     # bytes of document.xml we are willing to inflate (zip-bomb guard)
 ALLOWED_EXT = (".txt", ".md", ".docx")
-DB_VERSION = 1
+DB_VERSION = 2
 
 
 class ValidationError(ValueError):
@@ -121,6 +121,23 @@ class ScriptStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_scripts_updated ON scripts(updated DESC);
             """)
+            self._db.execute("PRAGMA user_version = 1")
+            self._db.commit()
+            v = 1
+        if v < 2:
+            self._db.executescript("""
+                CREATE TABLE IF NOT EXISTS rehearsals (
+                    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                    script_id INTEGER,
+                    at        REAL    NOT NULL,
+                    seconds   INTEGER NOT NULL,
+                    wpm       INTEGER NOT NULL,
+                    fillers   INTEGER NOT NULL,
+                    score     INTEGER NOT NULL,
+                    data      TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_reh_script ON rehearsals(script_id, at DESC);
+            """)
             self._db.execute("PRAGMA user_version = %d" % DB_VERSION)
             self._db.commit()
 
@@ -197,6 +214,21 @@ class ScriptStore:
         if r:
             return self.update(r["id"], title, body)
         return self.create(title, body, source=source)
+
+    def add_rehearsal(self, script_id, report):
+        import json
+        with self._lock:
+            self._db.execute("INSERT INTO rehearsals(script_id, at, seconds, wpm, fillers, score, data) "
+                             "VALUES (?,?,?,?,?,?,?)",
+                             (int(script_id or 0), time.time(), int(report["seconds"]), int(report["wpm"]),
+                              int(report["filler_count"]), int(report["score"]), json.dumps(report)))
+            self._db.commit()
+
+    def rehearsals(self, script_id, limit=10):
+        with self._lock:
+            rows = self._db.execute("SELECT at, seconds, wpm, fillers, score FROM rehearsals WHERE script_id = ? "
+                                    "ORDER BY at DESC, id DESC LIMIT ?", (int(script_id or 0), int(limit))).fetchall()
+        return [dict(r) for r in rows]
 
     def close(self):
         with self._lock:

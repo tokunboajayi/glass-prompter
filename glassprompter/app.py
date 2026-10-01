@@ -16,9 +16,10 @@ from . import APP_ID, APP_NAME, ORG, __version__, config, engine, paths, scripts
 from . import log as logsetup
 from .server import RemoteServer
 from .voice import VoiceEngine
+from .tts import Speaker
 from .ui import icon as appicon
 from .ui import theme
-from .ui.dialogs import AboutDialog, LibraryDialog, PhoneDialog, SettingsDialog, WelcomeDialog
+from .ui.dialogs import AboutDialog, LibraryDialog, PhoneDialog, ReportDialog, SettingsDialog, WelcomeDialog
 from .ui.prompter import Prompter
 
 log = logging.getLogger("glassprompter")
@@ -110,6 +111,12 @@ class Controller(QObject):
         self.voice.status.connect(self.prompter.on_voice_status)
         self.voice.failed.connect(self._voice_failed)
         self.prompter.listenRequested.connect(self._listen)
+        self.voice.utterance.connect(self.prompter.on_utterance)
+        self.prompter.rehearsalFinished.connect(self._rehearsal_done)
+        self.speaker = Speaker()
+        self.speaker.finished.connect(self.prompter.on_read_aloud_done)
+        self.prompter.readAloudRequested.connect(
+            lambda on: self.speaker.speak(self.prompter.script_text, self.cfg.s.wpm) if on else self.speaker.stop())
 
         self.save_timer = QTimer(self, singleShot=True, interval=600, timeout=self.cfg.save)
         self.publish_timer = QTimer(self, singleShot=True, interval=80, timeout=self.publish)
@@ -150,6 +157,19 @@ class Controller(QObject):
             self.voice.start(self.prompter.vwords)
         else:
             self.voice.stop()
+
+    def _rehearsal_done(self, report):
+        sid = report.get("script_id") or 0
+        history = self.store.rehearsals(sid, limit=8)
+        if history:
+            report["trend"] = report["score"] - history[0]["score"]
+        self.store.add_rehearsal(sid, report)
+        history = self.store.rehearsals(sid, limit=8)
+        dlg = ReportDialog(None, report, history)
+        self.show_dialog(dlg)
+        if getattr(dlg, "again", False):
+            self.prompter.restart()
+            self.prompter.start_listening()
 
     def _voice_failed(self, msg):
         self.prompter.stop_listening(summary=False)
@@ -337,6 +357,7 @@ class Controller(QObject):
          "slower": lambda: p.change_wpm(-10), "back": lambda: p.nudge(-2), "ahead": lambda: p.nudge(2),
          "bigger": lambda: p.change_font(2), "smaller": lambda: p.change_font(-2),
          "hide": p.toggle_window, "voice": p.toggle_voice, "ghost": p.toggle_ghost,
+         "read_aloud": p.toggle_read_aloud,
          "next_section": lambda: p.jump_section(1), "prev_section": lambda: p.jump_section(-1)}[action]()
         self.schedule_publish()
 
@@ -444,6 +465,7 @@ class Controller(QObject):
         self.act_mirror = QAction("Mirror text", m, checkable=True,
                                   triggered=lambda on: on != self.cfg.s.mirror and self.prompter.toggle_mirror())
         m.addAction(self.act_voice)
+        m.addAction(QAction("Read script aloud", m, triggered=self.prompter.toggle_read_aloud))
         m.addAction(self.act_ghost)
         m.addAction(self.act_mirror)
         m.addSeparator()
@@ -491,6 +513,7 @@ class Controller(QObject):
     def quit(self):
         log.info("Quitting")
         self.voice.stop()
+        self.speaker.stop()
         self.unregister_hotkeys()
         self.stop_server()
         self.cfg.save()

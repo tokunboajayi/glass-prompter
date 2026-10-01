@@ -1,4 +1,4 @@
-﻿# Glass Prompter
+# Glass Prompter
 
 A see-through teleprompter that sits right under your webcam, so you can read your script and keep eye contact on calls, demos and videos. It is hidden from screen sharing and recordings.
 
@@ -6,6 +6,8 @@ A see-through teleprompter that sits right under your webcam, so you can read yo
 
 ## Features
 
+- **Rehearsal Coach:** a report card after every practice run: score, pace, filler words, pauses and skipped lines, with a trend over time. Plus a live pace light while you speak.
+- **Read Aloud:** hear your script in a natural voice at your target pace while it scrolls.
 - **Voice Follow:** the script scrolls as you speak. It runs 100% offline and only listens for your script's own words, so it's accurate. Spoken words fade so your eye lands on the next one, it shows your live words per minute, and you get a summary at the end.
 - **macOS-style glass:** real frosted blur on Windows 11, traffic-light window buttons, frameless glass dialogs and iOS-style switches.
 - **Ghost mode:** clicks pass through the prompter to the app behind it.
@@ -68,7 +70,7 @@ The server runs on background threads and never touches the UI. It reaches the U
 ```powershell
 python -m pip install -r requirements.txt
 python glass_prompter.pyw                     # run from source
-python -m pytest --basetemp=.pytest_tmp tests # 53 tests
+python -m pytest --basetemp=.pytest_tmp tests # 58 tests
 powershell -ExecutionPolicy Bypass -File packaging\build.ps1   # test -> bundle -> installer
 python tools\smoke.py .smoke --visible        # UI smoke test with screenshots
 ```

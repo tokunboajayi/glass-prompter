@@ -8,6 +8,11 @@ A see-through teleprompter that sits right under your webcam, so you keep eye co
 
 Requires Windows 10 (version 2004 or later) or Windows 11, 64-bit.
 
+## New in 1.2: audio
+- **Rehearsal Coach:** a report card after each practice run, covering score, pace, filler words, pauses and skipped lines, with your trend over time.
+- **Live pace light:** "Pace good", "Slow down" or "Pick it up", with a live filler counter.
+- **Read Aloud:** hear your script at your pace while the prompter scrolls along.
+
 ## New in 1.1
 - **Voice Follow:** the script scrolls as you speak. It's 100% offline and spoken words fade as you go.
 - **macOS-style glass UI:** real frosted blur, traffic lights, and iOS-style switches.

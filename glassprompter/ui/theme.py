@@ -44,7 +44,7 @@ def font(role, px, weight=QFont.Weight.Normal):
 
 
 ICON = dict(play=0xE768, pause=0xE769, edit=0xE70F, phone=0xE8EA, close=0xE8BB, minus=0xE738, plus=0xE710,
-            font_down=0xE8E7, font_up=0xE8E8, help=0xE897, restart=0xE72C, settings=0xE713, library=0xE8F1, mic=0xE720)
+            font_down=0xE8E7, font_up=0xE8E8, help=0xE897, restart=0xE72C, settings=0xE713, library=0xE8F1, mic=0xE720, speaker=0xE767)
 ICON = {k: chr(v) for k, v in ICON.items()}
 DOT, DASH, ELLIPSIS = chr(0xB7), chr(0x2014), chr(0x2026)
 
@@ -60,7 +60,7 @@ QToolButton:pressed {{ background: rgba(255,255,255,12); }}
 QToolButton:focus {{ border: 2px solid #FFB020; }}
 QToolButton#play {{ background: #FFB020; color: #16120A; }}
 QToolButton#play:hover {{ background: #FFC04D; }}
-QToolButton#voice[on="true"] {{ color: #FFB020; background: rgba(255,176,32,40); }}
+QToolButton#voice[on="true"], QToolButton#speak[on="true"] {{ color: #FFB020; background: rgba(255,176,32,40); }}
 QLabel#wpm {{ color: #C8C8D2; font-family: "{f['ui']}"; font-size: 12px; padding: 0 2px; min-width: 52px; }}
 QFrame#sep {{ background: rgba(255,255,255,22); min-width: 1px; max-width: 1px; margin: 6px 3px; }}
 """
