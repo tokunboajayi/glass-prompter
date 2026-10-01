@@ -8,3 +8,5 @@ dist/
 assets/
 shots/
 .shots/
+.agents/
+.build_log.txt
