@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e0e12">
+<meta name="color-scheme" content="dark">
+<meta name="referrer" content="no-referrer">
+<title>Glass Prompter Remote</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <h1><img src="/icon.svg" alt="" width="24" height="24"> Prompter</h1>
+    <span id="conn" class="pill"><i></i><span>Connecting</span></span>
+  </header>
+
+  <!-- pairing -->
+  <section id="pairView" class="card" hidden>
+    <h2>Enter the 6-digit PIN</h2>
+    <p class="hint">On your PC, click the prompter and press <b>P</b> to see it.</p>
+    <form id="pairForm" autocomplete="off">
+      <input id="pin" class="pin" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" aria-label="PIN" required>
+      <button class="btn primary wide" type="submit">Connect</button>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+    <section class="card status" aria-live="polite">
+      <div class="row-between">
+        <b id="stateText">Paused</b>
+        <span id="meta" class="muted"></span>
+      </div>
+      <div id="scriptTitle" class="script-title"></div>
+      <div class="bar"><div id="prog"></div></div>
+      <div id="queued" class="note" hidden>New script waiting. Pause to load it.</div>
+    </section>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="remote" aria-selected="true">Remote</button>
+      <button role="tab" data-tab="library" aria-selected="false">Library</button>
+      <button role="tab" data-tab="write" aria-selected="false">Write</button>
+    </nav>
+
+    <section id="tab-remote" role="tabpanel">
+      <div class="grid">
+        <button class="btn primary full" data-action="play"><span id="ppIcon" class="sym">&#9654;</span><span id="ppText">Play</span></button>
+        <button class="btn" data-action="back"><span class="sym">&#8593;</span><small>Back</small></button>
+        <button class="btn" data-action="restart"><span class="sym">&#8634;</span><small>Restart</small></button>
+        <button class="btn" data-action="ahead"><span class="sym">&#8595;</span><small>Ahead</small></button>
+        <button class="btn" data-action="slower"><span class="sym">&#8722;</span><small>Slower</small></button>
+        <button class="btn" data-action="faster"><span class="sym">+</span><small>Faster</small></button>
+        <button class="btn" data-action="hide"><span class="sym">&#9681;</span><small>Hide / show</small></button>
+        <button class="btn half" data-action="smaller"><span class="sym sm">A</span><small>Smaller</small></button>
+        <button class="btn half" data-action="bigger"><span class="sym lg">A</span><small>Bigger</small></button>
+      </div>
+    </section>
+
+    <section id="tab-library" role="tabpanel" hidden>
+      <input id="search" class="field" type="search" placeholder="Search scripts" aria-label="Search scripts">
+      <ul id="list" class="list"></ul>
+      <p id="empty" class="hint center" hidden>No scripts yet. Write one or upload a file.</p>
+    </section>
+
+    <section id="tab-write" role="tabpanel" hidden>
+      <div class="row-between">
+        <span id="editing" class="muted">New script</span>
+        <button id="newBtn" class="link" type="button" hidden>Start a new one</button>
+      </div>
+      <input id="title" class="field" maxlength="120" placeholder="Title (optional)" aria-label="Title">
+      <textarea id="body" class="field" placeholder="Paste or type your script.&#10;&#10;[PAUSE] on its own line stops the scroll.&#10;[ANY CUE] on its own line shows in amber." aria-label="Script"></textarea>
+      <p id="count" class="hint">0 words</p>
+      <div class="actions">
+        <button id="saveLoad" class="btn primary" type="button">Save &amp; load</button>
+        <button id="save" class="btn" type="button">Save</button>
+      </div>
+      <label class="upload">&#8682; Upload .txt, .md or .docx
+        <input id="file" type="file" accept=".txt,.md,.docx" hidden>
+      </label>
+    </section>
+  </div>
+</main>
+<div id="toast" role="status"></div>
+</body>
+</html>
