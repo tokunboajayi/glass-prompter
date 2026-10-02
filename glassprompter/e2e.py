@@ -146,6 +146,7 @@ class Audit:
 
         # 1. single instance: four copies started in the same instant
         self.launch(4)
+        t0 = time.time()
         up = self.wait(lambda: self.call("GET", "/api/v1/health", auth=False, timeout=2)[0] == 200, 90, 0.5)
         if not self.check("app starts and phone server is up", bool(up)):
             self.out("  processes: %s" % ", ".join("running" if p.poll() is None else "exit %s" % p.returncode
@@ -153,6 +154,10 @@ class Audit:
             self._dump(os.path.join(self.home, "startup_trace.txt"), "where the app is stuck", 80)
             self._dump(os.path.join(self.home, "logs", "glassprompter.log"), "app log", 40)
             return self.finish()
+        took = time.time() - t0
+        self.out("%-34s %s  %.0f s to start" % ("startup time", "PASS" if took < 20 else "SLOW", took))
+        if took >= 20:                                 # not fatal, but show exactly where the time went
+            self._dump(os.path.join(self.home, "startup_trace.txt"), "where startup spent its time", 120)
         time.sleep(8)                                  # losers hand over and exit
         self.check("single instance (4-way launch race)", len(self.alive()) == 1,
                    "%d running" % len(self.alive()))
