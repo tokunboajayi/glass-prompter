@@ -13,7 +13,7 @@ ReleaseDate: 2026-10-02
 Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/tokunboajayi/glass-prompter/releases/download/v2.4.2/GlassPrompter-Setup-2.4.2.exe
-  InstallerSha256: A4C96EA2A56360915335434C41126B3046BEE1C5CF0CCA4A36349A18AE04D5E4
+  InstallerSha256: 2DB4C10C2D4F0A2101A2B138B703628DB1E334BF0B70745D642C86E31372CACF
   ProductCode: '{6F1C2D4E-8B7A-4C3D-9E21-5A7C3B9D0E14}_is1'
 ManifestType: installer
 ManifestVersion: 1.6.0
