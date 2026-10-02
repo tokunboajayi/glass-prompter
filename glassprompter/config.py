@@ -43,6 +43,7 @@ class Settings:
     last_update_check: float = 0.0
     skipped_version: str = ""
     probe_version: str = ""                            # app version whose native parts were last crash-tested
+    probe_exe: str = ""                                # ...and where it ran from (a moved app is tested again)
     native_crashes: list = field(default_factory=list)  # parts that crashed that test: "voice_follow", "read_aloud"
     start_with_windows: bool = False                   # "start at login" on every OS (name kept for old files)
     drop_dir: str = ""
