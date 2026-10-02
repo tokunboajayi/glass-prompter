@@ -203,12 +203,39 @@ class GlassDialog(QDialog):
             return super().mousePressEvent(ev)
         pt = ev.position().toPoint()
         edges = self._edges(pt)
-        if edges != Qt.Edge(0):
-            self.windowHandle().startSystemResize(edges)
-        elif pt.y() < HEADER + 8:                       # the header works like a title bar
-            self.windowHandle().startSystemMove()
+        if edges == Qt.Edge(0) and pt.y() >= HEADER + 8:
+            return                                       # only the header works like a title bar
+        wh, ok = self.windowHandle(), False
+        if native.OS != "macos" and wh is not None:      # macOS: drag by hand (system move is a no-op there)
+            ok = wh.startSystemResize(edges) if edges != Qt.Edge(0) else wh.startSystemMove()
+        if not ok:
+            self._drag = (edges, ev.globalPosition().toPoint(), self.geometry())
+
+    def mouseReleaseEvent(self, ev):
+        self._drag = None
+        super().mouseReleaseEvent(ev)
 
     def mouseMoveEvent(self, ev):
+        drag = getattr(self, "_drag", None)
+        if drag and ev.buttons() & Qt.MouseButton.LeftButton:
+            edges, start, g0 = drag
+            d = ev.globalPosition().toPoint() - start
+            if edges == Qt.Edge(0):
+                self.move(g0.topLeft() + d)
+            else:
+                from PySide6.QtCore import QRect
+                g = QRect(g0)
+                mw, mh = self.minimumSizeHint().width(), self.minimumSizeHint().height()
+                if edges & Qt.Edge.LeftEdge:
+                    g.setLeft(min(g0.right() - mw, g0.left() + d.x()))
+                if edges & Qt.Edge.RightEdge:
+                    g.setRight(max(g0.left() + mw, g0.right() + d.x()))
+                if edges & Qt.Edge.TopEdge:
+                    g.setTop(min(g0.bottom() - mh, g0.top() + d.y()))
+                if edges & Qt.Edge.BottomEdge:
+                    g.setBottom(max(g0.top() + mh, g0.bottom() + d.y()))
+                self.setGeometry(g)
+            return
         e = self._edges(ev.position().toPoint())
         L, R, Tp, B = Qt.Edge.LeftEdge, Qt.Edge.RightEdge, Qt.Edge.TopEdge, Qt.Edge.BottomEdge
         if e in (L | Tp, R | B):

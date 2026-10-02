@@ -122,6 +122,7 @@ class Speaker(QObject):
         self._voices = {}
         self._lock = threading.Lock()
         self.natural = False
+        self.safe = True                    # False if the natural voice crashed in the startup crash test
 
     @property
     def speaking(self):
@@ -131,7 +132,7 @@ class Speaker(QObject):
 
     def preload(self, voice_id):
         """Load the voice in the background so the first press of Read Aloud speaks almost instantly."""
-        if voice_id != SYSTEM and natural_available(voice_id):
+        if voice_id != SYSTEM and self.safe and natural_available(voice_id):
             threading.Thread(target=self._voice, args=(voice_id,), daemon=True, name="tts-preload").start()
 
     def _voice(self, voice_id):
@@ -149,7 +150,7 @@ class Speaker(QObject):
             plan = [it for it in plan if it[0] == "rest" or it[2] + len(it[3]) > start_word]
         if not any(it[0] == "say" for it in plan):
             return False
-        if voice_id != SYSTEM and natural_available(voice_id):
+        if voice_id != SYSTEM and self.safe and natural_available(voice_id):
             self.natural = True
             self._stop.clear()
             self._thread = threading.Thread(target=self._run_natural, args=(plan, wpm, voice_id),

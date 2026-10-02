@@ -1,7 +1,7 @@
 """The prompter overlay: a frameless, always-on-top, per-pixel translucent window."""
 import time
 
-from PySide6.QtCore import QElapsedTimer, QEasingCurve, QPointF, QPropertyAnimation, QRectF, QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QElapsedTimer, QEasingCurve, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetricsF, QGuiApplication, QLinearGradient, QPainter,
                            QPainterPath, QPen, QPixmap, QPolygonF)
 from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabel, QMenu, QToolButton, QWidget
@@ -1248,15 +1248,43 @@ class Prompter(QWidget):
             self.sync_ui()
         edges = self.edges_at(ev.position().toPoint())
         wh = self.windowHandle()
-        if edges != Qt.Edge(0):
-            wh.startSystemResize(edges)
-        else:
-            wh.startSystemMove()
+        # macOS: Qt's system move/resize doesn't work for frameless always-on-top tool panels, so drag by hand there
+        # (and anywhere the system call is refused).
+        ok = False
+        if native.OS != "macos" and wh is not None:
+            ok = wh.startSystemResize(edges) if edges != Qt.Edge(0) else wh.startSystemMove()
+        if not ok:
+            self._drag = (edges, ev.globalPosition().toPoint(), self.geometry())
+
+    def mouseReleaseEvent(self, ev):
+        self._drag = None
+
+    def _manual_drag(self, gp):
+        edges, start, g0 = self._drag
+        d = gp - start
+        if edges == Qt.Edge(0):
+            self.move(g0.topLeft() + d)
+            return
+        g = QRect(g0)
+        minw, minh = self.minimumWidth(), self.minimumHeight()
+        if edges & Qt.Edge.LeftEdge:
+            g.setLeft(min(g0.right() - minw, g0.left() + d.x()))
+        if edges & Qt.Edge.RightEdge:
+            g.setRight(max(g0.left() + minw, g0.right() + d.x()))
+        if edges & Qt.Edge.TopEdge:
+            g.setTop(min(g0.bottom() - minh, g0.top() + d.y()))
+        if edges & Qt.Edge.BottomEdge:
+            g.setBottom(max(g0.top() + minh, g0.bottom() + d.y()))
+        self.setGeometry(g)
 
     def mouseDoubleClickEvent(self, ev):
+        self._drag = None
         self.toggle_play()
 
     def mouseMoveEvent(self, ev):
+        if getattr(self, "_drag", None) and ev.buttons() & Qt.MouseButton.LeftButton:
+            self._manual_drag(ev.globalPosition().toPoint())
+            return
         e = self.edges_at(ev.position().toPoint())
         L, R, Tp, B = Qt.Edge.LeftEdge, Qt.Edge.RightEdge, Qt.Edge.TopEdge, Qt.Edge.BottomEdge
         if e in (L | Tp, R | B):

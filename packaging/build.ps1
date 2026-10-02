@@ -42,6 +42,12 @@ python -m PyInstaller --noconfirm --clean --log-level WARN `
   --distpath "$build\dist" --workpath "$build\work" packaging\GlassPrompter.spec
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed." }
 
+Write-Host "-- self-test of the built app (Voice Follow + Read Aloud)"
+$report = Join-Path $build "selftest.txt"
+$st = Start-Process -FilePath "$build\dist\GlassPrompter\GlassPrompter.exe" -ArgumentList "--selftest", "`"$report`"" -Wait -PassThru
+Get-Content $report
+if ($st.ExitCode -ne 0) { throw "Self-test failed: the build is missing Voice Follow or Read Aloud parts." }
+
 Write-Host "-- installer"
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") |
   Where-Object { Test-Path $_ } | Select-Object -First 1

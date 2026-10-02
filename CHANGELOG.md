@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.4.1 - 2026-10-02
+Mac fixes, from the first real MacBook test.
+
+- **Voice Follow works on Mac.** The speech engine (`libvosk.dyld`) was missing from the Mac app. The build tool
+  only collected `.dylib` files, so it skipped this one.
+- **Built-in self-test:** `GlassPrompter --selftest` checks the speech model, the Voice Follow engine, the natural
+  voice and audio. Every Windows and Mac build now runs it, and the release fails if any part is missing.
+- **Crash guard:** the first time a new version starts, it tests Voice Follow, the natural voice and audio output
+  in separate background processes.
+  - If one of them crashes on that computer, only that feature is switched off. The app stays open.
+  - Read Aloud falls back to the system voice, and the crash is written to the log.
+- **Moving and resizing on Mac:** the prompter and dialogs can now be dragged and resized on macOS. The system
+  window-drag call does nothing for this kind of floating panel there, so the app now moves the window itself.
+
 ## 2.4.0 - 2026-10-02
 Seamless UI release: one glass design language across the app and the website.
 

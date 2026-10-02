@@ -61,6 +61,10 @@ Files whose names start with an underscore (like this one) are ignored.
 """
 
 
+class GuardSignals(QObject):
+    done = Signal(list)
+
+
 class UpdateSignals(QObject):
     found = Signal(dict)
     none = Signal(bool)          # True if the user asked (show "you're up to date")
@@ -139,8 +143,13 @@ class Controller(QObject):
         if self.cfg.s.remote_enabled:
             self.start_server()
         QTimer.singleShot(1200, self._probe_network)
-        QTimer.singleShot(1500, self.voice.preload)             # first Space press starts listening instantly
-        QTimer.singleShot(2500, lambda: self.speaker.preload(self.cfg.s.tts_voice))
+        self.guard = GuardSignals()
+        self.guard.done.connect(self._guard_done)
+        if self.cfg.s.probe_version == __version__:
+            self._guard_done(list(self.cfg.s.native_crashes), first=False)
+        else:
+            self.speaker.safe = False                            # system voice until the crash test passes
+            QTimer.singleShot(1500, self._crash_guard)
         QTimer.singleShot(4000, self._backup)
         self.update = None
         self.updating = False
@@ -171,8 +180,43 @@ class Controller(QObject):
                  bool(self.server and self.server.running), sum(self.hotkeys.ok.values()), len(HOTKEYS),
                  native.capture_support()[0])
 
+    # ------------------------------------------------------------ native crash guard
+    def _crash_guard(self):
+        """Once per app version, run Voice Follow, the natural voice and audio output in child processes.
+        If a native library crashes there, that feature is switched off instead of taking the whole app down."""
+        def run():
+            from . import selftest
+            crashed = []
+            for part, checks in (("voice_follow", ("voice_follow",)), ("read_aloud", ("read_aloud_synth", "audio_out"))):
+                for c in checks:
+                    res = selftest.probe_one(c, timeout=120)
+                    log.info("crash guard %s: %s %s", c, "ok" if res["ok"] else "FAILED", res["detail"])
+                    if res["crashed"]:
+                        crashed.append(part)
+                        break
+            self.guard.done.emit(crashed)
+        threading.Thread(target=run, name="crash-guard", daemon=True).start()
+
+    def _guard_done(self, crashed, first=True):
+        if first:
+            self.cfg.s.native_crashes, self.cfg.s.probe_version = list(crashed), __version__
+            self.cfg.save()
+        self.voice_blocked = "voice_follow" in crashed
+        self.speaker.safe = "read_aloud" not in crashed
+        if not self.voice_blocked:
+            QTimer.singleShot(200, self.voice.preload)            # first Space press starts listening instantly
+        if self.speaker.safe:
+            QTimer.singleShot(1200, lambda: self.speaker.preload(self.cfg.s.tts_voice))
+        elif first:
+            self.prompter.toast("The natural voice can't run on this computer, so Read Aloud uses the system voice",
+                                theme.T.warn, 6)
+
     # ------------------------------------------------------------ voice follow
     def _listen(self, on):
+        if on and getattr(self, "voice_blocked", False):
+            self._voice_failed("Voice Follow can't run on this computer (its speech engine crashed in a test). "
+                               "Please report it on GitHub.")
+            return
         if on:
             self.voice.start(self.prompter.vwords, self.cfg.s.mic_device)
         else:
@@ -660,7 +704,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(prog="glassprompter")
     parser.add_argument("file", nargs="?", help="script file to open (.txt, .md, .docx)")
     parser.add_argument("--background", action="store_true", help="start in the tray (used by autostart)")
+    parser.add_argument("--selftest", nargs="?", const="", metavar="REPORT",
+                        help="check Voice Follow and Read Aloud without a window, then exit (0 = OK)")
+    parser.add_argument("--selftest-child", nargs=2, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.selftest_child:
+        from . import selftest
+        return selftest.child(*args.selftest_child)
+    if args.selftest is not None:
+        from . import selftest
+        return selftest.run(args.selftest or None)
 
     logsetup.setup()
     native.set_app_id()

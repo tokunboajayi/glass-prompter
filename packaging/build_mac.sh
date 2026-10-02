@@ -36,6 +36,13 @@ python3 -m PyInstaller --noconfirm --clean --log-level WARN \
 APP="${BUILD}/dist/Glass Prompter.app"
 codesign --force --deep --sign - "${APP}"          # ad-hoc signature (required on Apple silicon)
 
+echo "-- self-test of the built app (Voice Follow engine + model, Read Aloud voice + synthesis)"
+for f in "Contents/Frameworks/vosk/libvosk.dyld" "Contents/Frameworks/piper/espeakbridge.so"; do
+  [ -e "${APP}/${f}" ] || { echo "MISSING in bundle: ${f}"; exit 1; }
+done
+"${APP}/Contents/MacOS/GlassPrompter" --selftest "${BUILD}/selftest.txt" || { cat "${BUILD}/selftest.txt"; exit 1; }
+cat "${BUILD}/selftest.txt"
+
 echo "-- disk image"
 mkdir -p dist
 STAGE="${BUILD}/dmg"

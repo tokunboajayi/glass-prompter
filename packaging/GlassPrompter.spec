@@ -34,10 +34,19 @@ if MAC:
 else:
     hidden += ["glassprompter.platform.windows"]
 
+# vosk loads its engine with dlopen("libvosk.dyld") on macOS (.dll / .so elsewhere). PyInstaller's
+# collect_dynamic_libs() only matches .dylib, so the Mac app shipped without Voice Follow. Collect it by name.
+import glob as _glob
+import vosk as _vosk
+VOSK_LIBS = collect_dynamic_libs("vosk") + [(f, "vosk") for f in
+                                            _glob.glob(os.path.join(os.path.dirname(_vosk.__file__), "*.dyld"))]
+if not any(os.path.basename(f).startswith("libvosk.") for f, _ in VOSK_LIBS):
+    raise SystemExit("vosk engine library not found next to " + _vosk.__file__)
+
 a = Analysis(
     [os.path.join(ROOT, "glass_prompter.pyw")],
     pathex=[ROOT],
-    binaries=collect_dynamic_libs("vosk") + collect_dynamic_libs("piper") + collect_dynamic_libs("onnxruntime"),
+    binaries=VOSK_LIBS + collect_dynamic_libs("piper") + collect_dynamic_libs("onnxruntime"),
     datas=[(os.path.join(ROOT, "glassprompter", "server", "static"), os.path.join("glassprompter", "server", "static")),
            (MODEL, os.path.join("glassprompter", "models", MODEL_NAME)),
            (os.path.join(ROOT, "glassprompter", "fonts"), os.path.join("glassprompter", "fonts")),

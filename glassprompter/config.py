@@ -42,6 +42,8 @@ class Settings:
     auto_update: bool = True                           # look for a newer release once a day (GitHub only)
     last_update_check: float = 0.0
     skipped_version: str = ""
+    probe_version: str = ""                            # app version whose native parts were last crash-tested
+    native_crashes: list = field(default_factory=list)  # parts that crashed that test: "voice_follow", "read_aloud"
     start_with_windows: bool = False                   # "start at login" on every OS (name kept for old files)
     drop_dir: str = ""
     first_run_done: bool = False
