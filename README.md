@@ -1,11 +1,16 @@
 # Glass Prompter
 
-A see-through teleprompter that sits right under your webcam on **Windows and macOS**, follows your voice word by word, and coaches you after every run. Your eyes stay on the camera, your script stays off the screen share.
+A see-through teleprompter that sits right under your webcam on **Windows and macOS**, follows your voice word by word, and coaches you after every run. Your eyes stay on the camera, and your script stays off the screen share.
 
-**Install:** grab the latest build from [Releases](../../releases/latest):
+**Download:** [tokunboajayi.github.io/glass-prompter](https://tokunboajayi.github.io/glass-prompter/) (detects your OS), or [Releases](../../releases/latest).
 
-- **Windows 10/11:** `GlassPrompter-Setup-x.y.z.exe`. Per-user install, no admin rights, lives in the tray.
-- **macOS 13+:** `GlassPrompter-x.y.z-macOS-arm64.dmg` (Apple silicon) or `-x86_64.dmg` (Intel). Drag to Applications. It lives in the menu bar.
+| | Installer | Command line |
+|---|---|---|
+| Windows 10/11 | `GlassPrompter-Setup-x.y.z.exe` (per-user, no admin) | `winget install TokunboAjayi.GlassPrompter` |
+| Mac, Apple silicon (macOS 13+) | `GlassPrompter-x.y.z-macOS-arm64.dmg` | `brew install --cask tokunboajayi/tap/glass-prompter` |
+| Mac, Intel (macOS 13+) | `GlassPrompter-x.y.z-macOS-x86_64.dmg` | same as above |
+
+Updates arrive inside the app. Once a day it checks GitHub for a new version and verifies the download's SHA-256 before installing. You can turn this off in Settings.
 
 ## Why it's different
 
@@ -85,6 +90,8 @@ QT_QPA_PLATFORM=offscreen python tools/shots.py shots   # render every screen to
 ```
 
 Pushing a tag `vX.Y.Z` builds the Windows installer and both Mac disk images in GitHub Actions and attaches them to the release.
+Then run `python packaging/distribution.py` to generate the winget manifests and Homebrew cask for that release.
+The website lives in `docs/` and is served by GitHub Pages. Rebuild its images with `tools/shots.py` and `tools/marketing_images.py`.
 
 ## Data and privacy
 
@@ -93,7 +100,7 @@ Scripts, settings, backups and logs stay on your computer:
 - Windows: `%APPDATA%\GlassPrompter`
 - macOS: `~/Library/Application Support/GlassPrompter`
 
-Audio is processed on-device and never sent anywhere.
+Audio is processed on-device and never sent anywhere. The only internet request is the optional daily update check to `api.github.com`.
 
 ## Known limits
 

@@ -39,6 +39,9 @@ class Settings:
     remote_port: int = 8765
     pin: str = ""
     # system
+    auto_update: bool = True                           # look for a newer release once a day (GitHub only)
+    last_update_check: float = 0.0
+    skipped_version: str = ""
     start_with_windows: bool = False                   # "start at login" on every OS (name kept for old files)
     drop_dir: str = ""
     first_run_done: bool = False

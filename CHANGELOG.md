@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.3.0 - 2026-10-02
+Distribution release.
+
+- **In-app updates:** once a day Glass Prompter checks GitHub for a new version. You can turn this off in
+  Settings, and nothing about you is sent.
+  - When a new version exists, an **Update to x.y.z** item appears in the tray or menu bar.
+  - The update downloads with progress and is verified against GitHub's published SHA-256 before it installs.
+  - On Windows it installs silently and reopens the app. On macOS it opens the new disk image.
+  - You can also choose **Check for updates** in the tray menu or About, and **Skip this version**.
+- **Website:** a download page on GitHub Pages (`docs/`). It detects Windows or Mac and links the right installer
+  from the latest release.
+- **Package managers:** `packaging/distribution.py` generates winget manifests and a Homebrew cask for any
+  release.
+- The installer now shows publisher, support and update links in Windows' Apps list.
+
 ## 2.2.0 - 2026-10-01
 - **Adjustable ghost transparency:** ghost mode (clicks pass through) now lets you choose how see-through the
   prompter is, from 15% to 100%:

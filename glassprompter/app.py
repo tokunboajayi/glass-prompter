@@ -6,11 +6,12 @@ import logging
 import os
 import sys
 import threading
+import time
 
 from PySide6.QtCore import QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QGuiApplication
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
-from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 from . import APP_ID, APP_NAME, ORG, __version__, config, engine, paths, scripts
 from . import log as logsetup
@@ -58,6 +59,14 @@ script library and loads it automatically. Saving the same file again updates it
 If this folder syncs with OneDrive or iCloud Drive, you can edit scripts from your phone or any computer.
 Files whose names start with an underscore (like this one) are ignored.
 """
+
+
+class UpdateSignals(QObject):
+    found = Signal(dict)
+    none = Signal(bool)          # True if the user asked (show "you're up to date")
+    failed = Signal(str, bool)
+    progress = Signal(float)
+    ready = Signal(str)
 
 
 class Bridge(QObject):
@@ -133,6 +142,19 @@ class Controller(QObject):
         QTimer.singleShot(1500, self.voice.preload)             # first Space press starts listening instantly
         QTimer.singleShot(2500, lambda: self.speaker.preload(self.cfg.s.tts_voice))
         QTimer.singleShot(4000, self._backup)
+        self.update = None
+        self.updating = False
+        self.upd = UpdateSignals()
+        self.upd.found.connect(self._update_found)
+        self.upd.none.connect(lambda asked: asked and self.prompter.toast(
+            "You're on the latest version (%s)" % __version__, theme.T.ok))
+        self.upd.failed.connect(lambda msg, asked: (log.info("Update check: %s", msg),
+                                                    asked and self.prompter.toast(msg, theme.T.bad, 5)))
+        self.upd.progress.connect(lambda f: self.prompter.toast("Downloading update  %d%%" % int(f * 100),
+                                                                theme.T.aqua, 2))
+        self.upd.ready.connect(self._update_ready)
+        if self.cfg.s.auto_update:
+            QTimer.singleShot(8000, lambda: self.check_updates(False))
         if self.cfg.s.start_with_windows != native.is_autostart():
             native.set_autostart(self.cfg.s.start_with_windows)
 
@@ -155,6 +177,81 @@ class Controller(QObject):
             self.voice.start(self.prompter.vwords, self.cfg.s.mic_device)
         else:
             self.voice.stop()
+
+    # ------------------------------------------------------------ updates (GitHub Releases)
+    def check_updates(self, asked=True):
+        from . import updater
+
+        def run():
+            try:
+                found = updater.check(force=asked, last_checked=self.cfg.s.last_update_check)
+            except Exception as ex:
+                self.upd.failed.emit("Couldn't check for updates (offline?)", asked)
+                log.info("update check failed: %s", ex)
+                return
+            self.cfg.s.last_update_check = time.time()
+            if found and (asked or found["version"] != self.cfg.s.skipped_version):
+                self.upd.found.emit(found)
+            else:
+                self.upd.none.emit(asked)
+        threading.Thread(target=run, name="update-check", daemon=True).start()
+
+    def _update_found(self, update):
+        self.update = update
+        self.update_tray()
+        self.prompter.toast("Glass Prompter %s is ready  %s  install it from the %s menu"
+                            % (update["version"], theme.DOT, native.TRAY.split(" (")[0]), theme.T.aqua, 6)
+        self.tray.showMessage(APP_NAME, "Version %s is available. Choose \"Update to %s\" in the menu."
+                              % (update["version"], update["version"]), QSystemTrayIcon.MessageIcon.Information, 6000)
+
+    def install_update(self):
+        from . import updater
+        if not self.update or self.updating:
+            return
+        u = self.update
+        size = (u["installer"].get("size") or 0) / 1e6
+        box = QMessageBox()
+        box.setWindowTitle("Update Glass Prompter")
+        box.setText("Install Glass Prompter %s?" % u["version"])
+        box.setInformativeText("Downloads %.0f MB from GitHub and checks its fingerprint before installing. "
+                               "Your scripts and settings stay exactly as they are." % size)
+        ok = box.addButton("Download and install", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+        skip = box.addButton("Skip this version", QMessageBox.ButtonRole.DestructiveRole)
+        box.setDefaultButton(ok)
+        box.exec()
+        if box.clickedButton() is skip:
+            self.cfg.s.skipped_version = u["version"]
+            self.update = None
+            self.update_tray()
+            self.save_timer.start()
+            return
+        if box.clickedButton() is not ok:
+            return
+        self.updating = True
+        last = [0.0]
+
+        def progress(f):
+            if f - last[0] >= 0.1 or f >= 1.0:
+                last[0] = f
+                self.upd.progress.emit(f)
+
+        def run():
+            try:
+                self.upd.ready.emit(updater.download(u, progress))
+            except Exception as ex:
+                self.updating = False
+                self.upd.failed.emit("Update failed: %s" % ex, True)
+        threading.Thread(target=run, name="update-download", daemon=True).start()
+
+    def _update_ready(self, path):
+        from . import updater
+        self.updating = False
+        if updater.install(path):
+            log.info("Handing over to the installer: %s", path)
+            self.quit()
+        else:
+            self.prompter.toast("Drag Glass Prompter into Applications to finish, then reopen it", theme.T.aqua, 8)
 
     def _read_aloud(self, on):
         p = self.prompter
@@ -448,7 +545,7 @@ class Controller(QObject):
         self.cfg.save()
 
     def open_about(self):
-        self.show_dialog(AboutDialog(None))
+        self.show_dialog(AboutDialog(None, lambda: self.check_updates(True)))
 
     # ------------------------------------------------------------ tray
     def setup_tray(self):
@@ -484,6 +581,10 @@ class Controller(QObject):
         m.addAction(self.act_capture)
         m.addAction(QAction("Move under the camera", m, triggered=self.prompter.reset_position))
         m.addSeparator()
+        self.act_update = QAction("Update", m, triggered=self.install_update)
+        self.act_update.setVisible(False)
+        m.addAction(self.act_update)
+        m.addAction(QAction("Check for updates", m, triggered=lambda: self.check_updates(True)))
         m.addAction(QAction("About Glass Prompter", m, triggered=self.open_about))
         m.addAction(QAction("Quit", m, triggered=self.quit))
         m.aboutToShow.connect(self.update_tray)
@@ -510,6 +611,9 @@ class Controller(QObject):
         self.act_show.setText("Hide prompter" if p.isVisible() else "Show prompter")
         self.act_play.setText("Pause" if (p.playing or p.counting) else "Play")
         self.act_capture.setChecked(self.cfg.s.hide_from_capture)
+        if getattr(self, "update", None):
+            self.act_update.setText("Update to %s%s" % (self.update["version"], theme.ELLIPSIS))
+        self.act_update.setVisible(bool(getattr(self, "update", None)))
         self.act_voice.setChecked(self.cfg.s.voice_follow)
         self.act_ghost.setChecked(p.ghost)
         self.act_mirror.setChecked(self.cfg.s.mirror)

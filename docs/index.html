@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Glass Prompter: a teleprompter under your webcam</title>
+<meta name="description" content="Free see-through teleprompter for Windows and macOS. Sits under your webcam, follows your voice word by word, reads aloud in a natural voice, and stays private on screen share.">
+<meta name="theme-color" content="#06070d">
+<meta property="og:title" content="Glass Prompter">
+<meta property="og:description" content="Read your script. Keep eye contact. A free teleprompter that follows your voice, for Windows and Mac.">
+<meta property="og:image" content="https://tokunboajayi.github.io/glass-prompter/img/hero.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="img/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#06070d; --surface:#0f1220; --surface-2:#151a2b; --line:rgba(255,255,255,.09);
+  --on:#f5f7ff; --muted:#a0a8bc; --dim:#7d8599; --aqua:#40e8d0; --violet:#8b6cff; --ember:#ffa64d;
+  --ok:#3ddc97; --r:16px; --max:1120px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
+body{margin:0;background:var(--bg);color:var(--on);font:16px/1.6 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased;background-image:
+  radial-gradient(60% 40% at 8% 0%,rgba(64,232,208,.14),transparent 70%),
+  radial-gradient(50% 40% at 95% 10%,rgba(139,108,255,.18),transparent 70%)}
+a{color:inherit}
+img{max-width:100%;height:auto;display:block}
+.wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
+nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;text-decoration:none}
+.brand img{width:28px;height:28px}
+.nav-links{display:flex;gap:6px}
+.nav-links a{padding:8px 12px;border-radius:10px;text-decoration:none;color:var(--muted);font-size:14px;font-weight:500}
+.nav-links a:hover{color:var(--on);background:rgba(255,255,255,.06)}
+.hero{text-align:center;padding:56px 0 24px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;
+  font-size:13px;color:var(--muted);background:rgba(255,255,255,.03)}
+.eyebrow i{width:7px;height:7px;border-radius:50%;background:var(--aqua)}
+h1{font-size:clamp(38px,6.2vw,68px);line-height:1.05;letter-spacing:-.035em;margin:20px auto 16px;font-weight:700;max-width:14ch}
+.sub{font-size:clamp(17px,2vw,20px);color:var(--muted);max-width:620px;margin:0 auto 32px}
+.cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 22px;border-radius:12px;font-weight:600;
+  font-size:15px;text-decoration:none;border:1px solid var(--line);background:rgba(255,255,255,.05);cursor:pointer;
+  transition:background .2s,transform .2s}
+.btn:hover{background:rgba(255,255,255,.1)}
+.btn:active{transform:scale(.98)}
+.btn:focus-visible{outline:2px solid var(--aqua);outline-offset:3px}
+.btn.primary{background:#f5f7ff;color:#0a0c14;border-color:#f5f7ff}
+.btn.primary:hover{background:#fff}
+.btn svg{width:18px;height:18px;flex:none}
+.meta{margin-top:14px;font-size:13px;color:var(--dim)}
+.shot{margin:48px auto 0;border-radius:20px;overflow:hidden;border:1px solid var(--line);
+  box-shadow:0 30px 80px rgba(0,0,0,.55)}
+section{padding:96px 0}
+h2{font-size:clamp(28px,3.6vw,40px);letter-spacing:-.025em;line-height:1.15;margin:0 0 12px;font-weight:700}
+.lead{color:var(--muted);font-size:18px;max-width:620px;margin:0 0 40px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px}
+.card h3{font-size:17px;margin:14px 0 6px;font-weight:600}
+.card p{margin:0;color:var(--muted);font-size:15px}
+.ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(64,232,208,.1);color:var(--aqua)}
+.ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.split{display:grid;grid-template-columns:1fr 1.25fr;gap:48px;align-items:center}
+.split img{border-radius:16px;border:1px solid var(--line)}
+.points{list-style:none;padding:0;margin:0}
+.points li{padding:12px 0;border-top:1px solid var(--line);color:var(--muted)}
+.points li b{color:var(--on);font-weight:600}
+kbd{font:600 12px Inter,system-ui,sans-serif;padding:2px 7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.06);color:var(--on)}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:13px;color:var(--dim);font-weight:600}
+td:first-child{color:var(--muted)}
+td.us{color:var(--on);font-weight:500}
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+.dl{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.dl .card{display:flex;flex-direction:column;gap:6px}
+.dl .card .btn{margin-top:14px;justify-content:center}
+.dl .card.rec{border-color:rgba(64,232,208,.5);box-shadow:0 0 0 1px rgba(64,232,208,.2)}
+.tag{font-size:12px;color:var(--aqua);font-weight:600}
+.small{font-size:13px;color:var(--dim)}
+details{border-top:1px solid var(--line);padding:18px 0}
+details:last-child{border-bottom:1px solid var(--line)}
+summary{cursor:pointer;font-weight:600;font-size:17px;list-style:none;display:flex;justify-content:space-between;gap:16px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--dim);font-weight:400;font-size:22px;line-height:1}
+details[open] summary::after{content:"\2212"}
+details p{color:var(--muted);margin:10px 0 0;max-width:760px}
+footer{padding:48px 0 64px;color:var(--dim);font-size:14px;border-top:1px solid var(--line)}
+footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+@media (max-width:900px){.grid,.dl{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}}
+@media (max-width:620px){.grid,.dl{grid-template-columns:1fr}.nav-links a.hide-sm{display:none}section{padding:72px 0}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.6 7.6 0 0 1 0 11"/></symbol>
+  <symbol id="i-ghost" viewBox="0 0 24 24"><path d="M5 20V10a7 7 0 0 1 14 0v10l-2.3-1.6L14.3 20 12 18.4 9.7 20l-2.4-1.6z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-win" viewBox="0 0 24 24"><path d="M3 5.5l7.5-1v7H3zM12 4.3L21 3v8.5h-9zM3 12.5h7.5v7l-7.5-1zM12 12.5h9V21l-9-1.3z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.5 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8s-1.9-.8-3.1-.8C6.9 7.2 5.4 8.1 4.6 9.6c-1.7 2.9-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.1.8 2.1-1.2 2.8-2.4c.9-1.3 1.3-2.6 1.3-2.7 0 0-2.6-1-2.6-4zM14.2 5.5c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.8 1.4-.6.7-1.1 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.3z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<div class="wrap">
+  <nav aria-label="Main">
+    <a class="brand" href="#"><img src="img/icon.svg" alt="">Glass Prompter</a>
+    <div class="nav-links">
+      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#compare">Compare</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/tokunboajayi/glass-prompter">GitHub</a>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <span class="eyebrow"><i></i><span id="ver">Free for Windows and Mac</span></span>
+    <h1>Read your script. Keep eye contact.</h1>
+    <p class="sub">A see-through teleprompter that sits right under your webcam, follows your voice word by word, and stays off the screen share.</p>
+    <div class="cta">
+      <a id="primary" class="btn primary" href="https://github.com/tokunboajayi/glass-prompter/releases/latest">
+        <svg aria-hidden="true"><use href="#i-down"/></svg><span id="primaryText">Download free</span></a>
+      <a class="btn" href="#download">Other platforms</a>
+    </div>
+    <p class="meta" id="primaryMeta">No account. No subscription. Works offline.</p>
+    <img class="shot" src="img/hero.jpg" width="2400" height="1400" alt="Glass Prompter showing a script right under the webcam during a video call, with spoken words dimmed and the next words bright">
+  </header>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Built for the moment you hit record</h2>
+    <p class="lead">Everything other prompters get wrong, fixed in one small app that stays out of your way.</p>
+    <div class="grid">
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-mic"/></svg></div>
+        <h3>Follows your voice</h3><p>Scrolls with your words, not a timer. Pause, ad-lib, go back. It keeps your place with about 20&nbsp;ms of processing, entirely offline.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-speaker"/></svg></div>
+        <h3>Reads aloud, naturally</h3><p>Hear your script in a natural neural voice at your pace, with the prompter following each word. Great for learning the rhythm.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-ghost"/></svg></div>
+        <h3>Ghost mode</h3><p>Clicks pass straight through to the app behind. Pick how see-through it is, from 15% to solid, with <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>[</kbd> <kbd>]</kbd>.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-shield"/></svg></div>
+        <h3>Private on screen share</h3><p>Hidden from Zoom, Teams, Meet and OBS on Windows. On macOS 15+ it tells you the truth: share a window, not your whole screen.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-phone"/></svg></div>
+        <h3>Phone remote</h3><p>Scan a QR code and your phone becomes the remote: play, speed, sections, ghost level, and sending new scripts. PIN protected.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-chart"/></svg></div>
+        <h3>Rehearsal coach</h3><p>After each practice run you get your pace, filler words, long pauses, skipped lines and a score you can watch improve.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap split">
+    <div>
+      <h2>See through it. Click through it.</h2>
+      <p class="lead">Ghost mode turns the panel see-through while the words stay sharp, so your slides, notes or code stay readable and clickable underneath.</p>
+      <ul class="points">
+        <li><b>Your level.</b> 15% to 100%, set from the keyboard, Settings or your phone.</li>
+        <li><b>Always legible.</b> A soft outline and a quiet shadow behind the reading line keep the text readable over anything.</li>
+        <li><b>Out of the way.</b> The controls hide while you read and come back when you hover.</li>
+      </ul>
+    </div>
+    <img src="img/ghost.jpg" width="2100" height="760" alt="Ghost mode at 35 percent over a document: the document shows through, the script text stays crisp" loading="lazy">
+  </div>
+</section>
+
+<section id="compare">
+  <div class="wrap">
+    <h2>How it compares</h2>
+    <p class="lead">Based on what people say about the tools they use today.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col"></th><th scope="col">Glass Prompter</th><th scope="col">Typical voice-scroll apps</th><th scope="col">Mac notch apps</th></tr></thead>
+        <tbody>
+          <tr><td>Windows and Mac</td><td class="us">Both, same app</td><td>Usually one</td><td>Mac only</td></tr>
+          <tr><td>Voice scrolling</td><td class="us">Word by word, offline, glides smoothly</td><td>Often lags or jumps on a mishear</td><td>Varies</td></tr>
+          <tr><td>Mic drops mid-take</td><td class="us">Reconnects by itself</td><td>Often freezes</td><td>Varies</td></tr>
+          <tr><td>Screen share status</td><td class="us">Honest badge per OS</td><td>"Invisible" claims</td><td>Often undocumented on macOS 15+</td></tr>
+          <tr><td>Natural read-aloud</td><td class="us">Built in, offline</td><td>Rare</td><td>Rare</td></tr>
+          <tr><td>Your scripts</td><td class="us">Daily backups and export</td><td>Lost-script reports are common</td><td>Varies</td></tr>
+          <tr><td>Price</td><td class="us">Free</td><td>Subscription</td><td>$30 to $40</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap split">
+    <img src="img/phone.jpg" width="600" height="1200" alt="The phone remote: play, speed, ghost level, sections and read aloud" loading="lazy" style="max-width:340px;justify-self:center">
+    <div>
+      <h2>Your phone is the remote</h2>
+      <p class="lead">No app to install. Scan the QR code on your computer, enter the PIN, and control everything from across the room.</p>
+      <ul class="points">
+        <li><b>Live state.</b> Playing, listening, pace and time left update instantly.</li>
+        <li><b>Write and send scripts.</b> Type on your phone or upload a .docx, .md or .txt file.</li>
+        <li><b>Stays local.</b> It runs over your Wi-Fi and never touches the internet.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="wrap">
+    <h2>Download</h2>
+    <p class="lead" id="dlLead">Free, no account. Updates arrive inside the app.</p>
+    <div class="dl">
+      <div class="card" data-os="windows">
+        <span class="tag">Windows 10 / 11</span><h3>Windows installer</h3>
+        <p class="small">64-bit, installs for you only, no admin needed.</p>
+        <a class="btn primary" data-asset="exe" href="https://github.com/tokunboajayi/glass-prompter/releases/latest"><svg aria-hidden="true"><use href="#i-win"/></svg>Download for Windows</a>
+        <span class="small size" data-size="exe"></span>
+      </div>
+      <div class="card" data-os="mac-arm">
+        <span class="tag">macOS 13+  &middot;  M1 to M4</span><h3>Mac with Apple silicon</h3>
+        <p class="small">Most Macs from 2020 on.</p>
+        <a class="btn" data-asset="arm64" href="https://github.com/tokunboajayi/glass-prompter/releases/latest"><svg aria-hidden="true"><use href="#i-apple"/></svg>Download for Mac</a>
+        <span class="small size" data-size="arm64"></span>
+      </div>
+      <div class="card" data-os="mac-intel">
+        <span class="tag">macOS 13+  &middot;  Intel</span><h3>Mac with Intel</h3>
+        <p class="small">Not sure? Apple menu &rsaquo; About This Mac.</p>
+        <a class="btn" data-asset="x86_64" href="https://github.com/tokunboajayi/glass-prompter/releases/latest"><svg aria-hidden="true"><use href="#i-apple"/></svg>Download for Intel Mac</a>
+        <span class="small size" data-size="x86_64"></span>
+      </div>
+    </div>
+    <p class="small" style="margin-top:20px">Prefer the command line? Windows: <kbd>winget install TokunboAjayi.GlassPrompter</kbd> &nbsp; Mac: <kbd>brew install --cask tokunboajayi/tap/glass-prompter</kbd></p>
+  </div>
+</section>
+
+<section id="faq" style="padding-top:0">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <details><summary>Windows says "Windows protected your PC". Is it safe?</summary>
+      <p>The installer isn't code-signed yet, so SmartScreen shows a warning for new apps. Click <b>More info</b>, then <b>Run anyway</b>. Every download has a published SHA-256 fingerprint, and the in-app updater checks it automatically.</p></details>
+    <details><summary>My Mac says the app can't be opened.</summary>
+      <p>The first time, right-click Glass Prompter in Applications and choose <b>Open</b>. On macOS 15 or later, open System Settings, go to Privacy &amp; Security, and click <b>Open Anyway</b>. You only do this once.</p></details>
+    <details><summary>Can people on the call see the prompter?</summary>
+      <p>On Windows 10 (2004+) and 11 it's excluded from screen sharing and recordings. macOS 15 and later lets screen recorders capture every window, so on a Mac share a single window or app instead of the whole screen. The badge on the prompter always shows the real state.</p></details>
+    <details><summary>Does my voice or script go anywhere?</summary>
+      <p>No. Voice recognition and the read-aloud voice run on your computer. Scripts live in a local library. The only internet request is a once-a-day check for a new version on GitHub, which you can turn off.</p></details>
+    <details><summary>Is it really free?</summary>
+      <p>Yes. No account, no trial, no watermark.</p></details>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>&copy; 2026 Olatokunbo Ajayi &middot; Glass Prompter</span>
+    <span><a href="https://github.com/tokunboajayi/glass-prompter/releases">Release notes</a> &middot; <a href="https://github.com/tokunboajayi/glass-prompter/issues">Report a problem</a></span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var REL = "https://api.github.com/repos/tokunboajayi/glass-prompter/releases/latest";
+  var ua = navigator.userAgent || "";
+  var os = /Windows/i.test(ua) ? "windows" : /Mac OS X|Macintosh/i.test(ua) && !/iPhone|iPad/i.test(ua) ? "mac" : "other";
+  var labels = { windows: "Download for Windows", mac: "Download for Mac" };
+  if (labels[os]) document.getElementById("primaryText").textContent = labels[os];
+  if (os === "windows") document.querySelector('[data-os="windows"]').classList.add("rec");
+  if (os === "mac") document.querySelector('[data-os="mac-arm"]').classList.add("rec");
+
+  function mb(n) { return Math.round(n / 1e6) + " MB"; }
+  fetch(REL, { headers: { Accept: "application/vnd.github+json" } })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function (rel) {
+      var v = (rel.tag_name || "").replace(/^v/, "");
+      document.getElementById("ver").textContent = "Version " + v + " · free for Windows and Mac";
+      var pick = {};
+      (rel.assets || []).forEach(function (a) {
+        if (/\.exe$/i.test(a.name)) pick.exe = a;
+        else if (/arm64\.dmg$/i.test(a.name)) pick.arm64 = a;
+        else if (/x86_64\.dmg$/i.test(a.name)) pick.x86_64 = a;
+      });
+      Object.keys(pick).forEach(function (k) {
+        var a = pick[k];
+        document.querySelectorAll('[data-asset="' + k + '"]').forEach(function (el) { el.href = a.browser_download_url; });
+        document.querySelectorAll('[data-size="' + k + '"]').forEach(function (el) { el.textContent = a.name + " · " + mb(a.size); });
+      });
+      var main = os === "windows" ? pick.exe : os === "mac" ? pick.arm64 : null;
+      if (main) {
+        document.getElementById("primary").href = main.browser_download_url;
+        document.getElementById("primaryMeta").textContent = "Version " + v + " · " + mb(main.size) +
+          (os === "mac" ? " · Apple silicon (Intel below)" : "") + " · no account, works offline";
+      } else {
+        document.getElementById("primary").href = "#download";
+      }
+    })
+    .catch(function () { /* links already point at the latest release page */ });
+})();
+</script>
+</body>
+</html>

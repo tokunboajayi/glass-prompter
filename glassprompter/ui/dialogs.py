@@ -458,6 +458,8 @@ class SettingsDialog(BaseDialog):
 
 
         card = Card()
+        card.row("Check for updates", switch(s.auto_update, lambda v: self._set("auto_update", v)),
+                 "Once a day, from GitHub. Nothing about you is sent.")
         card.row("Start at login", switch(native.is_autostart(), self._autostart),
                  "Waits quietly in the %s." % native.TRAY.split(" (")[0])
         b = button("Open", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(s.drop_dir)))
@@ -662,7 +664,7 @@ def _clear_layout(layout):
 
 # ====================================================================== about
 class AboutDialog(BaseDialog):
-    def __init__(self, parent):
+    def __init__(self, parent, check_updates=None):
         super().__init__(parent, "About")
         self.setFixedWidth(440)
         lay = QVBoxLayout(self)
@@ -676,6 +678,8 @@ class AboutDialog(BaseDialog):
         row = QHBoxLayout()
         row.addWidget(button("Open data folder", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(paths.data_dir()))))
         row.addWidget(button("Open logs", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(paths.log_dir()))))
+        if check_updates:
+            row.addWidget(button("Check for updates", lambda: (check_updates(), self.accept())))
         row.addStretch(1)
         row.addWidget(button("Close", self.accept, primary=True))
         lay.addSpacing(6)

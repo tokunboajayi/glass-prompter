@@ -15,7 +15,10 @@ AppId={{6F1C2D4E-8B7A-4C3D-9E21-5A7C3B9D0E14}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
-AppPublisher=Glass Prompter
+AppPublisher=Olatokunbo Ajayi
+AppPublisherURL=https://github.com/tokunboajayi/glass-prompter
+AppSupportURL=https://github.com/tokunboajayi/glass-prompter/issues
+AppUpdatesURL=https://github.com/tokunboajayi/glass-prompter/releases
 DefaultDirName={localappdata}\Programs\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -58,9 +61,17 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "Launch {#AppName}"; Flags: nowait postinstall skipifsilent
+; In-app updates run the installer silently with /UPDATE=1: reopen the app when it's done.
+Filename: "{app}\{#AppExe}"; Flags: nowait; Check: IsUpdate
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM {#AppExe}"; Flags: runhidden; RunOnceId: "KillApp"
+
+[Code]
+function IsUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
 
 [Messages]
 FinishedLabel=Setup has finished installing [name]. It lives in the tray (bottom-right of the taskbar). Your scripts and settings are kept in %APPDATA%\GlassPrompter even if you uninstall.

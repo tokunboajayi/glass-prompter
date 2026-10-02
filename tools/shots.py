@@ -61,6 +61,10 @@ def grab(w, name):
 
 def run():
     p.show()
+    if os.environ.get("GP_SHOTS_PRIVATE"):          # marketing renders: show the real Windows/Mac "Private" state
+        app.processEvents()                          # let the queued apply_capture() run first, then override
+        p.guard = p.apply_capture = lambda *a: None
+        p.cap_level, p.cap_state = "full", True
     p.hovered = True
     p.sync_ui()
     app.processEvents()
