@@ -48,6 +48,16 @@ $st = Start-Process -FilePath "$build\dist\GlassPrompter\GlassPrompter.exe" -Arg
 Get-Content $report
 if ($st.ExitCode -ne 0) { throw "Self-test failed: the build is missing Voice Follow or Read Aloud parts." }
 
+Write-Host "-- end-to-end audit of the built app (launch race, phone API, every control, ghost, Read Aloud)"
+$e2e = Join-Path $build "e2e.txt"
+$p = Start-Process -FilePath "$build\dist\GlassPrompter\GlassPrompter.exe" -ArgumentList "--e2e", "`"$e2e`"" -PassThru
+if (-not $p.WaitForExit(600000)) { $p.Kill(); throw "End-to-end audit timed out." }
+Get-Content $e2e
+if ($p.ExitCode -ne 0) {
+  if (Test-Path "$e2e.app.log") { Get-Content "$e2e.app.log" -Tail 40 }
+  throw "End-to-end audit failed (see above)."
+}
+
 Write-Host "-- installer"
 $iscc = @("$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe", "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe") |
   Where-Object { Test-Path $_ } | Select-Object -First 1

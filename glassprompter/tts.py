@@ -107,11 +107,72 @@ def download_voice(voice_id, progress=None):
     return dest
 
 
+class _NullOut:
+    """Silent output that keeps real-time pacing (CI machines and computers with no sound device)."""
+
+    def __init__(self, rate):
+        self.rate, self.latency, self.t = rate, 0.0, None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+    def write(self, data):
+        time.sleep(len(data) / (self.rate * 2.0))
+
+
+class _Resampled:
+    """Plays 16-bit mono at `src` Hz on a device that only accepts its own rate (some USB/Bluetooth/pro devices)."""
+
+    def __init__(self, stream, src, dst):
+        import numpy as np
+        self.np, self.stream, self.k, self.latency = np, stream, dst / float(src), stream.latency
+
+    def __enter__(self):
+        self.stream.__enter__()
+        return self
+
+    def __exit__(self, *a):
+        return self.stream.__exit__(*a)
+
+    def write(self, data):
+        np = self.np
+        x = np.frombuffer(data, dtype=np.int16).astype(np.float32)
+        if not len(x):
+            return
+        n = max(1, int(round(len(x) * self.k)))
+        y = np.interp(np.linspace(0, len(x) - 1, n), np.arange(len(x)), x)
+        self.stream.write(y.astype(np.int16).tobytes())
+
+
+def open_output(rate):
+    """Open the default speaker for 16-bit mono at `rate`, falling back to the device's own rate. Raises if none."""
+    if os.environ.get("GLASSPROMPTER_NULL_AUDIO") == "1":
+        return _NullOut(rate)
+    if sd is None:
+        raise RuntimeError("audio library missing")
+    try:
+        return sd.RawOutputStream(samplerate=rate, channels=1, dtype="int16", latency="low")
+    except Exception as first:
+        try:
+            dev = sd.query_devices(kind="output")
+            native_rate = int(dev["default_samplerate"])
+        except Exception:
+            raise RuntimeError("no speaker or headphones found (%s)" % first)
+        log.info("Output rejected %d Hz (%s); using %d Hz", rate, first, native_rate)
+        stream = sd.RawOutputStream(samplerate=native_rate, channels=1, dtype="int16", latency="low")
+        return _Resampled(stream, rate, native_rate)
+
+
 class Speaker(QObject):
     finished = Signal()
     progress = Signal(int)              # word index (word_map order) being spoken right now
     status = Signal(str)                # "preparing" | "speaking" | "system"
     failed = Signal(str)
+    fellback = Signal()                 # the natural voice failed and the system voice took over
+    _fallback = Signal(str)             # (thread -> main thread) text to read with the system voice
 
     def __init__(self):
         super().__init__()
@@ -123,6 +184,10 @@ class Speaker(QObject):
         self._lock = threading.Lock()
         self.natural = False
         self.safe = True                    # False if the natural voice crashed in the startup crash test
+        self._wpm = 150
+        self._said = -1                     # last word index actually spoken by the natural voice
+        self._plan = []
+        self._fallback.connect(self._take_over)
 
     @property
     def speaking(self):
@@ -150,10 +215,11 @@ class Speaker(QObject):
             plan = [it for it in plan if it[0] == "rest" or it[2] + len(it[3]) > start_word]
         if not any(it[0] == "say" for it in plan):
             return False
+        self._wpm, self._plan, self._said = wpm, plan, -1
         if voice_id != SYSTEM and self.safe and natural_available(voice_id):
             self.natural = True
-            self._stop.clear()
-            self._thread = threading.Thread(target=self._run_natural, args=(plan, wpm, voice_id),
+            self._stop = threading.Event()                  # each run gets its own stop flag
+            self._thread = threading.Thread(target=self._run_natural, args=(plan, wpm, voice_id, self._stop),
                                             name="tts", daemon=True)
             self._thread.start()
             return True
@@ -161,17 +227,15 @@ class Speaker(QObject):
         return self._speak_system(" ".join(it[1] for it in plan if it[0] == "say"), wpm)
 
     def stop(self):
-        self._stop.set()
-        if self._thread is not None:
-            self._thread.join(timeout=1.5)
-            self._thread = None
+        self._stop.set()                    # the playing thread notices within one 50 ms block and closes
+        self._thread = None                 # its audio stream; never block the UI waiting for it
         if self.proc is not None and self.proc.state() != QProcess.ProcessState.NotRunning:
             self.proc.kill()
             self.proc.waitForFinished(1000)
         self._cleanup()
 
     # ---------------------------------------------------------------- natural (Piper)
-    def _run_natural(self, plan, wpm, voice_id):
+    def _run_natural(self, plan, wpm, voice_id, stop):
         try:
             self.status.emit("preparing")
             voice = self._voice(voice_id)
@@ -180,7 +244,7 @@ class Speaker(QObject):
             ready = queue.Queue(maxsize=3)
 
             def put(x):
-                while not self._stop.is_set():
+                while not stop.is_set():
                     try:
                         return ready.put(x, timeout=0.2)
                     except queue.Full:
@@ -194,7 +258,7 @@ class Speaker(QObject):
             def produce():                  # synthesize ahead of playback, one sentence at a time
                 try:
                     for item in plan:
-                        if self._stop.is_set():
+                        if stop.is_set():
                             break
                         if item[0] == "rest":
                             put(("rest", item[1]))
@@ -202,44 +266,60 @@ class Speaker(QObject):
                         _, text, first, weights = item
                         audio = b"".join(c.audio_int16_bytes for c in voice.synthesize(text, syn_config=cfg))
                         put(("say", audio, first, weights))
+                except Exception as e:      # hand synthesis errors to the player so they're never silent
+                    put(("error", e))
                 finally:
                     put(None)
 
             threading.Thread(target=produce, name="tts-synth", daemon=True).start()
             block = int(rate * 0.05) * 2                 # 50 ms of 16-bit mono
-            with sd.RawOutputStream(samplerate=rate, channels=1, dtype="int16", latency="low") as out:
+            with open_output(rate) as out:
                 lag_bytes = float(out.latency or 0.0) * rate * 2
                 self.status.emit("speaking")
                 last = -1
-                while not self._stop.is_set():
+                while not stop.is_set():
                     try:
                         item = ready.get(timeout=0.2)
                     except queue.Empty:
                         continue
                     if item is None:
                         break
+                    if item[0] == "error":
+                        raise item[1]
                     if item[0] == "rest":
                         out.write(b"\0" * (int(rate * item[1]) * 2))
                         continue
                     _, audio, first, weights = item
                     total = float(max(1, len(audio)))
                     for pos in range(0, len(audio), block):
-                        if self._stop.is_set():
+                        if stop.is_set():
                             break
                         out.write(audio[pos:pos + block])
                         heard = max(0.0, (pos + block - lag_bytes) / total)
                         w = first + word_at(weights, min(1.0, heard))
                         if w != last:
-                            last = w
+                            last = self._said = w
                             self.progress.emit(w)
-                if not self._stop.is_set():
+                if not stop.is_set():
                     time.sleep(lag_bytes / (rate * 2) + 0.05)   # let the last syllable play out
         except Exception as ex:
-            log.warning("Natural voice failed: %s", ex)
-            self.failed.emit("The natural voice couldn't play (%s)." % ex)
-        finally:
-            if not self._stop.is_set():
-                self.finished.emit()
+            log.warning("Natural voice failed, switching to the system voice: %s", ex, exc_info=True)
+            if not stop.is_set():
+                rest = " ".join(it[1] for it in self._plan if it[0] == "say" and it[2] + len(it[3]) > self._said + 1)
+                stop.set()                       # we hand over; don't emit finished
+                self._fallback.emit(rest)
+                return
+        if not stop.is_set():
+            self.finished.emit()
+
+    def _take_over(self, text):
+        self._thread = None
+        self.natural = False
+        if not text.strip():
+            self.finished.emit()
+            return
+        self.fellback.emit()
+        self._speak_system(text, self._wpm)
 
     # ---------------------------------------------------------------- system voice fallback
     def _speak_system(self, body, wpm):

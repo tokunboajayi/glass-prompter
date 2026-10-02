@@ -124,6 +124,7 @@ class Controller(QObject):
         self.speaker.progress.connect(self.prompter.on_tts_progress)
         self.speaker.status.connect(self.prompter.on_tts_status)
         self.speaker.failed.connect(lambda m: self.prompter.toast(m, theme.T.bad, 5))
+        self.speaker.fellback.connect(self._tts_fellback)
         self.prompter.readAloudRequested.connect(self._read_aloud)
 
         self.save_timer = QTimer(self, singleShot=True, interval=600, timeout=self.cfg.save)
@@ -149,6 +150,7 @@ class Controller(QObject):
             self._guard_done(list(self.cfg.s.native_crashes), first=False)
         else:
             self.speaker.safe = False                            # system voice until the crash test passes
+            self.prompter.guard_state = "pending"
             QTimer.singleShot(1500, self._crash_guard)
         QTimer.singleShot(4000, self._backup)
         self.update = None
@@ -203,6 +205,8 @@ class Controller(QObject):
             self.cfg.save()
         self.voice_blocked = "voice_follow" in crashed
         self.speaker.safe = "read_aloud" not in crashed
+        self.prompter.guard_state = "crashed:" + ",".join(crashed) if crashed else "ok"
+        self.prompter.stateChanged.emit()
         if not self.voice_blocked:
             QTimer.singleShot(200, self.voice.preload)            # first Space press starts listening instantly
         if self.speaker.safe:
@@ -306,7 +310,20 @@ class Controller(QObject):
             p.stop_read_aloud()
             p.toast("Nothing to read here", theme.T.bad)
             return
+        p.tts_engine = "natural" if self.speaker.natural else "system"
         p.set_tts_follow(self.speaker.natural)
+
+    def _tts_fellback(self):
+        p = self.prompter
+        if not p.reading_aloud:
+            return
+        p.tts_engine = "system"
+        p.tts_preparing = False
+        p.set_tts_follow(False)
+        p.playing = True                                 # system voice: scroll at the chosen pace
+        p.last = p.now()
+        p.toast("The natural voice couldn't play here, so the system voice took over", theme.T.warn, 5)
+        p.sync_ui()
 
     def _rehearsal_done(self, report):
         sid = report.get("script_id") or 0
@@ -382,7 +399,8 @@ class Controller(QObject):
         if connected != self.prompter.remote_connected:
             self.prompter.remote_connected = connected
             self.prompter.update()
-        if self.prompter.playing:
+        p = self.prompter
+        if p.playing or p.reading_aloud or p.listening:          # keep the phone's live view moving
             self.publish()
 
     # ------------------------------------------------------------ scripts
@@ -683,20 +701,45 @@ class Controller(QObject):
 
 
 # ---------------------------------------------------------------- entry point
+def _instance_name():
+    import hashlib
+    home = os.path.normcase(os.path.abspath(paths.data_dir()))
+    return "%s-%s-%s" % (APP_ID, getpass.getuser(), hashlib.sha1(home.encode("utf-8")).hexdigest()[:8])
+
+
 def _single_instance(app, args):
-    """Return a listening QLocalServer, or None if another copy is running (it gets our request)."""
-    name = "%s-%s" % (APP_ID, getpass.getuser())
-    sock = QLocalSocket()
-    sock.connectToServer(name)
-    if sock.waitForConnected(400):
-        msg = ("open:" + os.path.abspath(args.file)) if args.file else "show"
-        sock.write(msg.encode("utf-8"))
-        sock.waitForBytesWritten(1000)
-        sock.disconnectFromServer()
+    """Return a listening QLocalServer, or None if another copy owns this profile (it gets our request).
+
+    A lock file decides who runs. That's race-free: double-clicking 3 times, or the installer and the user starting
+    the app in the same second, can't produce 2 copies (the old socket-only check could on slow first starts).
+    """
+    from PySide6.QtCore import QLockFile
+    name = _instance_name()
+    lock = QLockFile(os.path.join(paths.data_dir(), "instance.lock"))
+    lock.setStaleLockTime(0)                       # only stale when the owning process is gone
+    if not lock.tryLock(150):
+        msg = (("open:" + os.path.abspath(args.file)) if args.file else "show").encode("utf-8")
+        deadline = time.monotonic() + 15           # the first copy may still be starting up
+        while time.monotonic() < deadline:
+            sock = QLocalSocket()
+            sock.connectToServer(name)
+            if sock.waitForConnected(300):
+                sock.write(msg)
+                sock.waitForBytesWritten(1000)
+                sock.disconnectFromServer()
+                break
+            if lock.tryLock(0):                    # the other copy quit meanwhile: we're the one now
+                return _listen(app, name, lock)
+            time.sleep(0.25)
         return None
+    return _listen(app, name, lock)
+
+
+def _listen(app, name, lock):
     QLocalServer.removeServer(name)
     server = QLocalServer(app)
     server.listen(name)
+    server._lock = lock                            # held for the life of the app
     return server
 
 
@@ -707,6 +750,8 @@ def main(argv=None):
     parser.add_argument("--selftest", nargs="?", const="", metavar="REPORT",
                         help="check Voice Follow and Read Aloud without a window, then exit (0 = OK)")
     parser.add_argument("--selftest-child", nargs=2, help=argparse.SUPPRESS)
+    parser.add_argument("--e2e", nargs="?", const="", metavar="REPORT",
+                        help="run the full end-to-end audit against a fresh copy of the app, then exit (0 = OK)")
     args = parser.parse_args(argv)
     if args.selftest_child:
         from . import selftest
@@ -714,6 +759,9 @@ def main(argv=None):
     if args.selftest is not None:
         from . import selftest
         return selftest.run(args.selftest or None)
+    if args.e2e is not None:
+        from . import e2e
+        return e2e.run(args.e2e or None)
 
     logsetup.setup()
     native.set_app_id()

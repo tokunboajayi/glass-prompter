@@ -75,6 +75,9 @@
       : (s.wpm || 0) + " wpm") + " \u00b7 " + (s.left || "0:00") + " left";
     $("voiceBtn").classList.toggle("on", voice);
     $("voiceText").textContent = voice ? (s.listening ? "Listening" : "Voice Follow on") : "Voice Follow off";
+    $("ghostBtn").classList.toggle("on", !!s.ghost);
+    $("ghostText").textContent = s.ghost ? "Ghost on \u00b7 " + Math.round((s.ghost_opacity || 0) * 100) + "%"
+                                         : "Ghost mode off";
     const secs = s.sections || [];
     $("secWrap").hidden = secs.length === 0;
     const sl = $("secList");

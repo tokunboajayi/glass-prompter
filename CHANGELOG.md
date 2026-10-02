@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.4.2 - 2026-10-02
+Fixes from people installing it on their own computers, plus an end-to-end audit that every build must pass.
+
+- **No more duplicate copies.** Clicking the app several times while it was starting, or the installer and you
+  opening it at the same moment, could leave 2 copies running. This was reproduced on 2.4.0: 4 launches at once
+  gave 2 copies. A lock file now decides which copy runs; the same test gives 1 copy every time.
+- **More see-through / more solid always works.**
+  - Before, those buttons only changed a stored level, which had no visible effect until Ghost mode was on.
+  - Now adjusting the level switches Ghost mode on, so you see the change straight away.
+  - The phone's Ghost button shows whether Ghost mode is on and its level.
+- **Read Aloud is more reliable.**
+  - If the natural voice can't play on a computer, the system voice takes over from the same spot instead of
+    stopping silently.
+  - A natural-voice error that used to end reading early without a message now triggers that switch.
+  - Audio devices that refuse the voice's sample rate are handled by converting the audio to the device's rate.
+  - Stopping is now instant. Before, the window could freeze for up to 1.5 s.
+- **End-to-end audit, run by every Windows and Mac build** (`GlassPrompter --e2e`):
+  - It checks single-instance with 4 simultaneous launches, phone pairing and security, the script library and
+    upload, and every remote control.
+  - It also checks Ghost mode and both see-through directions, natural Read Aloud following word by word,
+    Voice Follow on/off, and that there were no crashes or errors.
+- **Phone remote UI test** (`tools/phone_e2e.py`): 33 checks in a mobile browser.
+- The phone's live view now updates while Read Aloud or Voice Follow is running, not only while scrolling.
+- The phone's "Start a new one" button is now a full 44 px touch target.
+
 ## 2.4.1 - 2026-10-02
 Mac fixes, from the first real MacBook test.
 

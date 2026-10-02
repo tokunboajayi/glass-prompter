@@ -43,6 +43,15 @@ done
 "${APP}/Contents/MacOS/GlassPrompter" --selftest "${BUILD}/selftest.txt" || { cat "${BUILD}/selftest.txt"; exit 1; }
 cat "${BUILD}/selftest.txt"
 
+echo "-- end-to-end audit of the built app (launch race, phone API, every control, ghost, Read Aloud)"
+"${APP}/Contents/MacOS/GlassPrompter" --e2e "${BUILD}/e2e.txt" & E2E=$!
+( sleep 600; kill -9 ${E2E} 2>/dev/null ) & WATCH=$!
+if wait ${E2E}; then RC=0; else RC=$?; fi
+kill ${WATCH} 2>/dev/null || true
+cat "${BUILD}/e2e.txt" || true
+[ -f "${BUILD}/e2e.txt.app.log" ] && tail -40 "${BUILD}/e2e.txt.app.log"
+[ "${RC}" = "0" ] || { echo "End-to-end audit failed"; exit 1; }
+
 echo "-- disk image"
 mkdir -p dist
 STAGE="${BUILD}/dmg"

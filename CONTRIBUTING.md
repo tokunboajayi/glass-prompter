@@ -101,6 +101,16 @@ The app serves this on port 8765 on your local network.
 - Request sizes are limited.
 - A new PIN signs out every phone.
 
+## Audits
+
+| Command | What it checks |
+|---|---|
+| `python glass_prompter.pyw --selftest` | Speech model, Voice Follow engine, natural voice, audio |
+| `python glass_prompter.pyw --e2e` | The whole app, driven like a user and the phone would (about 2 minutes) |
+| `python tools/phone_e2e.py` | The phone web app in a mobile browser (needs Node and Playwright) |
+
+The Windows and Mac build scripts run `--selftest` and `--e2e` on the built app, so a broken build is never published.
+
 ## Pull requests
 
 1. Keep the app working on all three OSes. Platform-specific code goes in `glassprompter/platform/`.

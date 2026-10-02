@@ -211,6 +211,8 @@ class Prompter(QWidget):
         self.coach = None
         self.reading_aloud = False
         self.tts_word, self.tts_follow, self.tts_preparing = -1, False, False
+        self.tts_engine = ""                           # "natural" | "system" while reading aloud
+        self.guard_state = ""                          # crash guard: "pending" | "ok" | "crashed:<parts>"
         self.frosted = ""
         self.cap_level, self.cap_note = native.capture_support()
         self.voice_latency = 0
@@ -1129,14 +1131,17 @@ class Prompter(QWidget):
         self.sync_ui()
 
     def change_ghost_opacity(self, d):
+        """More see-through / more solid. Adjusting it switches Ghost mode on, so the change is always visible."""
         self.cfg.ghost_opacity = round(min(1.0, max(0.15, self.cfg.ghost_opacity + d)), 2)
         self.settingsChanged.emit()
-        if self.ghost:
-            self.toast("Ghost %d%%" % round(self.cfg.ghost_opacity * 100), T.aqua, 1.4)
+        if not self.ghost:
+            self.set_ghost(True)                   # shows its own toast, including how to leave Ghost mode
+            if not self.ghost:                     # this OS can't pass clicks through: still show the level
+                self.toast("See-through %d%%" % round(self.cfg.ghost_opacity * 100), T.aqua, 1.4)
         else:
-            self.toast("Ghost level %d%%  %s  turn on with %s+G" % (round(self.cfg.ghost_opacity * 100), DOT,
-                                                                   native.MOD))
+            self.toast("See-through %d%%" % round(self.cfg.ghost_opacity * 100), T.aqua, 1.4)
         self.update()
+        self.stateChanged.emit()
 
     def toggle_ghost(self):
         self.set_ghost(not self.ghost)
@@ -1373,7 +1378,9 @@ class Prompter(QWidget):
             "queued": self.pending is not None, "capture_hidden": self.cap_state,
             "window_visible": self.isVisible(), "font_px": self.cfg.font_px,
             "voice_follow": self.cfg.voice_follow, "listening": self.listening, "live_wpm": self.live_wpm,
-            "ghost": self.ghost, "mirror": self.cfg.mirror, "reading_aloud": self.reading_aloud,
+            "ghost": self.ghost, "ghost_opacity": self.cfg.ghost_opacity, "mirror": self.cfg.mirror,
+            "reading_aloud": self.reading_aloud, "tts_word": self.tts_word, "tts_engine": self.tts_engine,
+            "tts_preparing": self.tts_preparing, "pos": round(self.pos, 1), "guard": self.guard_state,
             "fillers": sum(self.coach.fillers.values()) if self.coach else 0,
             "voice_latency_ms": self.voice_latency if self.listening else 0,
             "sections": [t for _, t in engine.sections(self.lines)],
