@@ -24,6 +24,7 @@ import re
 import secrets
 import socket
 import socketserver
+import sys
 import threading
 import time
 import urllib.parse
@@ -234,7 +235,9 @@ class RemoteServer:
 
         class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
             daemon_threads = True
-            allow_reuse_address = False      # on Windows SO_REUSEADDR lets a 2nd process steal the port
+            # Windows: SO_REUSEADDR lets a 2nd process steal the port. macOS/Linux: it only allows rebinding while
+            # the last run's connections sit in TIME_WAIT (~30 s), so a quick restart keeps the phone remote.
+            allow_reuse_address = sys.platform != "win32"
             request_queue_size = 32
 
         try:

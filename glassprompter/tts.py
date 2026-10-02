@@ -40,6 +40,10 @@ VOICES = {
 }
 DEFAULT_VOICE = "lessac"
 SYSTEM = "system"
+# espeak-ng ignores a data path longer than ~150 bytes and falls back to the folder compiled in on piper's build
+# machine, which doesn't exist here, so it exits the process. Keep a margin below that.
+ESPEAK_PATH_MAX = 140
+ESPEAK_LINK = "gp-espeak-ng-data"
 
 
 def speakable(text):
@@ -64,6 +68,39 @@ def voice_file(voice_id):
         if os.path.isfile(f) and os.path.isfile(f + ".json"):
             return f
     return None
+
+
+def espeak_data_dir(src=None, bases=None):
+    """espeak-ng data folder for piper, at a path short enough for espeak-ng to accept.
+
+    A Mac app opened from the disk image or Downloads runs from App Translocation
+    (/private/var/folders/../AppTranslocation/<uuid>/d/Glass Prompter.app/...), ~165+ characters - too long.
+    Point a short symlink at the real folder instead. It's refreshed every launch, since that folder moves."""
+    if src is None:
+        from piper.phonemize_espeak import ESPEAK_DATA_DIR
+        src = str(ESPEAK_DATA_DIR)
+    if len(src) <= ESPEAK_PATH_MAX:
+        return src
+    for base in bases if bases is not None else (paths.data_dir(), tempfile.gettempdir()):
+        link = os.path.join(base, ESPEAK_LINK)
+        if len(link) > ESPEAK_PATH_MAX or not os.path.isdir(base):
+            continue
+        tmp = "%s.%d" % (link, os.getpid())
+        try:
+            if os.path.realpath(link) != os.path.realpath(src):
+                os.symlink(src, tmp)
+                os.replace(tmp, link)                      # atomic: other processes never see it missing
+            return link
+        except OSError as ex:
+            log.warning("Couldn't link espeak-ng data into %s: %s", base, ex)
+            if os.path.lexists(tmp):
+                os.remove(tmp)
+    log.warning("espeak-ng data path is %d characters and no short link was possible: %s", len(src), src)
+    return src
+
+
+def load_voice(path):
+    return PiperVoice.load(path, espeak_data_dir=espeak_data_dir())
 
 
 def natural_available(voice_id=DEFAULT_VOICE):
@@ -203,7 +240,7 @@ class Speaker(QObject):
     def _voice(self, voice_id):
         with self._lock:
             if voice_id not in self._voices:
-                self._voices[voice_id] = PiperVoice.load(voice_file(voice_id))
+                self._voices[voice_id] = load_voice(voice_file(voice_id))
             return self._voices[voice_id]
 
     # ---------------------------------------------------------------- public
