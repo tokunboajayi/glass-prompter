@@ -672,6 +672,9 @@ def main(argv=None):
     app.setQuitOnLastWindowClosed(False)
     app.setStyle("Fusion")
     app.setStyleSheet(theme.app_qss())
+    from .ui.glass import TipFilter
+    app._tips = TipFilter(app)                      # every short tooltip becomes a glass tip
+    app.installEventFilter(app._tips)
     app.setWindowIcon(appicon.app_icon())
 
     instance = _single_instance(app, args)

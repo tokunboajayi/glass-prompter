@@ -95,6 +95,22 @@ def run():
     app.processEvents()
     grab(p, "4_help.png")
     p.show_help = False
+    p.hovered = True
+    p.sync_ui()
+    app.processEvents()
+    m = p.bar.menu
+    m.popup_under(p.bar.more, True)
+    m.hover = 2
+    app.processEvents()
+    grab(m, "4b_menu.png")
+    m.close()
+    from glassprompter.ui.glass import GlassTip
+    tip = GlassTip.get()
+    tip.request(p.bar.voice, "Voice Follow", "V")
+    tip._show_now()
+    app.processEvents()
+    grab(tip, "4c_tip.png")
+    tip.cancel()
     for cls, args, name, size in [
         (dialogs.SettingsDialog, (None, ctl), "5_settings.png", None),
         (dialogs.LibraryDialog, (None, ctl.store, 0, lambda s: None), "6_library.png", (940, 600)),

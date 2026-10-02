@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QFrame, QGraphicsOpacityEffect, QHBoxLayout, QLabe
 from .. import coach as coachlib, engine, tracking
 from .. import platform as native
 from . import icons
-from .glass import RADIUS, paint_glass
+from .glass import RADIUS, GlassMenu, GlassTip, TipFilter, keys_width, paint_glass, paint_keys
 from .theme import DASH, DOT, ELLIPSIS, T, aurora_line, bar_qss, font, fonts
 
 COUNTDOWN_STEP = 0.7
@@ -28,14 +28,20 @@ class ControlBar(QFrame):
         lay.setContentsMargins(4, 4, 4, 4)
         lay.setSpacing(2)
 
-        def btn(glyph, tip, fn, name=None):
+        self.tips = TipFilter(self)
+        self.owner = owner
+        M, C = native.MOD, native.CMD
+
+        def btn(glyph, tip, keys, fn, name=None):
             b = QToolButton(self)
             b.setIcon(icons.icon(glyph, "#0A0C14" if name == "play" else self.ICON, 18))
             b.setIconSize(QSize(18, 18))
-            b.setToolTip(tip)
-            b.setAccessibleName(tip.split("  (")[0])
-            b.setFocusPolicy(Qt.FocusPolicy.TabFocus)        # clicking never steals keyboard focus
+            b.setProperty("tip", tip)
+            b.setProperty("keys", keys)
+            b.setAccessibleName(tip)
+            b.setFocusPolicy(Qt.FocusPolicy.NoFocus)         # every action has a key; no stray focus rings
             b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.installEventFilter(self.tips)
             if name:
                 b.setObjectName(name)
             if fn:
@@ -48,39 +54,50 @@ class ControlBar(QFrame):
             s.setObjectName("sep")
             lay.addWidget(s)
 
-        self.play = btn("play", "Play / pause  (Space, %s+Space)" % native.MOD, owner.toggle_play, "play")
-        btn("restart", "Back to the top  (Home)", owner.restart)
+        self.play = btn("play", "Play / pause", "Space", owner.toggle_play, "play")
+        btn("restart", "Back to the top", "Home", owner.restart)
         sep()
-        self.voice = btn("mic", "Voice Follow: scrolls as you speak  (V)", owner.toggle_voice, "voice")
-        self.speak = btn("speaker", "Read aloud in a natural voice  (L)", owner.toggle_read_aloud, "speak")
+        self.voice = btn("mic", "Voice Follow", "V", owner.toggle_voice, "voice")
+        self.speak = btn("speaker", "Read aloud", "L", owner.toggle_read_aloud, "speak")
         sep()
-        btn("minus", "Slower  (Down)", lambda: owner.change_wpm(-10))
+        btn("minus", "Slower", "Down", lambda: owner.change_wpm(-10))
         self.wpm = QLabel(self)
         self.wpm.setObjectName("wpm")
         self.wpm.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.wpm.setTextFormat(Qt.TextFormat.RichText)
         lay.addWidget(self.wpm)
-        btn("plus", "Faster  (Up)", lambda: owner.change_wpm(+10))
+        btn("plus", "Faster", "Up", lambda: owner.change_wpm(+10))
         sep()
-        btn("library", "Scripts  (E)", owner.requestLibrary.emit)
-        more = btn("more", "More", None)
-        menu = QMenu(more)
-        for item in (("Bigger text\t+", lambda: owner.change_font(+2)),
-                         ("Smaller text\t-", lambda: owner.change_font(-2)), None,
-                         ("Phone remote" + ELLIPSIS + "\tP", owner.requestPhone.emit),
-                         ("Settings" + ELLIPSIS + "\t%s+," % native.CMD, owner.requestSettings.emit),
-                         ("Ghost mode, click-through\t%s+G" % native.MOD, owner.toggle_ghost),
-                         ("Keyboard shortcuts\tF1", owner.toggle_help), None,
-                         ("Hide prompter\t%s+H" % native.MOD, owner.hide_window)):
-            if item is None:
-                menu.addSeparator()
-                continue
-            text, fn = item
-            act = menu.addAction(text)
-            act.triggered.connect(fn)
-        more.setMenu(menu)
-        more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.menu = menu
+        btn("library", "Scripts", "E", owner.requestLibrary.emit)
+        self.more = btn("more", "More", "", self.open_menu, "more")
+        cfg = owner.cfg
+        self.menu = GlassMenu([
+            {"kind": "header", "text": "View"},
+            {"kind": "stepper", "icon": "text_bigger", "text": "Text size",
+             "value": lambda: "%d" % cfg.font_px, "dec": lambda: owner.change_font(-2),
+             "inc": lambda: owner.change_font(+2)},
+            {"kind": "toggle", "icon": "mirror", "text": "Mirror text", "keys": "M",
+             "state": lambda: cfg.mirror, "fn": owner.toggle_mirror},
+            {"kind": "toggle", "icon": "shield", "text": "Hide from screen share", "keys": "C",
+             "state": lambda: cfg.hide_from_capture, "fn": owner.toggle_capture},
+            {"kind": "sep"},
+            {"kind": "header", "text": "Ghost"},
+            {"kind": "action", "icon": "ghost", "text": "Ghost mode", "keys": M + "+G", "fn": owner.toggle_ghost},
+            {"kind": "stepper", "icon": None, "text": "See-through",
+             "value": lambda: "%d%%" % round(cfg.ghost_opacity * 100),
+             "dec": lambda: owner.change_ghost_opacity(-0.05), "inc": lambda: owner.change_ghost_opacity(+0.05)},
+            {"kind": "sep"},
+            {"kind": "action", "icon": "phone", "text": "Phone remote" + ELLIPSIS, "keys": "P",
+             "fn": owner.requestPhone.emit},
+            {"kind": "action", "icon": "keyboard", "text": "Keyboard shortcuts", "keys": "F1",
+             "fn": owner.toggle_help},
+            {"kind": "action", "icon": "settings", "text": "Settings" + ELLIPSIS, "keys": C + "+,",
+             "fn": owner.requestSettings.emit},
+            {"kind": "sep"},
+            {"kind": "action", "icon": "eye_off", "text": "Hide prompter", "keys": M + "+H",
+             "fn": owner.hide_window, "quiet": True},
+        ], self)
+        self.menu.closed.connect(self.menu_closed)
 
         self.effect = QGraphicsOpacityEffect(self)
         self.effect.setOpacity(1.0)
@@ -88,6 +105,21 @@ class ControlBar(QFrame):
         self.anim = QPropertyAnimation(self.effect, b"opacity", self)
         self.anim.finished.connect(self._finished)
         self.target = 1.0
+
+    def open_menu(self):
+        GlassTip.get().cancel()
+        if time.monotonic() - getattr(self, "_menu_closed_at", 0) < 0.25:
+            return                                   # the click that closed the popup shouldn't reopen it
+        self.more.setProperty("on", True)
+        self.more.style().unpolish(self.more)
+        self.more.style().polish(self.more)
+        self.menu.popup_under(self.more, self.owner.cfg.reduce_motion)
+
+    def menu_closed(self):
+        self._menu_closed_at = time.monotonic()
+        self.more.setProperty("on", False)
+        self.more.style().unpolish(self.more)
+        self.more.style().polish(self.more)
 
     def set_wpm(self, text, unit):
         self.wpm.setText('<span style="font-weight:600">%s</span>'
@@ -649,13 +681,16 @@ class Prompter(QWidget):
         p.setFont(self.cap_font)
         if not (self.playing or self.counting or self.listening or self.reading_aloud):
             p.setPen(mute)
-            hint = "Press Space and start talking" if self.cfg.voice_follow else "Space to start  " + DOT + "  F1 shortcuts"
+            room = w * 0.66 - right - 14
             if self.pending:
                 hint = "New script from %s  %s  Space to load" % (self.pending[3], DOT)
                 p.setPen(T.aqua)
-            room = w * 0.66 - right - 14
-            if QFontMetricsF(self.cap_font).horizontalAdvance(hint) <= room:      # never cut words in half
-                p.drawText(QRectF(right + 14, by, room, 22), Qt.AlignmentFlag.AlignVCenter, hint)
+                if QFontMetricsF(self.cap_font).horizontalAdvance(hint) <= room:  # never cut words in half
+                    p.drawText(QRectF(right + 14, by, room, 22), Qt.AlignmentFlag.AlignVCenter, hint)
+            else:
+                parts = ([("k", "Space"), ("t", "and start talking")] if self.cfg.voice_follow else
+                         [("k", "Space"), ("t", "start"), ("t", DOT), ("k", "F1"), ("t", "shortcuts")])
+                self._inline_hint(p, right + 14, by + 11, room, parts, mute)
         meta = ["%s left" % engine.fmt_secs(self.time_left())]
         if self.cfg.voice_follow and self.live_wpm:
             meta.insert(0, "%d wpm" % self.live_wpm)
@@ -718,58 +753,106 @@ class Prompter(QWidget):
         p.drawText(QRectF(-100, -70, 200, 140), Qt.AlignmentFlag.AlignCenter, str(n))
         p.restore()
 
-    def _keycaps(self, p, x, cy, combo, font_):
-        """Draw 'Ctrl+Alt+Space' as keycaps; returns the right edge."""
-        fm = QFontMetricsF(font_)
-        p.setFont(font_)
-        keys = ["+"] if combo == "+" else combo.split("+")
-        for i, key in enumerate(keys):
-            if i:
-                p.setPen(T.muted)
-                p.drawText(QRectF(x, cy - 10, 10, 20), Qt.AlignmentFlag.AlignCenter, "+")
-                x += 10
-            kw = max(20.0, fm.horizontalAdvance(key) + 12)
-            r = QRectF(x, cy - 10, kw, 20)
-            p.setPen(QPen(QColor(255, 255, 255, 34), 1))
-            p.setBrush(QColor(255, 255, 255, 14))
-            p.drawRoundedRect(r.adjusted(0.5, 0.5, -0.5, -0.5), 5, 5)
-            p.setPen(T.on_surface)
-            p.drawText(r, Qt.AlignmentFlag.AlignCenter, key)
-            x += kw
-        return x
+    def _inline_hint(self, p, x, cy, room, parts, color):
+        """Status-row hint with real keycaps; skipped entirely when it doesn't fit."""
+        kf = font("ui", 10, QFont.Weight.DemiBold)
+        fm = QFontMetricsF(self.cap_font)
+        widths = [keys_width(v, kf) if k == "k" else fm.horizontalAdvance(v) for k, v in parts]
+        if sum(widths) + 6 * (len(parts) - 1) > room:
+            return
+        p.setFont(self.cap_font)
+        for (kind, v), wdt in zip(parts, widths):
+            if kind == "k":
+                paint_keys(p, x, cy, v, kf, h=17, dim=True)
+            else:
+                p.setPen(color)
+                p.setFont(self.cap_font)
+                p.drawText(QRectF(x, cy - 10, wdt + 2, 20), Qt.AlignmentFlag.AlignVCenter, v)
+            x += wdt + 6
+
+    HELP = (
+        ("Anywhere", True, [("Space", "Play / pause"), ("Up", "Faster"), ("Down", "Slower"), ("V", "Voice Follow"),
+                            ("H", "Show / hide"), ("G", "Ghost mode"), ("[", "More see-through"),
+                            ("]", "More solid")]),
+        ("On the prompter", False, [("Space", "Play / pause"), ("L", "Read aloud"), ("E", "Scripts"),
+                                    ("+", "Bigger text"), ("PgDn", "Next section"), ("C", "Share privacy"),
+                                    ("M", "Mirror text"), ("F1", "This sheet")]),
+    )
 
     def paint_help(self, p, w, h, panel):
+        """Shortcut sheet: two columns, label left / keys right, global modifier shown once per column."""
         p.fillPath(panel, QColor(T.surface))
-        m = native.MOD
-        cols = [
-            ("Anywhere", [(m + "+Space", "Play / pause"), (m + "+Up", "Faster"), (m + "+Down", "Slower"),
-                          (m + "+V", "Voice Follow"), (m + "+H", "Show / hide"), (m + "+G", "Ghost mode"),
-                          (m + "+[", "Ghost more see-through"), (m + "+]", "Ghost more solid")]),
-            ("On the prompter", [("Space", "Play / pause"), ("L", "Read aloud"), ("E", "Scripts"),
-                                 ("+", "Bigger text"), ("PgDn", "Next section"), ("C", "Share privacy"),
-                                 ("G", "Ghost mode"), ("M", "Mirror text")]),
-        ]
-        colw = (w - 64) / 2
+        pad, gap = 28.0, 40.0
         kf = font("ui", 11, QFont.Weight.DemiBold)
-        rows = max(len(r) for _, r in cols)
-        rh = min(26.0, (h - 74) / rows)
-        for ci, (title, items) in enumerate(cols):
-            x = 32 + ci * (colw + 0)
-            p.setFont(self.badge_font)
-            p.setPen(T.muted)
-            p.drawText(QRectF(x, 16, colw, 18), Qt.AlignmentFlag.AlignVCenter, title.upper())
-            for ri, (keys, what) in enumerate(items):
-                cy = 46 + ri * rh + rh / 2 - 6
-                self._keycaps(p, x, cy, keys, kf)
-                p.setFont(self.help_font)
-                p.setPen(T.on_surface)
-                p.drawText(QRectF(x + colw * 0.48, cy - 10, colw * 0.52 - 12, 20), Qt.AlignmentFlag.AlignVCenter,
-                           what)
+        hf = font("ui", 14, QFont.Weight.DemiBold)
+        # header
+        icons.draw(p, "keyboard", QRectF(pad, 15, 18, 18), T.aqua)
+        p.setFont(hf)
+        p.setPen(T.on_surface)
+        p.drawText(QRectF(pad + 26, 12, 300, 24), Qt.AlignmentFlag.AlignVCenter, "Keyboard shortcuts")
         p.setFont(self.cap_font)
         p.setPen(T.muted)
-        p.drawText(QRectF(32, h - 30, w - 64, 20), Qt.AlignmentFlag.AlignVCenter,
-                   "In a script:  # Heading = section   %s   [PAUSE] stops   %s   [Smile] = cue   %s   Esc to close"
-                   % (DOT, DOT, DOT))
+        esc_left = w - pad - keys_width("Esc", kf)
+        paint_keys(p, esc_left, 24, "Esc", kf, dim=True)
+        p.drawText(QRectF(esc_left - 106, 14, 100, 20),
+                   Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, "Close")
+        top, foot = 48.0, 36.0
+        colw = (w - 2 * pad - gap) / 2
+        rows = max(len(r) for _, _, r in self.HELP)
+        if h < 270:                                           # short prompter: drop the footer, keep every row
+            foot = 0.0
+        rh = min(24.0, (h - top - 30 - foot - 10) / rows)
+        for ci, (title, glob, items) in enumerate(self.HELP):
+            x = pad + ci * (colw + gap)
+            p.setFont(self.badge_font)
+            p.setPen(T.muted)
+            p.drawText(QRectF(x, top, colw, 16), Qt.AlignmentFlag.AlignVCenter, title.upper())
+            if glob:                                          # "hold Ctrl Alt" once instead of on every row
+                tw = QFontMetricsF(self.badge_font).horizontalAdvance(title.upper())
+                p.setFont(self.cap_font)
+                p.drawText(QRectF(x + tw + 10, top, 40, 16), Qt.AlignmentFlag.AlignVCenter, "hold")
+                hx = x + tw + 10 + QFontMetricsF(self.cap_font).horizontalAdvance("hold") + 6
+                paint_keys(p, hx, top + 8, native.MOD, kf, h=17)
+            p.setPen(QPen(QColor(255, 255, 255, 14), 1))
+            p.drawLine(QPointF(x, top + 22), QPointF(x + colw, top + 22))
+            for ri, (keys, what) in enumerate(items):
+                cy = top + 30 + ri * rh + rh / 2
+                if ri % 2 == 1:
+                    p.setPen(Qt.PenStyle.NoPen)
+                    p.setBrush(QColor(255, 255, 255, 5))
+                    p.drawRoundedRect(QRectF(x - 8, cy - rh / 2, colw + 16, rh), 6, 6)
+                p.setFont(self.help_font)
+                p.setPen(T.on_surface)
+                p.drawText(QRectF(x, cy - rh / 2, colw - 80, rh), Qt.AlignmentFlag.AlignVCenter, what)
+                paint_keys(p, x + colw, cy, keys, kf, right=True, h=min(19.0, rh - 3))
+        if not foot:
+            return
+        # footer: script syntax as coloured tokens
+        y = h - foot / 2 - 4
+        p.setPen(QPen(QColor(255, 255, 255, 14), 1))
+        p.drawLine(QPointF(pad, h - foot - 4), QPointF(w - pad, h - foot - 4))
+        x = pad
+        p.setFont(self.cap_font)
+        fm = QFontMetricsF(self.cap_font)
+        for tok, color, what in (("In scripts", None, ""), ("# Heading", T.section, "section"),
+                                 ("[PAUSE]", T.cue, "stops"), ("[Smile]", T.cue, "cue")):
+            if color is None:
+                p.setPen(T.muted)
+                p.drawText(QRectF(x, y - 10, 200, 20), Qt.AlignmentFlag.AlignVCenter, tok)
+                x += fm.horizontalAdvance(tok) + 16
+                continue
+            tw = fm.horizontalAdvance(tok) + 12
+            chip = QRectF(x, y - 9, tw, 18)
+            bg = QColor(color)
+            bg.setAlpha(28)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(bg)
+            p.drawRoundedRect(chip, 5, 5)
+            p.setPen(color)
+            p.drawText(chip, Qt.AlignmentFlag.AlignCenter, tok)
+            p.setPen(T.muted)
+            p.drawText(QRectF(chip.right() + 6, y - 10, 100, 20), Qt.AlignmentFlag.AlignVCenter, what)
+            x = chip.right() + 6 + fm.horizontalAdvance(what) + 18
 
     # ------------------------------------------------------------ feedback
     def toast(self, msg, color=None, dur=2.4):

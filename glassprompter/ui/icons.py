@@ -118,6 +118,51 @@ def draw(p, name, r, color):
         p.setBrush(c)
         for x in (5, 10, 15):
             p.drawEllipse(QPointF(x, 10), 1.5, 1.5)
+    elif name == "mirror":
+        _pen(p, c)
+        p.drawLine(QPointF(10, 3), QPointF(10, 4.6))
+        p.drawLine(QPointF(10, 7.2), QPointF(10, 8.8))
+        p.drawLine(QPointF(10, 11.4), QPointF(10, 13))
+        p.drawLine(QPointF(10, 15.4), QPointF(10, 17))
+        for sx in (-1, 1):
+            t = QPainterPath()
+            t.moveTo(10 + sx * 2.4, 5.5)
+            t.lineTo(10 + sx * 7, 14.5)
+            t.lineTo(10 + sx * 2.4, 14.5)
+            t.closeSubpath()
+            p.drawPath(t)
+    elif name == "shield":
+        _pen(p, c)
+        sh = QPainterPath()
+        sh.moveTo(10, 2.8)
+        sh.lineTo(15.8, 5.2)
+        sh.lineTo(15.8, 9.4)
+        sh.cubicTo(15.8, 13.2, 13.3, 16, 10, 17.4)
+        sh.cubicTo(6.7, 16, 4.2, 13.2, 4.2, 9.4)
+        sh.lineTo(4.2, 5.2)
+        sh.closeSubpath()
+        p.drawPath(sh)
+        p.drawLine(QPointF(7.6, 10), QPointF(9.4, 11.8))
+        p.drawLine(QPointF(9.4, 11.8), QPointF(12.6, 8.4))
+    elif name == "keyboard":
+        _pen(p, c)
+        p.drawRoundedRect(QRectF(2.8, 5, 14.4, 10), 2.2, 2.2)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(c)
+        for row, y in enumerate((8, 10.4)):
+            for k in range(5 - row):
+                p.drawEllipse(QPointF(5.6 + k * 2.2 + row * 1.1, y), 0.75, 0.75)
+        _pen(p, c)
+        p.drawLine(QPointF(7.4, 12.8), QPointF(12.6, 12.8))
+    elif name == "eye_off":
+        _pen(p, c)
+        e = QPainterPath()
+        e.moveTo(2.8, 10)
+        e.quadTo(10, 2.6, 17.2, 10)
+        e.quadTo(10, 17.4, 2.8, 10)
+        p.drawPath(e)
+        p.drawEllipse(QPointF(10, 10), 2.4, 2.4)
+        p.drawLine(QPointF(4, 16), QPointF(16, 4))
     elif name == "spark":                       # brand mark: four-point star
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(c)

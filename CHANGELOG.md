@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.4.0 - 2026-10-02
+Seamless UI release: one glass design language across the app and the website.
+
+- **New ⋯ menu:** a painted glass menu replaces the OS menu, which drew square corners and a grey box on Windows.
+  - Text size and ghost see-through are inline steppers, so you don't have to reopen the menu.
+  - Mirror text and screen-share privacy are switches that show their live state.
+  - Every item shows its keyboard shortcut as keycaps. Arrow keys, Enter and Esc all work.
+- **Glass tooltips:** hovering a control shows its name and its key, styled like the app. This applies to every
+  short tooltip in every dialog.
+- **Shortcut sheet (F1), redesigned:**
+  - Labels on the left and keys on the right, in two aligned columns.
+  - The global modifier ("hold Ctrl Alt", or ⌃⌥ on a Mac) appears once instead of on every row.
+  - The script syntax shows as coloured chips.
+- **Status row** shows real keycaps (Space, F1) instead of plain text.
+- **Control bar:** no stray focus ring on the play button.
+- **Website:**
+  - A sticky glass navigation bar.
+  - An install panel with Windows/macOS tabs and one-click Copy. The right tab is picked for your OS.
+  - A new Shortcuts section with a Windows/Mac keys switch.
+  - Keycaps that match the app.
+
 ## 2.3.0 - 2026-10-02
 Distribution release.
 

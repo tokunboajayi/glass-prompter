@@ -28,11 +28,12 @@ Updates arrive inside the app. Once a day it checks GitHub for a new version and
 
 - **Aurora Glass UI:** deep-ink frosted glass (Windows 11 acrylic, macOS vibrancy) with a living aurora rim that shows state. It's calm when idle, flows while you read and pulses with your voice. Vector icons, frameless dialogs, one design system on both OSes and the phone.
 - **Voice Follow:** offline (Vosk) and tuned for low latency. Spoken words dim so your eye lands on the next one. Shows live wpm and latency.
-- **Rehearsal Coach + live pace light**, plus **Read Aloud** (Windows SAPI / macOS `say`) at your target pace.
+- **Rehearsal Coach + live pace light**, plus **Read Aloud** in a natural neural voice (Piper, offline) that the prompter follows word by word.
 - **Hidden from screen share** where the OS allows it. It re-checks every 1.5 s and the badge always shows the real state.
 - **Ghost mode** (click-through), **mirror mode**, **sections** (`# Heading`), `[PAUSE]` and `[CUE]` markers, a 3-2-1 countdown, and pacing in words per minute.
 - **Phone remote** over Wi-Fi: pair with a QR code, PIN-protected, with live state over SSE. Manage and upload scripts from the phone.
 - **Drop folder** in `Documents/Glass Prompter`: works with OneDrive or iCloud Drive.
+- **One design system everywhere:** glass menus with inline switches and steppers, glass tooltips that show each action's keys, a grouped shortcut sheet (F1), and the same keycaps on the website.
 - **Global shortcuts:** Ctrl+Alt (Windows) or Control+Option (macOS) plus Space/Up/Down/Left/Right/R/H/E/V/G/PgUp/PgDn. On macOS these use Carbon hotkeys, so no Accessibility permission is needed.
 - **On macOS** the prompter floats over full-screen apps on every Space and never hides when Zoom takes focus.
 
@@ -83,7 +84,7 @@ packaging/          PyInstaller spec (Win + Mac), Inno Setup, build.ps1, build_m
 ```bash
 python -m pip install -r requirements.txt
 python glass_prompter.pyw                        # run from source
-python -m pytest -q tests                        # 67 tests
+python -m pytest -q tests                        # 77 tests
 QT_QPA_PLATFORM=offscreen python tools/shots.py shots   # render every screen to PNG
 # Windows build:  powershell -ExecutionPolicy Bypass -File packaging\build.ps1
 # macOS build:    bash packaging/build_mac.sh

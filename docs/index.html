@@ -31,7 +31,10 @@ body{margin:0;background:var(--bg);color:var(--on);font:16px/1.6 Inter,system-ui
 a{color:inherit}
 img{max-width:100%;height:auto;display:block}
 .wrap{max-width:var(--max);margin:0 auto;padding:0 24px}
-nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+.topbar{position:sticky;top:0;z-index:20;background:rgba(6,7,13,.62);backdrop-filter:saturate(160%) blur(18px);
+  -webkit-backdrop-filter:saturate(160%) blur(18px);border-bottom:1px solid transparent;transition:border-color .2s}
+.topbar.scrolled{border-bottom-color:var(--line)}
+nav{display:flex;align-items:center;justify-content:space-between;height:64px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:600;text-decoration:none}
 .brand img{width:28px;height:28px}
 .nav-links{display:flex;gap:6px}
@@ -60,7 +63,9 @@ section{padding:96px 0}
 h2{font-size:clamp(28px,3.6vw,40px);letter-spacing:-.025em;line-height:1.15;margin:0 0 12px;font-weight:700}
 .lead{color:var(--muted);font-size:18px;max-width:620px;margin:0 0 40px}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px}
+.card,.glass{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012)) ,var(--surface);
+  border:1px solid var(--line);border-top-color:rgba(255,255,255,.14);border-radius:var(--r)}
+.card{padding:24px}
 .card h3{font-size:17px;margin:14px 0 6px;font-weight:600}
 .card p{margin:0;color:var(--muted);font-size:15px}
 .ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(64,232,208,.1);color:var(--aqua)}
@@ -70,8 +75,40 @@ h2{font-size:clamp(28px,3.6vw,40px);letter-spacing:-.025em;line-height:1.15;marg
 .points{list-style:none;padding:0;margin:0}
 .points li{padding:12px 0;border-top:1px solid var(--line);color:var(--muted)}
 .points li b{color:var(--on);font-weight:600}
-kbd{font:600 12px Inter,system-ui,sans-serif;padding:2px 7px;border-radius:6px;border:1px solid rgba(255,255,255,.2);
-  background:rgba(255,255,255,.06);color:var(--on)}
+kbd{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 7px;font:600 12px/1 Inter,system-ui,sans-serif;
+  border-radius:6px;background:rgba(255,255,255,.07);color:#dee3f0;box-shadow:inset 0 -1px 0 rgba(255,255,255,.14);vertical-align:middle}
+kbd+kbd{margin-left:3px}
+/* install terminal */
+.term{margin-top:28px;overflow:hidden}
+.term-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px 10px 18px;border-bottom:1px solid var(--line)}
+.term-title{font-size:13px;color:var(--muted);font-weight:500}
+.tabs{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:rgba(255,255,255,.05)}
+.tabs button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:7px;min-height:32px;padding:0 12px;border-radius:8px;
+  font-size:13px;font-weight:600;color:var(--muted);transition:background .15s,color .15s}
+.tabs button svg{width:14px;height:14px}
+.tabs button:hover{color:var(--on)}
+.tabs button[aria-selected="true"]{background:rgba(255,255,255,.1);color:var(--on)}
+.tabs button:focus-visible,.copy:focus-visible{outline:2px solid var(--aqua);outline-offset:2px}
+.cmd{display:flex;align-items:center;gap:12px;padding:18px}
+.cmd code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;font:500 15px/1.5 ui-monospace,"Cascadia Code","SF Mono",Menlo,Consolas,monospace;color:var(--on)}
+.cmd code .pr{color:var(--aqua);user-select:none;margin-right:10px}
+.copy{all:unset;cursor:pointer;flex:none;display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 12px;border-radius:9px;
+  font-size:13px;font-weight:600;color:var(--on);background:rgba(255,255,255,.07);transition:background .15s}
+.copy:hover{background:rgba(255,255,255,.13)}
+.copy svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.copy .ok{display:none;color:var(--ok)}
+.copy.done .ok{display:inline}.copy.done .cp{display:none}
+.note{margin:0;padding:0 18px 16px;font-size:13px;color:var(--dim)}
+.note b{color:var(--ember);font-weight:600}
+/* shortcuts */
+.keys{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.keys .glass{padding:8px 8px 10px}
+.keys h3{display:flex;align-items:center;gap:8px;margin:0;padding:12px 12px 10px;font-size:13px;font-weight:600;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.04em}
+.keys h3 span{text-transform:none;letter-spacing:0;font-weight:500}
+.krow{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:40px;padding:0 12px;border-radius:8px;font-size:15px}
+.krow:nth-child(odd){background:rgba(255,255,255,.025)}
+.seg{display:flex;justify-content:flex-end;margin:-8px 0 20px}
 table{width:100%;border-collapse:collapse;font-size:15px}
 th,td{padding:14px 16px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:13px;color:var(--dim);font-weight:600}
@@ -84,6 +121,7 @@ td.us{color:var(--on);font-weight:500}
 .dl .card.rec{border-color:rgba(64,232,208,.5);box-shadow:0 0 0 1px rgba(64,232,208,.2)}
 .tag{font-size:12px;color:var(--aqua);font-weight:600}
 .small{font-size:13px;color:var(--dim)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 details{border-top:1px solid var(--line);padding:18px 0}
 details:last-child{border-bottom:1px solid var(--line)}
 summary{cursor:pointer;font-weight:600;font-size:17px;list-style:none;display:flex;justify-content:space-between;gap:16px}
@@ -93,7 +131,8 @@ details[open] summary::after{content:"\2212"}
 details p{color:var(--muted);margin:10px 0 0;max-width:760px}
 footer{padding:48px 0 64px;color:var(--dim);font-size:14px;border-top:1px solid var(--line)}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
-@media (max-width:900px){.grid,.dl{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}}
+@media (max-width:900px){.grid,.dl{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}.keys{grid-template-columns:1fr}}
+@media (max-width:620px){.term-head{flex-direction:column;align-items:flex-start}.cmd{flex-direction:column;align-items:stretch}.copy{justify-content:center}}
 @media (max-width:620px){.grid,.dl{grid-template-columns:1fr}.nav-links a.hide-sm{display:none}section{padding:72px 0}}
 </style>
 </head>
@@ -107,20 +146,25 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
   <symbol id="i-win" viewBox="0 0 24 24"><path d="M3 5.5l7.5-1v7H3zM12 4.3L21 3v8.5h-9zM3 12.5h7.5v7l-7.5-1zM12 12.5h9V21l-9-1.3z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.5 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8s-1.9-.8-3.1-.8C6.9 7.2 5.4 8.1 4.6 9.6c-1.7 2.9-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.1.8 2.1-1.2 2.8-2.4c.9-1.3 1.3-2.6 1.3-2.7 0 0-2.6-1-2.6-4zM14.2 5.5c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.8 1.4-.6.7-1.1 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.3z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
-<div class="wrap">
+<div class="topbar" id="topbar"><div class="wrap">
   <nav aria-label="Main">
     <a class="brand" href="#"><img src="img/icon.svg" alt="">Glass Prompter</a>
     <div class="nav-links">
       <a class="hide-sm" href="#features">Features</a>
       <a class="hide-sm" href="#compare">Compare</a>
+      <a class="hide-sm" href="#shortcuts">Shortcuts</a>
       <a href="#download">Download</a>
       <a href="https://github.com/tokunboajayi/glass-prompter">GitHub</a>
     </div>
   </nav>
+</div></div>
 
+<div class="wrap">
   <header class="hero">
     <span class="eyebrow"><i></i><span id="ver">Free for Windows and Mac</span></span>
     <h1>Read your script. Keep eye contact.</h1>
@@ -231,7 +275,55 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <span class="small size" data-size="x86_64"></span>
       </div>
     </div>
-    <p class="small" style="margin-top:20px">Prefer the command line? Windows: <kbd>winget install TokunboAjayi.GlassPrompter</kbd> &nbsp; Mac: <kbd>brew install --cask tokunboajayi/tap/glass-prompter</kbd></p>
+    <div class="glass term">
+      <div class="term-head">
+        <span class="term-title">Or install from the command line</span>
+        <div class="tabs" role="tablist" aria-label="Operating system">
+          <button role="tab" id="tab-win" aria-controls="pane-win" aria-selected="true"><svg aria-hidden="true"><use href="#i-win"/></svg>Windows</button>
+          <button role="tab" id="tab-mac" aria-controls="pane-mac" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="#i-apple"/></svg>macOS</button>
+        </div>
+      </div>
+      <div role="tabpanel" id="pane-win" aria-labelledby="tab-win">
+        <div class="cmd"><code><span class="pr">&gt;</span>winget install TokunboAjayi.GlassPrompter</code>
+          <button class="copy" type="button" data-copy="winget install TokunboAjayi.GlassPrompter"><svg class="cp" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ok" aria-hidden="true"><use href="#i-check"/></svg><span>Copy</span></button></div>
+        <p class="note" data-winget-pending><b>In review.</b> Microsoft is approving the winget listing. Until it's live, use the installer above.</p>
+      </div>
+      <div role="tabpanel" id="pane-mac" aria-labelledby="tab-mac" hidden>
+        <div class="cmd"><code><span class="pr">$</span>brew install --cask tokunboajayi/tap/glass-prompter</code>
+          <button class="copy" type="button" data-copy="brew install --cask tokunboajayi/tap/glass-prompter"><svg class="cp" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ok" aria-hidden="true"><use href="#i-check"/></svg><span>Copy</span></button></div>
+        <p class="note">Works on Apple silicon and Intel. Updates with <kbd>brew upgrade</kbd> or inside the app.</p>
+      </div>
+      <span class="sr-only" aria-live="polite" id="copied"></span>
+    </div>
+  </div>
+</section>
+
+<section id="shortcuts">
+  <div class="wrap">
+    <h2>Every action is one key away</h2>
+    <p class="lead">Global shortcuts work from any app, even mid-call. The same sheet is inside the app: press <kbd>F1</kbd>.</p>
+    <div class="seg"><div class="tabs" role="tablist" aria-label="Keyboard layout">
+      <button role="tab" id="k-win" aria-selected="true" data-keys="win">Windows</button>
+      <button role="tab" id="k-mac" aria-selected="false" tabindex="-1" data-keys="mac">Mac</button>
+    </div></div>
+    <div class="keys">
+      <div class="glass"><h3>Anywhere <span>hold <kbd data-mod="1">Ctrl</kbd><kbd data-mod="2">Alt</kbd></span></h3>
+        <div class="krow">Play / pause<span><kbd>Space</kbd></span></div>
+        <div class="krow">Faster / slower<span><kbd>&uarr;</kbd><kbd>&darr;</kbd></span></div>
+        <div class="krow">Voice Follow<span><kbd>V</kbd></span></div>
+        <div class="krow">Show / hide<span><kbd>H</kbd></span></div>
+        <div class="krow">Ghost mode<span><kbd>G</kbd></span></div>
+        <div class="krow">Ghost see-through / solid<span><kbd>[</kbd><kbd>]</kbd></span></div>
+      </div>
+      <div class="glass"><h3>On the prompter</h3>
+        <div class="krow">Read aloud<span><kbd>L</kbd></span></div>
+        <div class="krow">Scripts<span><kbd>E</kbd></span></div>
+        <div class="krow">Bigger / smaller text<span><kbd>+</kbd><kbd>&minus;</kbd></span></div>
+        <div class="krow">Next section<span><kbd>PgDn</kbd></span></div>
+        <div class="krow">Screen-share privacy<span><kbd>C</kbd></span></div>
+        <div class="krow">Mirror text<span><kbd>M</kbd></span></div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -267,6 +359,58 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   if (labels[os]) document.getElementById("primaryText").textContent = labels[os];
   if (os === "windows") document.querySelector('[data-os="windows"]').classList.add("rec");
   if (os === "mac") document.querySelector('[data-os="mac-arm"]').classList.add("rec");
+
+  // sticky bar hairline
+  var bar = document.getElementById("topbar");
+  addEventListener("scroll", function () { bar.classList.toggle("scrolled", scrollY > 8); }, { passive: true });
+
+  // accessible tabs (arrow keys, roving tabindex)
+  function tabs(list, onSelect) {
+    var btns = Array.prototype.slice.call(list.querySelectorAll('[role="tab"]'));
+    function select(b, focus) {
+      btns.forEach(function (x) {
+        var on = x === b;
+        x.setAttribute("aria-selected", on); x.tabIndex = on ? 0 : -1;
+        var pane = x.getAttribute("aria-controls");
+        if (pane) document.getElementById(pane).hidden = !on;
+      });
+      if (focus) b.focus();
+      if (onSelect) onSelect(b);
+    }
+    btns.forEach(function (b, i) {
+      b.addEventListener("click", function () { select(b); });
+      b.addEventListener("keydown", function (e) {
+        var d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+        if (d) { e.preventDefault(); select(btns[(i + d + btns.length) % btns.length], true); }
+      });
+    });
+    return select;
+  }
+  var pickInstall = tabs(document.querySelector(".term .tabs"));
+  var MOD = { win: ["Ctrl", "Alt"], mac: ["\u2303 Control", "\u2325 Option"] };
+  var pickKeys = tabs(document.querySelector(".seg .tabs"), function (b) {
+    var m = MOD[b.getAttribute("data-keys")];
+    document.querySelectorAll("[data-mod]").forEach(function (k) { k.textContent = m[+k.getAttribute("data-mod") - 1]; });
+  });
+  if (os === "mac") {
+    pickInstall(document.getElementById("tab-mac"));
+    pickKeys(document.getElementById("k-mac"));
+  }
+
+  // copy buttons
+  var live = document.getElementById("copied");
+  document.querySelectorAll(".copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var text = b.getAttribute("data-copy");
+      function ok() {
+        b.classList.add("done"); b.querySelector("span").textContent = "Copied"; live.textContent = "Command copied";
+        setTimeout(function () { b.classList.remove("done"); b.querySelector("span").textContent = "Copy"; }, 1600);
+      }
+      if (navigator.clipboard) navigator.clipboard.writeText(text).then(ok, function () {});
+      else { var t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select();
+             try { document.execCommand("copy"); ok(); } catch (e) {} t.remove(); }
+    });
+  });
 
   function mb(n) { return Math.round(n / 1e6) + " MB"; }
   fetch(REL, { headers: { Accept: "application/vnd.github+json" } })

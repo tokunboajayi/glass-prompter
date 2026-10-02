@@ -112,6 +112,7 @@ QToolButton:focus {{ border: 1px solid {AQUA}; }}
 QToolButton#play {{ background: #F5F7FF; border-radius: 16px; }}
 QToolButton#play:hover {{ background: #FFFFFF; }}
 QToolButton[on="true"] {{ background: rgba(64,232,208,30); }}
+QToolButton#more[on="true"] {{ background: rgba(255,255,255,24); }}
 QToolButton::menu-indicator {{ image: none; width: 0; }}
 QLabel#wpm {{ color: #F5F7FF; font-family: "{f['ui']}"; font-size: 12px; padding: 0 2px; min-width: 58px; }}
 QFrame#sep {{ background: rgba(255,255,255,16); min-width: 1px; max-width: 1px; margin: 9px 4px; }}
