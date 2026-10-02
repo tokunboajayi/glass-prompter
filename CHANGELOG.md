@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.0 - 2026-10-01
+- **Adjustable ghost transparency:** ghost mode (clicks pass through) now lets you choose how see-through the
+  prompter is, from 15% to 100%:
+  - Adjust it with **Ctrl+Alt+[ / ]** (Control+Option on Mac). This works even while clicks pass through.
+  - The phone remote has **More see-through** and **More solid** buttons, and Settings has a **Ghost level** slider.
+  - The frosted backdrop switches off in ghost mode, so the prompter is truly see-through.
+  - Text gets a soft dark outline, and a local shadow sits only behind the reading lines, so the script stays
+    legible over any app.
+  - Spoken words dim by colour, not transparency.
+- The overflow menu has a ghost mode item, and the shortcut sheet lists the ghost keys.
+- **Phone remote:** emoji and Unicode glyphs are replaced with a consistent stroke SVG icon set.
+- **Motion:** the control bar fades out faster than it fades in.
+- 73 automated tests.
+
 ## 2.1.0 - 2026-10-01
 Human voice and a refinement pass on the whole interface.
 

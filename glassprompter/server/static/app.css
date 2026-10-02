@@ -38,7 +38,8 @@ h2{font-size:18px;margin:0 0 4px}
 .grid .btn.full{min-height:84px;font-size:21px}
 .btn.wide{width:100%}
 .btn.danger{color:var(--bad)}
-.sym{font-size:22px;line-height:1} .sym.sm{font-size:16px} .sym.lg{font-size:26px}
+.ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.btn.full .ic{width:28px;height:28px}
 .btn:focus-visible,.tabs button:focus-visible,.field:focus-visible,.link:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .field{width:100%;background:var(--surface);color:var(--on);border:1px solid var(--outline);border-radius:12px;padding:12px 14px;
   font-family:inherit;font-size:16px;line-height:1.5;margin-top:10px}
@@ -102,3 +103,4 @@ h1,.status b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Sego
   .card,.tabs,.item,.field,.btn,.pill,#toast{background:#121522}
 }
 .grid .btn.full-soft{grid-column:1/-1}
+.sprite{position:absolute;width:0;height:0;overflow:hidden}

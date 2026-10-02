@@ -76,6 +76,11 @@ def run():
     app.processEvents()
     grab(p, "2_voice.png")
     p.listening = False
+    p.ghost, p.cfg.ghost_opacity, p.frosted = True, 0.35, ""
+    p.update()
+    app.processEvents()
+    grab(p, "2b_ghost.png")
+    p.ghost = False
     p.cfg.voice_follow = False
     p.counting, p.count_t0 = True, p.now() - 0.25
     app.processEvents()

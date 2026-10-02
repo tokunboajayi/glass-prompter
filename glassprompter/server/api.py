@@ -39,7 +39,8 @@ MAX_SESSIONS = 32
 MAX_STREAMS = 8
 FAIL_WINDOW, FAIL_LIMIT, LOCKOUT = 300, 5, 300       # 5 wrong PINs in 5 min -> 5 min lockout
 CONTROL_ACTIONS = {"play", "restart", "faster", "slower", "back", "ahead", "bigger", "smaller", "hide",
-                   "voice", "ghost", "next_section", "prev_section", "read_aloud"}
+                   "voice", "ghost", "ghost_less", "ghost_more", "next_section", "prev_section",
+                   "read_aloud"}
 STATIC_FILES = {"/": ("index.html", "text/html"), "/app.css": ("app.css", "text/css"),
                 "/app.js": ("app.js", "text/javascript"), "/icon.svg": ("icon.svg", "image/svg+xml")}
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "

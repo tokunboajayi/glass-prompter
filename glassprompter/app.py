@@ -27,7 +27,8 @@ log = logging.getLogger("glassprompter")
 
 HOTKEYS = {1: ("SPACE", "play"), 2: ("UP", "faster"), 3: ("DOWN", "slower"), 4: ("LEFT", "back"),
            5: ("RIGHT", "ahead"), 6: ("R", "restart"), 7: ("H", "toggle"), 8: ("E", "library"),
-           9: ("V", "voice"), 10: ("G", "ghost"), 11: ("PGUP", "prev_section"), 12: ("PGDN", "next_section")}
+           9: ("V", "voice"), 10: ("G", "ghost"), 11: ("PGUP", "prev_section"), 12: ("PGDN", "next_section"),
+           13: ("LBRACKET", "ghost_less"), 14: ("RBRACKET", "ghost_more")}
 assert all(k in native.HOTKEY_KEYS for k, _ in HOTKEYS.values())
 DROP_EXT = (".txt", ".md", ".docx")
 WELCOME_SCRIPT = """Welcome to Glass Prompter.
@@ -372,6 +373,7 @@ class Controller(QObject):
          "slower": lambda: p.change_wpm(-10), "back": lambda: p.nudge(-2), "ahead": lambda: p.nudge(2),
          "bigger": lambda: p.change_font(2), "smaller": lambda: p.change_font(-2),
          "hide": p.toggle_window, "voice": p.toggle_voice, "ghost": p.toggle_ghost,
+         "ghost_less": lambda: p.change_ghost_opacity(-0.1), "ghost_more": lambda: p.change_ghost_opacity(0.1),
          "read_aloud": p.toggle_read_aloud,
          "next_section": lambda: p.jump_section(1), "prev_section": lambda: p.jump_section(-1)}[action]()
         self.schedule_publish()
@@ -405,6 +407,8 @@ class Controller(QObject):
             return self.open_library()
         if action == "ghost":
             return p.toggle_ghost()
+        if action in ("ghost_less", "ghost_more"):          # works while clicks pass through
+            return p.change_ghost_opacity(-0.1 if action == "ghost_less" else 0.1)
         if action == "voice":
             if not p.isVisible():
                 p.show_window()

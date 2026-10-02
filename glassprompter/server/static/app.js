@@ -87,7 +87,7 @@
     $("prog").style.width = Math.round((s.progress || 0) * 100) + "%";
     $("queued").hidden = !s.queued;
     const active = s.playing || s.counting || s.listening;
-    $("ppIcon").textContent = active ? "\u275a\u275a" : "\u25b6";
+    $("ppIcon").firstElementChild.setAttribute("href", active ? "#i-pause" : "#i-play");
     $("ppText").textContent = voice ? (s.listening ? "Stop listening" : "Start listening") : (active ? "Pause" : "Play");
     if (!s.window_visible) setConn("Prompter hidden", "warn");
     else if (s.capture_hidden) setConn("Hidden from share", "ok");

@@ -69,6 +69,7 @@ class ControlBar(QFrame):
                          ("Smaller text\t-", lambda: owner.change_font(-2)), None,
                          ("Phone remote" + ELLIPSIS + "\tP", owner.requestPhone.emit),
                          ("Settings" + ELLIPSIS + "\t%s+," % native.CMD, owner.requestSettings.emit),
+                         ("Ghost mode, click-through\t%s+G" % native.MOD, owner.toggle_ghost),
                          ("Keyboard shortcuts\tF1", owner.toggle_help), None,
                          ("Hide prompter\t%s+H" % native.MOD, owner.hide_window)):
             if item is None:
@@ -106,7 +107,7 @@ class ControlBar(QFrame):
             self.effect.setOpacity(target)
             self._finished()
             return
-        self.anim.setDuration(160 if show else 200)
+        self.anim.setDuration(180 if show else 120)          # exits ~65% of enters
         self.anim.setEasingCurve(QEasingCurve.Type.OutCubic if show else QEasingCurve.Type.InCubic)
         self.anim.setStartValue(self.effect.opacity())
         self.anim.setEndValue(target)
@@ -390,6 +391,8 @@ class Prompter(QWidget):
         t = self.now()
         phase = 0.0 if (self.cfg.reduce_motion or not active) else (t * 18.0) % 360.0
         rim = 0.28 + (0.36 if active else 0.0) + (0.3 * self.mic_level if self.listening else 0.0)
+        gop = self.ghost_op()                   # 1.0 normally; the chosen see-through level in ghost mode
+        outline = clear or gop < 0.8            # see-through panel: give letters a soft dark edge to stay legible
 
         if clear:
             p.fillPath(panel, QColor(0, 0, 0, 3))              # keeps the window clickable
@@ -398,9 +401,9 @@ class Prompter(QWidget):
                 p.drawPath(panel)
         else:
             # frosted: lighter tint so the blur shows through; plain: deeper ink glass
-            tint = int(255 * self.cfg.panel_alpha * (0.62 if self.frosted else 1.0))
-            paint_glass(p, QRectF(0.5, 0.5, w - 1, h - 1), tint, bool(self.frosted), rad, phase, rim,
-                        glow=0.8 if active else 0.0)
+            tint = int(255 * self.cfg.panel_alpha * (0.62 if self.frosted else 1.0) * gop)
+            paint_glass(p, QRectF(0.5, 0.5, w - 1, h - 1), max(3, tint), bool(self.frosted), rad, phase,
+                        rim * (0.4 + 0.6 * gop), glow=(0.8 if active else 0.0) * gop)
 
         ry, lh = self.read_y(), self.lh
         if not clear:
@@ -408,12 +411,25 @@ class Prompter(QWidget):
             band = QRectF(0, ry - lh * 0.56, w, lh * 1.12)
             g = QLinearGradient(0, 0, w, 0)
             g.setColorAt(0.0, QColor(255, 255, 255, 0))
-            g.setColorAt(0.18, QColor(255, 255, 255, 13))
-            g.setColorAt(0.82, QColor(255, 255, 255, 13))
+            g.setColorAt(0.18, QColor(255, 255, 255, int(13 * gop)))
+            g.setColorAt(0.82, QColor(255, 255, 255, int(13 * gop)))
             g.setColorAt(1.0, QColor(255, 255, 255, 0))
             p.save()
             p.setClipPath(panel)
             p.fillRect(band, g)
+            p.restore()
+        if self.ghost and gop < 0.9:
+            # local scrim: a soft shadow only where you read, so text holds up over any busy app
+            sc = QRectF(0, ry - lh * 1.6, w, lh * 3.2)
+            sg = QLinearGradient(0, sc.top(), 0, sc.bottom())
+            k = int(120 * (1.0 - gop))
+            sg.setColorAt(0.0, QColor(0, 0, 0, 0))
+            sg.setColorAt(0.3, QColor(0, 0, 0, k))
+            sg.setColorAt(0.7, QColor(0, 0, 0, k))
+            sg.setColorAt(1.0, QColor(0, 0, 0, 0))
+            p.save()
+            p.setClipPath(panel)
+            p.fillRect(sc, sg)
             p.restore()
         # reading-line markers: two slim accent ticks
         p.setPen(Qt.PenStyle.NoPen)
@@ -455,7 +471,7 @@ class Prompter(QWidget):
                 self._paint_marker(tp, ln, w, y, lh, alpha, clear)
                 continue
             col = QColor(T.on_surface)
-            col.setAlphaF(alpha)
+            col.setAlphaF(alpha * (0.8 + 0.2 * gop))   # the panel goes see-through, the words stay legible
             tw = self.fm.horizontalAdvance(ln.text)
             x = (w - tw) / 2
             parts = [(ln.text, col)]
@@ -465,17 +481,21 @@ class Prompter(QWidget):
                 if n:
                     toks = ln.text.split(" ")
                     said = QColor(col)
-                    said.setAlphaF(alpha * 0.36)
+                    if gop >= 0.8:
+                        said.setAlphaF(alpha * 0.36)
+                    else:                                   # see-through: dim by colour, not alpha
+                        said = QColor(150, 156, 172)
+                        said.setAlphaF(col.alphaF())
                     head = " ".join(toks[:n])
                     parts = [(head + (" " if n < len(toks) else ""), said), (" ".join(toks[n:]), col)]
             px = x
             for seg, c in parts:
                 if not seg:
                     continue
-                if clear:
+                if outline:
                     path = QPainterPath()
                     path.addText(QPointF(px, y + base_off), self.text_font, seg)
-                    outline_pen.setColor(QColor(0, 0, 0, int(210 * c.alphaF())))
+                    outline_pen.setColor(QColor(0, 0, 0, int(235 * min(1.0, c.alphaF() * 1.3))))
                     tp.strokePath(path, outline_pen)
                     tp.fillPath(path, c)
                 else:
@@ -501,7 +521,9 @@ class Prompter(QWidget):
             p.drawRect(QRectF(0, h - 2, w * self.progress(), 2))
         p.restore()
 
-        self.paint_chrome(p, w, h, clear)
+        p.setOpacity(max(0.45, gop))
+        self.paint_chrome(p, w, h, clear or gop < 0.8)
+        p.setOpacity(1.0)
         if self.counting:
             self.paint_countdown(p, w, h, panel)
         if self.show_help:
@@ -721,9 +743,11 @@ class Prompter(QWidget):
         m = native.MOD
         cols = [
             ("Anywhere", [(m + "+Space", "Play / pause"), (m + "+Up", "Faster"), (m + "+Down", "Slower"),
-                          (m + "+V", "Voice Follow"), (m + "+H", "Show / hide"), (m + "+G", "Ghost mode")]),
+                          (m + "+V", "Voice Follow"), (m + "+H", "Show / hide"), (m + "+G", "Ghost mode"),
+                          (m + "+[", "Ghost more see-through"), (m + "+]", "Ghost more solid")]),
             ("On the prompter", [("Space", "Play / pause"), ("L", "Read aloud"), ("E", "Scripts"),
-                                 ("+", "Bigger text"), ("PgDn", "Next section"), ("C", "Share privacy")]),
+                                 ("+", "Bigger text"), ("PgDn", "Next section"), ("C", "Share privacy"),
+                                 ("G", "Ghost mode"), ("M", "Mirror text")]),
         ]
         colw = (w - 64) / 2
         kf = font("ui", 11, QFont.Weight.DemiBold)
@@ -1001,13 +1025,35 @@ class Prompter(QWidget):
         self.toast(self.lines[target].text.title())
 
     # ---- ghost (click-through) & mirror
+    def ghost_op(self):
+        return self.cfg.ghost_opacity if self.ghost else 1.0
+
     def set_ghost(self, on):
         self.ghost = bool(on) and native.set_click_through(self, True)
         if not on:
             native.set_click_through(self, False)
-        self.toast("Ghost mode: clicks pass through  %s  %s+G to undo" % (DOT, native.MOD) if self.ghost
-                   else "Ghost mode off", T.accent if self.ghost else None, 3.5)
+        # the frosted backdrop is drawn by the OS and would stay opaque: drop it while ghosted
+        if self.ghost and not self.cfg.clear_mode:
+            native.apply_backdrop(self, "none")
+            self.frosted = ""
+        else:
+            self.apply_backdrop()
+        if self.ghost:
+            self.toast("Ghost %d%%  %s  clicks pass through  %s  %s+[ ]  adjust  %s  %s+G  exit"
+                       % (round(self.cfg.ghost_opacity * 100), DOT, DOT, native.MOD, DOT, native.MOD), T.aqua, 4)
+        else:
+            self.toast("Ghost mode off")
         self.sync_ui()
+
+    def change_ghost_opacity(self, d):
+        self.cfg.ghost_opacity = round(min(1.0, max(0.15, self.cfg.ghost_opacity + d)), 2)
+        self.settingsChanged.emit()
+        if self.ghost:
+            self.toast("Ghost %d%%" % round(self.cfg.ghost_opacity * 100), T.aqua, 1.4)
+        else:
+            self.toast("Ghost level %d%%  %s  turn on with %s+G" % (round(self.cfg.ghost_opacity * 100), DOT,
+                                                                   native.MOD))
+        self.update()
 
     def toggle_ghost(self):
         self.set_ghost(not self.ghost)

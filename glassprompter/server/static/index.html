@@ -13,6 +13,25 @@
 <script src="/app.js" defer></script>
 </head>
 <body>
+<svg class="sprite" width="0" height="0" aria-hidden="true">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="currentColor" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.4" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+    <symbol id="i-restart" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4.5h4.5"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14M12 5v14"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-text-sm" viewBox="0 0 24 24"><path d="M7 17l3.5-9 3.5 9M8.3 14h4.4"/></symbol>
+    <symbol id="i-text-lg" viewBox="0 0 24 24"><path d="M4 19l6-15 6 15M6.2 13.5h7.6M18 6v6M15 9h6"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6"/></symbol>
+    <symbol id="i-ghost" viewBox="0 0 24 24"><path d="M5 20V10a7 7 0 0 1 14 0v10l-2.3-1.6L14.3 20 12 18.4 9.7 20l-2.4-1.6z"/><circle cx="9.5" cy="10.5" r=".9" fill="currentColor"/><circle cx="14.5" cy="10.5" r=".9" fill="currentColor"/></symbol>
+    <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.6 7.6 0 0 1 0 11"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14M18 6l-8 6 8 6z"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M6 6l8 6-8 6z"/></symbol>
+  </defs>
+</svg>
 <main>
   <header>
     <h1><img src="/icon.svg" alt="" width="24" height="24"> Prompter</h1>
@@ -48,24 +67,26 @@
 
     <section id="tab-remote" role="tabpanel">
       <div class="grid">
-        <button class="btn primary full" data-action="play"><span id="ppIcon" class="sym">&#9654;</span><span id="ppText">Play</span></button>
-        <button class="btn" data-action="back"><span class="sym">&#8593;</span><small>Back</small></button>
-        <button class="btn" data-action="restart"><span class="sym">&#8634;</span><small>Restart</small></button>
-        <button class="btn" data-action="ahead"><span class="sym">&#8595;</span><small>Ahead</small></button>
-        <button class="btn" data-action="slower"><span class="sym">&#8722;</span><small>Slower</small></button>
-        <button class="btn" data-action="faster"><span class="sym">+</span><small>Faster</small></button>
-        <button class="btn" data-action="hide"><span class="sym">&#9681;</span><small>Hide / show</small></button>
-        <button class="btn half" data-action="smaller"><span class="sym sm">A</span><small>Smaller</small></button>
-        <button class="btn half" data-action="bigger"><span class="sym lg">A</span><small>Bigger</small></button>
-        <button id="voiceBtn" class="btn half" data-action="voice"><span class="sym">&#127908;</span><small id="voiceText">Voice Follow off</small></button>
-        <button class="btn half" data-action="ghost"><span class="sym">&#128123;</span><small>Ghost mode</small></button>
-        <button class="btn full-soft" data-action="read_aloud"><span class="sym">&#128266;</span><small>Read my script aloud (rehearse)</small></button>
+        <button class="btn primary full" data-action="play"><svg id="ppIcon" class="ic" aria-hidden="true"><use href="#i-play"/></svg><span id="ppText">Play</span></button>
+        <button class="btn" data-action="back"><svg class="ic" aria-hidden="true"><use href="#i-up"/></svg><small>Back</small></button>
+        <button class="btn" data-action="restart"><svg class="ic" aria-hidden="true"><use href="#i-restart"/></svg><small>Restart</small></button>
+        <button class="btn" data-action="ahead"><svg class="ic" aria-hidden="true"><use href="#i-down"/></svg><small>Ahead</small></button>
+        <button class="btn" data-action="slower"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><small>Slower</small></button>
+        <button class="btn" data-action="faster"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg><small>Faster</small></button>
+        <button class="btn" data-action="hide"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg><small>Hide / show</small></button>
+        <button class="btn half" data-action="smaller"><svg class="ic" aria-hidden="true"><use href="#i-text-sm"/></svg><small>Smaller</small></button>
+        <button class="btn half" data-action="bigger"><svg class="ic" aria-hidden="true"><use href="#i-text-lg"/></svg><small>Bigger</small></button>
+        <button id="voiceBtn" class="btn half" data-action="voice"><svg class="ic" aria-hidden="true"><use href="#i-mic"/></svg><small id="voiceText">Voice Follow off</small></button>
+        <button class="btn half" data-action="ghost"><svg class="ic" aria-hidden="true"><use href="#i-ghost"/></svg><small>Ghost mode</small></button>
+        <button class="btn half" data-action="ghost_less"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg><small>More see-through</small></button>
+        <button class="btn half" data-action="ghost_more"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg><small>More solid</small></button>
+        <button class="btn full-soft" data-action="read_aloud"><svg class="ic" aria-hidden="true"><use href="#i-speaker"/></svg><small>Read my script aloud</small></button>
       </div>
       <div id="secWrap" hidden>
         <p class="hint">Sections</p>
         <div class="row-2">
-          <button class="btn" data-action="prev_section"><span class="sym">&#8676;</span><small>Previous section</small></button>
-          <button class="btn" data-action="next_section"><span class="sym">&#8677;</span><small>Next section</small></button>
+          <button class="btn" data-action="prev_section"><svg class="ic" aria-hidden="true"><use href="#i-prev"/></svg><small>Previous section</small></button>
+          <button class="btn" data-action="next_section"><svg class="ic" aria-hidden="true"><use href="#i-next"/></svg><small>Next section</small></button>
         </div>
         <div id="secList" class="chips"></div>
       </div>

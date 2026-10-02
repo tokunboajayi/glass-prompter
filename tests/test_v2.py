@@ -83,3 +83,22 @@ def test_export_markdown_writes_every_script_with_safe_unique_names(tmp_path):
 def test_title_from_filename_handles_both_path_styles():
     assert scripts.title_from_filename("/Users/aj/Desktop/my_talk.md") == "my talk"
     assert scripts.title_from_filename(r"C:\Users\aj\my-talk.docx") == "my talk"
+
+
+def test_ghost_opacity_is_clamped_and_saved():
+    from glassprompter import config
+    c = config.Config()
+    c.load()
+    assert 0.15 <= c.s.ghost_opacity <= 1.0
+    c.s.ghost_opacity = 0.01
+    config.validate(c.s)
+    assert c.s.ghost_opacity == 0.15
+
+
+def test_ghost_hotkeys_and_remote_actions_exist():
+    from glassprompter.app import HOTKEYS
+    from glassprompter.server import api
+    actions = {a for _, a in HOTKEYS.values()}
+    assert {"ghost", "ghost_less", "ghost_more"} <= actions
+    assert {"ghost_less", "ghost_more"} <= api.CONTROL_ACTIONS
+    assert common.hotkey_label("Ctrl+Alt", "LBRACKET") == "Ctrl+Alt+["

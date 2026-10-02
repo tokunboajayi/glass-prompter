@@ -449,6 +449,8 @@ class SettingsDialog(BaseDialog):
                     lambda v: self._set("panel_alpha", v / 100))
         card.slider("Reading line", 20, 70, int(s.read_line * 100), lambda v: "%d%%" % v,
                     lambda v: self._set("read_line", v / 100))
+        card.slider("Ghost level", 15, 100, int(s.ghost_opacity * 100), lambda v: "%d%%" % v,
+                    lambda v: self._set("ghost_opacity", v / 100))
         card.row("Text only, no panel", switch(s.clear_mode, lambda v: self._set("clear_mode", v)))
         card.row("Mirror for teleprompter glass", switch(s.mirror, lambda v: self._set("mirror", v)))
         card.row("Reduce motion", switch(s.reduce_motion, lambda v: self._set("reduce_motion", v)))

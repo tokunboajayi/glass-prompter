@@ -28,6 +28,7 @@ class Settings:
     font_px: int = 34
     font_family: str = ""                              # "" = the platform's display font
     panel_alpha: float = 0.90
+    ghost_opacity: float = 0.45                        # how solid the prompter is in ghost mode
     clear_mode: bool = False
     read_line: float = 0.40
     reduce_motion: bool = False
@@ -47,6 +48,7 @@ LIMITS = {
     "wpm": (40, 400),
     "font_px": (14, 96),
     "panel_alpha": (0.2, 1.0),
+    "ghost_opacity": (0.15, 1.0),
     "read_line": (0.2, 0.7),
     "remote_port": (1024, 65535),
 }

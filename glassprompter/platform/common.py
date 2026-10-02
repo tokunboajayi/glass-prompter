@@ -3,9 +3,10 @@ import os
 import sys
 
 # Global shortcut keys (same letters on every OS; the modifier differs: Ctrl+Alt / Control+Option).
-HOTKEY_KEYS = ("SPACE", "UP", "DOWN", "LEFT", "RIGHT", "R", "H", "E", "V", "G", "PGUP", "PGDN")
+HOTKEY_KEYS = ("SPACE", "UP", "DOWN", "LEFT", "RIGHT", "R", "H", "E", "V", "G", "PGUP", "PGDN",
+               "LBRACKET", "RBRACKET")
 KEY_NAMES = {"SPACE": "Space", "UP": "Up", "DOWN": "Down", "LEFT": "Left", "RIGHT": "Right",
-             "PGUP": "PgUp", "PGDN": "PgDn"}
+             "PGUP": "PgUp", "PGDN": "PgDn", "LBRACKET": "[", "RBRACKET": "]"}
 
 
 def hotkey_label(mod, key):
