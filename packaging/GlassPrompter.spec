@@ -79,7 +79,7 @@ if MAC:
             "CFBundleShortVersionString": __version__,
             "CFBundleVersion": __version__,
             "LSUIElement": True,                         # lives in the menu bar, no Dock icon
-            "LSMinimumSystemVersion": "12.0",
+            "LSMinimumSystemVersion": "13.0",
             "NSHighResolutionCapable": True,
             "NSMicrophoneUsageDescription": "Voice Follow listens to you read so the script scrolls with your "
                                             "voice. Audio is processed on this Mac and never leaves it.",

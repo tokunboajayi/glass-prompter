@@ -5,7 +5,7 @@ A see-through teleprompter that sits right under your webcam on **Windows and ma
 **Install:** grab the latest build from [Releases](../../releases/latest):
 
 - **Windows 10/11:** `GlassPrompter-Setup-x.y.z.exe`. Per-user install, no admin rights, lives in the tray.
-- **macOS 12+:** `GlassPrompter-x.y.z-macOS-arm64.dmg` (Apple silicon) or `-x86_64.dmg` (Intel). Drag to Applications. It lives in the menu bar.
+- **macOS 13+:** `GlassPrompter-x.y.z-macOS-arm64.dmg` (Apple silicon) or `-x86_64.dmg` (Intel). Drag to Applications. It lives in the menu bar.
 
 ## Why it's different
 

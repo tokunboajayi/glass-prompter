@@ -1,8 +1,13 @@
 PySide6-Essentials>=6.7
 qrcode>=7.4
-vosk>=0.3.45
+# Voice Follow (offline speech recognition). vosk 0.3.45 has no macOS wheel; 0.3.44 is universal2.
+vosk>=0.3.45; sys_platform != "darwin"
+vosk==0.3.44; sys_platform == "darwin"
 sounddevice>=0.4.6
+# Natural Read Aloud (offline neural voice)
 piper-tts>=1.3
+# onnxruntime dropped Intel-Mac wheels after 1.23 and needs macOS 14 from 1.24; 1.23 covers macOS 13+ on both chips
+onnxruntime>=1.17,<1.24; sys_platform == "darwin"
 pyobjc-framework-Cocoa>=10.0; sys_platform == "darwin"
 # dev / build
 pytest>=8
