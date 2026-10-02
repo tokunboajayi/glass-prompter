@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .pytest_tmp/
 .smoke/
+.smokecoach/
 build/
 dist/
 *.log
@@ -10,3 +11,4 @@ shots/
 .shots/
 .agents/
 .build_log.txt
+Claude outputs/
