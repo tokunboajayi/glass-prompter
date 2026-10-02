@@ -6,7 +6,7 @@
 
 **A see-through teleprompter that sits right under your webcam.**
 It follows your voice word by word, reads your script aloud, and stays off the screen share.
-Free for Windows and Mac.
+Free and open source (MIT) for Windows and Mac.
 
 ### [Download from the website &rarr;](https://tokunboajayi.github.io/glass-prompter/)
 
@@ -239,3 +239,10 @@ tools/           screenshots and self-tests       skills/      script-writing gu
 ```
 
 **Website:** <https://tokunboajayi.github.io/glass-prompter/>. It's served from the [`docs/`](docs/) folder on `main`, and every push to `main` updates it within a minute or two.
+
+---
+
+## License
+
+[MIT](LICENSE) © 2026 Olatokunbo Ajayi. You're free to use, change and share it. Bundled components keep their own
+licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -8,7 +8,9 @@ PublisherUrl: https://github.com/tokunboajayi
 PublisherSupportUrl: https://github.com/tokunboajayi/glass-prompter/issues
 PackageName: Glass Prompter
 PackageUrl: https://tokunboajayi.github.io/glass-prompter/
-License: Freeware
+License: MIT
+LicenseUrl: https://github.com/tokunboajayi/glass-prompter/blob/main/LICENSE
+Copyright: Copyright (c) 2026 Olatokunbo Ajayi
 ShortDescription: See-through teleprompter under your webcam that follows your voice.
 Description: |-
   Glass Prompter sits right under your webcam so you keep eye contact on calls and recordings.
