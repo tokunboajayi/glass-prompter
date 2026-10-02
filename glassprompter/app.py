@@ -178,6 +178,9 @@ class Controller(QObject):
             QTimer.singleShot(400, self.first_run)
         if args.file:
             QTimer.singleShot(300, lambda: self.import_path(args.file))
+        if os.environ.get("GLASSPROMPTER_STARTUP_TRACE"):
+            import faulthandler
+            faulthandler.cancel_dump_traceback_later()
         log.info("Ready on %s (remote=%s, hotkeys=%d/%d, capture=%s)", native.OS,
                  bool(self.server and self.server.running), sum(self.hotkeys.ok.values()), len(HOTKEYS),
                  native.capture_support()[0])
@@ -764,6 +767,11 @@ def main(argv=None):
         return e2e.run(args.e2e or None)
 
     logsetup.setup()
+    trace = os.environ.get("GLASSPROMPTER_STARTUP_TRACE")     # diagnostics: where is a slow/hung start stuck?
+    if trace:
+        import faulthandler
+        main._trace_file = open(trace, "a", encoding="utf-8")
+        faulthandler.dump_traceback_later(12, repeat=True, file=main._trace_file)
     native.set_app_id()
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     app = QApplication(sys.argv[:1])

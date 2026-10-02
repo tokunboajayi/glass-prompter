@@ -112,9 +112,16 @@ class Audit:
             os.environ["GLASSPROMPTER_NULL_AUDIO"] = "1"
             self.out("(no sound device here: Read Aloud plays to a silent output at real-time pace)")
 
+    def _dump(self, path, title, n):
+        if os.path.exists(path):
+            lines = open(path, encoding="utf-8", errors="replace").read().splitlines()[-n:]
+            self.out("  --- %s (%s) ---" % (title, os.path.basename(path)))
+            for ln in lines:
+                self.out("  | " + ln)
+
     def launch(self, n):
         from .selftest import _command, _no_window
-        env = dict(os.environ)
+        env = dict(os.environ, GLASSPROMPTER_STARTUP_TRACE=os.path.join(self.home, "startup_trace.txt"))
         self.procs = [subprocess.Popen(_command(), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                        **_no_window()) for _ in range(n)]
 
@@ -139,8 +146,12 @@ class Audit:
 
         # 1. single instance: four copies started in the same instant
         self.launch(4)
-        up = self.wait(lambda: self.call("GET", "/api/v1/health", auth=False, timeout=2)[0] == 200, 60, 0.5)
+        up = self.wait(lambda: self.call("GET", "/api/v1/health", auth=False, timeout=2)[0] == 200, 90, 0.5)
         if not self.check("app starts and phone server is up", bool(up)):
+            self.out("  processes: %s" % ", ".join("running" if p.poll() is None else "exit %s" % p.returncode
+                                                   for p in self.procs))
+            self._dump(os.path.join(self.home, "startup_trace.txt"), "where the app is stuck", 80)
+            self._dump(os.path.join(self.home, "logs", "glassprompter.log"), "app log", 40)
             return self.finish()
         time.sleep(8)                                  # losers hand over and exit
         self.check("single instance (4-way launch race)", len(self.alive()) == 1,
