@@ -9,7 +9,7 @@ git clone https://github.com/tokunboajayi/glass-prompter.git
 cd glass-prompter
 python -m pip install -r requirements.txt
 python glass_prompter.pyw          # starts the app
-python -m pytest -q tests          # 77 tests, runs headless on all three OSes
+python -m pytest -q tests          # 95 tests, runs headless on all three OSes
 ```
 
 **Voice Follow from source** needs the offline speech model. The installers bundle it.
@@ -31,6 +31,7 @@ Handy environment variables:
 | `GLASSPROMPTER_HOME` | Use a different data folder (great for a clean test profile) |
 | `GLASSPROMPTER_ALLOW_CAPTURE=1` | Don't hide windows from screen capture, so screenshots work |
 | `GLASSPROMPTER_MODEL` | Path to a Vosk model folder |
+| `GLASSPROMPTER_AI_KEY` | Anthropic API key for the AI assistant (otherwise read from `ai.key` in the data folder) |
 
 ## Project layout
 
@@ -45,10 +46,12 @@ glassprompter/
   tts.py               Read Aloud: Piper neural voices, sentence-ahead synthesis, word-level progress
   coach.py             rehearsal scoring
   scripts.py           SQLite library, import (.txt/.md/.docx), backup, Markdown export
+  ai.py                AI assistant: Claude Messages API client (stdlib only), key stays on the PC
   config.py            versioned, validated settings with atomic writes and migration
   updater.py           GitHub Releases check, SHA-256 verified download, silent install
   server/api.py        phone remote: REST /api/v1 + SSE, sessions, rate limiting, security headers
   server/static/       phone web app (strict CSP, no inline code)
+  ui/assistant.py      desktop AI chat window (worker thread, screen capture, send to prompter)
   ui/                  prompter overlay, glass toolkit (menu, tooltips, dialogs), icons, design tokens
   fonts/               Inter (SIL OFL), bundled so type looks the same on every OS
 tests/                 pytest
@@ -91,6 +94,9 @@ The app serves this on port 8765 on your local network.
 | GET/PUT/DELETE | `/api/v1/scripts/{id}` | read, update, delete |
 | POST | `/api/v1/scripts/{id}/load` | show it on the prompter |
 | POST | `/api/v1/upload?name=file.docx` | raw body, 8 MB max |
+| GET | `/api/v1/features` | `{"screen": bool, "ai": bool, "ai_model": "..."}`. Never includes the API key |
+| GET | `/api/v1/screen.jpg` | JPEG of the screen the prompter is on (max 1280 px wide; `?full=1` for full resolution). 403 when *Phone can view my screen* is off |
+| POST | `/api/v1/ai/chat` | `{"messages": [{"role": "user", "content": "..."}], "screen": true}` returns `{"reply": "...", "saw_screen": bool}`. The computer adds the screenshot and script, then calls Claude with the key from Settings |
 
 **Security:**
 

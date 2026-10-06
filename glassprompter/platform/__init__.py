@@ -4,7 +4,7 @@ Everything here degrades gracefully: if a native call fails the app keeps runnin
 the user honestly what does and doesn't work (for example screen-share hiding on macOS 15+).
 
 Functions every backend provides:
-    OS, MOD, MOD_KEYS, TRAY, prepare_window(w), set_capture_excluded(w, on), is_capture_excluded(w),
+    OS, MOD, MOD_KEYS, TRAY, prepare_window(w), set_capture_excluded(w, on), exclude_all_windows(skip), is_capture_excluded(w),
     capture_support() -> (level, note), set_click_through(w, on), backdrop_supported(),
     apply_backdrop(w, kind) -> str, set_autostart(on), is_autostart(), network_note(),
     documents_dir(), data_base(), tts_command(path, wpm), mic_error(msg), open_mic_settings(),

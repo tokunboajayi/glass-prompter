@@ -78,6 +78,39 @@ def set_capture_excluded(w, excluded=True):
     return bool(user32.SetWindowDisplayAffinity(_hwnd(w), WDA_EXCLUDEFROMCAPTURE if excluded else WDA_NONE))
 
 
+_EnumProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+user32.EnumWindows.argtypes = [_EnumProc, wintypes.LPARAM]
+user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+user32.IsWindowVisible.argtypes = [wintypes.HWND]
+
+
+def exclude_all_windows(skip=()):
+    """Hide EVERY visible top-level window of this process from capture, including ones Qt doesn't own
+    (the Windows file picker, message boxes, menus, tooltips). `skip` = windows whose state the user controls
+    (the prompter when 'Hide from screen share' is off). Returns how many windows were newly hidden."""
+    if os.environ.get("GLASSPROMPTER_ALLOW_CAPTURE") == "1":
+        return 0
+    pid = os.getpid()
+    skip_h = {int(_hwnd(w)) for w in skip if w is not None}
+    found = []
+
+    def visit(hwnd, _):
+        owner = wintypes.DWORD(0)
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        if owner.value == pid and user32.IsWindowVisible(hwnd) and int(hwnd or 0) not in skip_h:
+            found.append(hwnd)
+        return True
+    user32.EnumWindows(_EnumProc(visit), 0)
+    n = 0
+    for hwnd in found:
+        d = wintypes.DWORD(0)
+        if user32.GetWindowDisplayAffinity(hwnd, ctypes.byref(d)) and d.value == WDA_EXCLUDEFROMCAPTURE:
+            continue
+        if user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE):
+            n += 1
+    return n
+
+
 def is_capture_excluded(w):
     d = wintypes.DWORD(0)
     if not user32.GetWindowDisplayAffinity(_hwnd(w), ctypes.byref(d)):

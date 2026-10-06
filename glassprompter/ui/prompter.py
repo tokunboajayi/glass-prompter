@@ -87,6 +87,10 @@ class ControlBar(QFrame):
              "value": lambda: "%d%%" % round(cfg.ghost_opacity * 100),
              "dec": lambda: owner.change_ghost_opacity(-0.05), "inc": lambda: owner.change_ghost_opacity(+0.05)},
             {"kind": "sep"},
+            {"kind": "action", "icon": "spark", "text": "AI assistant" + ELLIPSIS, "keys": "A",
+             "fn": owner.requestAI.emit},
+            {"kind": "action", "icon": "camera", "text": "Take screenshot", "keys": "S",
+             "fn": owner.requestScreenshot.emit},
             {"kind": "action", "icon": "phone", "text": "Phone remote" + ELLIPSIS, "keys": "P",
              "fn": owner.requestPhone.emit},
             {"kind": "action", "icon": "keyboard", "text": "Keyboard shortcuts", "keys": "F1",
@@ -153,6 +157,8 @@ class ControlBar(QFrame):
 class Prompter(QWidget):
     requestLibrary = Signal()
     requestPhone = Signal()
+    requestAI = Signal()
+    requestScreenshot = Signal()
     requestSettings = Signal()
     requestHelp = Signal()
     stateChanged = Signal()
@@ -778,7 +784,8 @@ class Prompter(QWidget):
                             ("]", "More solid")]),
         ("On the prompter", False, [("Space", "Play / pause"), ("L", "Read aloud"), ("E", "Scripts"),
                                     ("+", "Bigger text"), ("PgDn", "Next section"), ("C", "Share privacy"),
-                                    ("M", "Mirror text"), ("F1", "This sheet")]),
+                                    ("M", "Mirror text"), ("A", "AI assistant"), ("S", "Screenshot"),
+                                    ("F1", "This sheet")]),
     )
 
     def paint_help(self, p, w, h, panel):
@@ -1357,6 +1364,7 @@ class Prompter(QWidget):
             K.Key_Minus: lambda: self.change_font(-2), K.Key_BracketLeft: lambda: self.change_glass(-0.05),
             K.Key_BracketRight: lambda: self.change_glass(0.05), K.Key_T: self.toggle_clear,
             K.Key_C: self.toggle_capture, K.Key_E: self.requestLibrary.emit, K.Key_P: self.requestPhone.emit,
+            K.Key_A: self.requestAI.emit, K.Key_S: self.requestScreenshot.emit,
             K.Key_F1: self.toggle_help, K.Key_Question: self.toggle_help,
         }.get(k)
         if fn:

@@ -278,7 +278,17 @@ class Audit:
         self.control("voice")
         self.check("Voice Follow off", self.state().get("voice_follow") is False)
 
-        # 8. still healthy
+        # 8. phone screen view + AI chat (no key on the test profile)
+        st, hd, body = self.call("GET", "/api/v1/screen.jpg", timeout=15)
+        jpeg = st == 200 and body[:3] == b"\xff\xd8\xff"
+        mac_no_permission = sys.platform == "darwin" and st == 503      # CI Macs can't grant Screen Recording
+        self.check("phone sees the screen (screen.jpg)", jpeg or mac_no_permission,
+                   "HTTP %s, %d bytes%s" % (st, len(body), " (no Screen Recording permission)" if mac_no_permission else ""))
+        st, d = self.api("POST", "/ai/chat", {"messages": [{"role": "user", "content": "hi"}], "screen": True})
+        self.check("AI chat without a key explains what to do", st == 400 and
+                   (d.get("error") or {}).get("code") == "ai_no_key", "HTTP %s" % st)
+
+        # 9. still healthy
         time.sleep(1)
         self.check("app still running (no crash)", len(self.alive()) == 1)
         return self.finish()

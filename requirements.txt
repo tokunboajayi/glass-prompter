@@ -1,5 +1,6 @@
 PySide6-Essentials>=6.7
 qrcode>=7.4
+certifi>=2024.2  # HTTPS certificates for updates and the AI assistant in frozen Mac builds
 # Voice Follow (offline speech recognition). vosk 0.3.45 has no macOS wheel; 0.3.44 is universal2.
 vosk>=0.3.45; sys_platform != "darwin"
 vosk==0.3.44; sys_platform == "darwin"

@@ -73,6 +73,48 @@ class UpdateSignals(QObject):
     ready = Signal(str)
 
 
+def grab_screen_jpeg(widget=None, max_w=1280, quality=70):
+    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+    screen = (widget.screen() if widget is not None else None) or QGuiApplication.primaryScreen()
+    if screen is None:
+        raise RuntimeError("no screen")
+    pix = screen.grabWindow(0)
+    if pix.isNull():
+        raise RuntimeError("screen capture is not allowed on this computer")
+    img = pix.toImage()
+    if img.width() > max_w:
+        img = img.scaledToWidth(max_w, Qt.SmoothTransformation)
+    ba = QByteArray()
+    buf = QBuffer(ba)
+    buf.open(QIODevice.WriteOnly)
+    if not img.save(buf, "JPEG", quality):
+        raise RuntimeError("could not encode the screenshot")
+    buf.close()
+    return bytes(ba.data())
+
+
+def screenshots_dir():
+    from PySide6.QtCore import QStandardPaths
+    pics = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation) or paths.data_dir()
+    d = os.path.join(pics, "Glass Prompter")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def save_screenshot(widget=None):
+    """Full-resolution PNG of the screen the prompter is on, saved to Pictures/Glass Prompter and copied to the
+    clipboard. The prompter and its windows are hidden from capture, so they never appear in it (Windows)."""
+    screen = (widget.screen() if widget is not None else None) or QGuiApplication.primaryScreen()
+    pix = screen.grabWindow(0)
+    if pix.isNull():
+        raise RuntimeError("screen capture is not allowed on this computer")
+    path = os.path.join(screenshots_dir(), time.strftime("Screenshot %Y-%m-%d %H%M%S.png"))
+    if not pix.save(path, "PNG"):
+        raise RuntimeError("couldn't save the screenshot")
+    QGuiApplication.clipboard().setPixmap(pix)
+    return path
+
+
 class Bridge(QObject):
     """Thread-safe entry point for the remote server: it emits, the UI thread handles (queued)."""
     controlRequested = Signal(str)
@@ -88,6 +130,39 @@ class Bridge(QObject):
     def script_changed(self, sid):
         self.scriptChanged.emit(int(sid))
 
+    # --- phone screen view + AI chat (called on server threads) ---
+    screenRequested = Signal(object)
+    cfg = None                                        # config.Config, read-only from server threads
+
+    @property
+    def settings(self):
+        return self.cfg.s if self.cfg else None
+    context = None                                    # () -> (script title, script text)
+
+    def screen_allowed(self):
+        return bool(self.settings and self.settings.phone_screen)
+
+    def screenshot(self, timeout=5.0, full=False):
+        """JPEG bytes of the screen the prompter is on. The grab runs on the UI thread; we wait for it."""
+        box = {"done": threading.Event(), "data": None, "error": None, "full": bool(full)}
+        self.screenRequested.emit(box)
+        if not box["done"].wait(timeout):
+            raise TimeoutError("screen capture timed out")
+        if box["error"]:
+            raise RuntimeError(box["error"])
+        return box["data"]
+
+    def ai_settings(self):
+        from . import ai
+        s = self.settings
+        return ai.load_key(), (s.ai_model if s else "")
+
+    def script_context(self):
+        try:
+            return self.context() if self.context else ("", "")
+        except Exception:
+            return "", ""
+
 
 class Controller(QObject):
     def __init__(self, app, args):
@@ -98,6 +173,7 @@ class Controller(QObject):
         self.store = scripts.ScriptStore(paths.database_path())
         self.server = None
         self.dialog = None
+        self.assistant = None
         self.drop_mtimes = {}
         self.network_note = ""
 
@@ -105,6 +181,8 @@ class Controller(QObject):
         self.prompter.paste_requested = self.paste_text
         self.prompter.requestLibrary.connect(self.open_library)
         self.prompter.requestPhone.connect(self.open_phone)
+        self.prompter.requestAI.connect(self.open_ai)
+        self.prompter.requestScreenshot.connect(self.take_screenshot)
         self.prompter.requestSettings.connect(self.open_settings)
         self.prompter.settingsChanged.connect(self.settings_changed)
         self.prompter.stateChanged.connect(self.schedule_publish)
@@ -131,12 +209,20 @@ class Controller(QObject):
         self.publish_timer = QTimer(self, singleShot=True, interval=80, timeout=self.publish)
         self.tick = QTimer(self, interval=1000, timeout=self.periodic)
         self.tick.start()
+        # Privacy guard: every window this app opens (dialogs, message boxes, the file picker, menus, tooltips,
+        # the AI window) is kept out of screenshots, recordings and screen shares - not just the prompter.
+        self.capture_guard = QTimer(self, interval=250, timeout=self.guard_capture)
+        self.capture_guard.start()
+        app.installEventFilter(self)
         self.drop_timer = QTimer(self, interval=2000, timeout=self.scan_drop)
 
         self.bridge = Bridge()
         self.bridge.controlRequested.connect(self.remote_control)
         self.bridge.loadRequested.connect(lambda sid, src: self.load_script(sid, src))
         self.bridge.scriptChanged.connect(self.remote_script_changed)
+        self.bridge.screenRequested.connect(self._grab_screen)
+        self.bridge.cfg = self.cfg
+        self.bridge.context = lambda: (self.prompter.script_title, self.prompter.script_text)
 
         self._first_script()
         self.setup_tray()
@@ -407,6 +493,31 @@ class Controller(QObject):
             self.publish()
 
     # ------------------------------------------------------------ scripts
+    def guard_capture(self):
+        skip = () if self.cfg.s.hide_from_capture else (self.prompter,)   # the prompter follows its own switch
+        try:
+            native.exclude_all_windows(skip)
+        except Exception as ex:                       # noqa: BLE001 - never let the guard crash the app
+            log.debug("capture guard: %s", ex)
+
+    def eventFilter(self, obj, ev):
+        # hide new windows the moment they appear, before the 250 ms sweep
+        from PySide6.QtCore import QEvent
+        if ev.type() == QEvent.Type.Show and getattr(obj, "isWindow", None) and obj.isWindow():
+            QTimer.singleShot(0, self.guard_capture)
+        return False
+
+    def _grab_screen(self, box):
+        """UI thread: grab the screen the prompter is on as a JPEG for the phone (max 1280 px wide)."""
+        try:
+            box["data"] = (grab_screen_jpeg(self.prompter, max_w=3840, quality=90) if box.get("full")
+                           else grab_screen_jpeg(self.prompter))
+        except Exception as e:                       # noqa: BLE001 - reported to the phone
+            log.warning("Screen capture failed: %s", e)
+            box["error"] = str(e)
+        finally:
+            box["done"].set()
+
     def load_script(self, sid, source="your library"):
         s = self.store.get(sid)
         if not s:
@@ -604,6 +715,26 @@ class Controller(QObject):
         if self.cfg.s.remote_enabled and (not self.server or not self.server.running):
             self.start_server()
         self.show_dialog(PhoneDialog(None, self))
+
+    def open_ai(self):
+        """The AI chat window. Not modal, so you can keep working (and scrolling the prompter) while it answers."""
+        if self.assistant is None:
+            from .ui.assistant import make_assistant
+            self.assistant = make_assistant(self)
+            self.assistant.show()
+        self.assistant.refresh_info()
+        self.assistant.raise_()
+        self.assistant.activateWindow()
+        self.assistant.text.setFocus()
+
+    def take_screenshot(self):
+        try:
+            path = save_screenshot(self.prompter)
+        except Exception as e:                       # noqa: BLE001
+            self.prompter.toast("Screenshot failed: %s" % e, theme.T.bad, 5)
+            return
+        log.info("Screenshot saved: %s", path)
+        self.prompter.toast("Screenshot saved to Pictures › Glass Prompter and copied", theme.T.ok, 4)
 
     def open_settings(self):
         self.show_dialog(SettingsDialog(None, self))

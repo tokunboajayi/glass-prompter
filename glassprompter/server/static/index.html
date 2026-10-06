@@ -61,6 +61,8 @@
 
     <nav class="tabs" role="tablist">
       <button role="tab" data-tab="remote" aria-selected="true">Remote</button>
+      <button role="tab" data-tab="screen" aria-selected="false">Screen</button>
+      <button role="tab" data-tab="ai" aria-selected="false">AI</button>
       <button role="tab" data-tab="library" aria-selected="false">Library</button>
       <button role="tab" data-tab="write" aria-selected="false">Write</button>
     </nav>
@@ -90,6 +92,40 @@
         </div>
         <div id="secList" class="chips"></div>
       </div>
+    </section>
+
+    <section id="tab-screen" role="tabpanel" hidden>
+      <div class="row-between">
+        <span id="screenInfo" class="muted">Your computer's screen, live</span>
+        <button id="screenPause" class="link" type="button">Pause</button>
+      </div>
+      <div id="screenBox" class="screen">
+        <img id="screenImg" alt="Your computer's screen">
+        <p id="screenMsg" class="hint center">Loading...</p>
+      </div>
+      <div class="row-2 shot-actions">
+        <button id="shotSave" class="btn" type="button"><small>Save screenshot</small></button>
+        <button id="shotAsk" class="btn" type="button"><small>Ask AI about this</small></button>
+      </div>
+      <p class="hint">Tap the picture to open it full size. The prompter itself never shows up here.</p>
+    </section>
+
+    <section id="tab-ai" role="tabpanel" hidden>
+      <div class="row-between">
+        <span id="aiInfo" class="muted">Ask anything. It can see your screen and search the web.</span>
+        <button id="aiClear" class="link" type="button">Clear</button>
+      </div>
+      <div id="aiLog" class="chat" aria-live="polite">
+        <p id="aiEmpty" class="hint center">Try: <i>"What should I say about this slide?"</i> or
+          <i>"Write a 20-second intro for this."</i></p>
+      </div>
+      <form id="aiForm" class="composer" autocomplete="off">
+        <textarea id="aiText" class="field" rows="2" maxlength="4000" placeholder="Ask anything..." aria-label="Message"></textarea>
+        <div class="row-between">
+          <label class="check"><input id="aiScreen" type="checkbox" checked> Include my screen</label>
+          <button id="aiSend" class="btn primary" type="submit">Send</button>
+        </div>
+      </form>
     </section>
 
     <section id="tab-library" role="tabpanel" hidden>

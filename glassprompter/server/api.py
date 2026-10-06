@@ -43,7 +43,7 @@ CONTROL_ACTIONS = {"play", "restart", "faster", "slower", "back", "ahead", "bigg
                    "read_aloud"}
 STATIC_FILES = {"/": ("index.html", "text/html"), "/app.css": ("app.css", "text/css"),
                 "/app.js": ("app.js", "text/javascript"), "/icon.svg": ("icon.svg", "image/svg+xml")}
-CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
        "connect-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 
 
@@ -200,6 +200,8 @@ class RemoteServer:
         self.limiter = RateLimiter()
         self.hub = EventHub()
         self.streams = threading.BoundedSemaphore(MAX_STREAMS)
+        self.screen_lock = threading.Semaphore(2)          # phone refreshes ~1/s; cap concurrent grabs
+        self.ai_lock = threading.Semaphore(1)              # one AI request at a time (it costs money)
         self.last_seen = 0.0
         self.error = None
         self._httpd = None
@@ -383,6 +385,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             ("DELETE", r"/scripts/(?P<sid>\d+)", self.h_delete),
             ("POST", r"/scripts/(?P<sid>\d+)/load", self.h_load),
             ("POST", r"/upload", self.h_upload),
+            ("GET", r"/features", self.h_features),
+            ("GET", r"/screen\.jpg", self.h_screen),
+            ("POST", r"/ai/chat", self.h_ai_chat),
         ]
         allowed = False
         for m, pattern, fn in table:
@@ -551,3 +556,67 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         s = self.srv.store.create(scripts.title_from_filename(name), text)
         self.srv.bridge.load_script(s["id"], name)
         self._json(201, s)
+
+    # ---------------------------------------------------------------- screen view + AI
+    def _bridge_call(self, name, *args, default=None):
+        fn = getattr(self.srv.bridge, name, None)
+        return fn(*args) if fn else default
+
+    def h_features(self, qs):
+        self._require_auth()
+        key, model = self._bridge_call("ai_settings", default=("", "")) or ("", "")
+        self._json(200, {"screen": bool(self._bridge_call("screen_allowed", default=False)),
+                         "ai": bool((key or "").strip()), "ai_model": model or ""})
+
+    def h_screen(self, qs):
+        self._require_auth()
+        if not self._bridge_call("screen_allowed", default=False):
+            raise ApiError(403, "screen_off", "Screen view is turned off in Settings > Privacy on your computer")
+        if not self.srv.screen_lock.acquire(timeout=6):
+            raise ApiError(503, "busy", "Screen capture is busy")
+        try:
+            full = (qs.get("full", ["0"])[0] or "0") == "1"
+            data = self.srv.bridge.screenshot(full=True) if full else self.srv.bridge.screenshot()
+        except Exception as e:                        # noqa: BLE001
+            raise ApiError(503, "capture_failed", "Couldn't capture the screen (%s)" % e)
+        finally:
+            self.srv.screen_lock.release()
+        if not data:
+            raise ApiError(503, "capture_failed", "Couldn't capture the screen")
+        self.send_response(200)
+        self.send_header("Content-Type", "image/jpeg")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self._security_headers()
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(data)
+
+    def h_ai_chat(self, qs):
+        self._require_auth()
+        from .. import ai
+        data = self._json_body()
+        messages = data.get("messages")
+        if not isinstance(messages, list) or not messages:
+            raise ApiError(400, "bad_request", "Send messages: [{role, content}]")
+        key, model = self._bridge_call("ai_settings", default=("", "")) or ("", "")
+        if not (key or "").strip():
+            raise ApiError(400, "ai_no_key", "Add your Anthropic API key in Settings > AI assistant on your computer.")
+        jpeg = None
+        if data.get("screen") and self._bridge_call("screen_allowed", default=False):
+            try:
+                jpeg = self.srv.bridge.screenshot()
+            except Exception as e:                    # noqa: BLE001 - answer without the screen
+                log.warning("AI chat: screen capture failed: %s", e)
+        title, text = ("", "")
+        if data.get("script", True):
+            title, text = self._bridge_call("script_context", default=("", "")) or ("", "")
+        if not self.srv.ai_lock.acquire(timeout=1):
+            raise ApiError(429, "ai_busy", "Still answering your last message")
+        try:
+            reply = ai.chat(key, messages, model, jpeg, title, text)
+        except ai.AIError as e:
+            raise ApiError(502, "ai_error", str(e))
+        finally:
+            self.srv.ai_lock.release()
+        self._json(200, {"reply": reply, "saw_screen": bool(jpeg)})

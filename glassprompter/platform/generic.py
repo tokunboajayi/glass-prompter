@@ -27,6 +27,10 @@ def set_capture_excluded(w, excluded=True):
     return False
 
 
+def exclude_all_windows(skip=()):
+    return 0
+
+
 def is_capture_excluded(w):
     return False
 

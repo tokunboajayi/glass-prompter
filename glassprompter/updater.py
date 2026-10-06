@@ -27,6 +27,23 @@ REPO = "tokunboajayi/glass-prompter"
 API = "https://api.github.com/repos/%s/releases/latest" % REPO
 PAGE = "https://github.com/%s/releases/latest" % REPO
 CHECK_EVERY = 24 * 3600
+_TLS = None
+
+
+def tls_context():
+    """HTTPS context that also works in frozen Mac builds, where OpenSSL can't find the system certificates.
+    Uses the OS store plus certifi's bundle when it is available."""
+    global _TLS
+    if _TLS is None:
+        import ssl
+        ctx = ssl.create_default_context()
+        try:
+            import certifi
+            ctx.load_verify_locations(certifi.where())
+        except Exception:                      # noqa: BLE001 - fall back to the OS store only
+            pass
+        _TLS = ctx
+    return _TLS
 
 
 def parse_version(text):
@@ -61,7 +78,7 @@ def asset_for(assets, os_name=None, machine=None):
 def fetch_latest(timeout=8):
     req = urllib.request.Request(API, headers={"Accept": "application/vnd.github+json",
                                                "User-Agent": "GlassPrompter/" + __version__})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with urllib.request.urlopen(req, timeout=timeout, context=tls_context()) as r:
         data = json.loads(r.read().decode("utf-8"))
     return {"tag": data.get("tag_name", ""), "name": data.get("name", ""), "notes": data.get("body", "") or "",
             "url": data.get("html_url", PAGE), "assets": data.get("assets", [])}
@@ -87,7 +104,7 @@ def expected_sha256(checksum_asset, timeout=15, installer=None):
         return digest[7:].lower()
     if not checksum_asset:
         return None
-    with urllib.request.urlopen(checksum_asset["browser_download_url"], timeout=timeout) as r:
+    with urllib.request.urlopen(checksum_asset["browser_download_url"], timeout=timeout, context=tls_context()) as r:
         text = r.read().decode("utf-8", "replace")
     m = re.search(r"\b([0-9a-fA-F]{64})\b", text)
     return m.group(1).lower() if m else None
@@ -100,7 +117,7 @@ def download(update, progress=None, cancelled=lambda: False):
     dest = os.path.join(tempfile.gettempdir(), asset["name"])
     tmp = dest + ".part"
     h = hashlib.sha256()
-    with urllib.request.urlopen(asset["browser_download_url"], timeout=30) as r, open(tmp, "wb") as f:
+    with urllib.request.urlopen(asset["browser_download_url"], timeout=30, context=tls_context()) as r, open(tmp, "wb") as f:
         size, got = int(r.headers.get("Content-Length") or asset.get("size") or 0), 0
         while True:
             if cancelled():

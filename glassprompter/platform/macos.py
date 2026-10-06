@@ -104,6 +104,27 @@ def set_capture_excluded(w, excluded=True):
         return False
 
 
+def exclude_all_windows(skip=()):
+    """Hide every window of this app from capture (sheets, alerts, open panels, menus). See windows.py."""
+    if os.environ.get("GLASSPROMPTER_ALLOW_CAPTURE") == "1" or objc is None or not _native_qpa():
+        return 0
+    try:
+        from AppKit import NSApp
+        skip_w = {id(x) for x in (_nswindow(w) for w in skip if w is not None) if x is not None}
+        skip_n = [x for x in (_nswindow(w) for w in skip if w is not None) if x is not None]
+        n = 0
+        for win in NSApp.windows():
+            if any(win == k for k in skip_n) or id(win) in skip_w:
+                continue
+            if win.sharingType() != NSWindowSharingNone:
+                win.setSharingType_(NSWindowSharingNone)
+                n += 1
+        return n
+    except Exception as ex:
+        log.debug("exclude_all_windows: %s", ex)
+        return 0
+
+
 def is_capture_excluded(w):
     win = _nswindow(w)
     try:

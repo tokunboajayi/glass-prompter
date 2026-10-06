@@ -120,6 +120,9 @@
       $("tab-" + x.dataset.tab).hidden = !on;
     });
     if (b.dataset.tab === "library") loadList();
+    screenTab = b.dataset.tab === "screen";
+    if (screenTab) refreshScreen();
+    if (b.dataset.tab === "ai") loadFeatures();
   }));
   function showTab(name) { document.querySelector('.tabs button[data-tab="' + name + '"]').click(); }
 
@@ -221,6 +224,130 @@
       toast("Uploaded " + f.name, true);
       setEditing(data);
     } catch (err) { toast(err.message, false); }
+  });
+
+  // ---------------------------------------------------------------- screen view
+  let screenTab = false, screenPaused = false, screenBusy = false, screenTimer = 0, screenUrl = "";
+  const SCREEN_MS = 1500;
+  async function refreshScreen() {
+    clearTimeout(screenTimer);
+    if (!screenTab || screenPaused || document.hidden || $("app").hidden || screenBusy) return;
+    screenBusy = true;
+    try {
+      const r = await fetch(API + "/screen.jpg", { credentials: "same-origin", cache: "no-store" });
+      if (r.status === 401) { showPair(); return; }
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error((d.error && d.error.message) || ("Error " + r.status));
+      }
+      const url = URL.createObjectURL(await r.blob());
+      $("screenImg").src = url;
+      if (screenUrl) URL.revokeObjectURL(screenUrl);
+      screenUrl = url;
+      $("screenMsg").hidden = true;
+      $("screenInfo").textContent = "Live \u00b7 updated " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+    } catch (e) {
+      $("screenMsg").hidden = false;
+      $("screenMsg").textContent = e.message;
+      $("screenInfo").textContent = "Not updating";
+    } finally {
+      screenBusy = false;
+      if (screenTab && !screenPaused) screenTimer = setTimeout(refreshScreen, SCREEN_MS);
+    }
+  }
+  $("screenPause").addEventListener("click", () => {
+    screenPaused = !screenPaused;
+    $("screenPause").textContent = screenPaused ? "Resume" : "Pause";
+    if (screenPaused) $("screenInfo").textContent = "Paused"; else refreshScreen();
+  });
+  $("screenImg").addEventListener("click", () => $("screenBox").classList.toggle("full"));
+  $("shotSave").addEventListener("click", async () => {
+    try {
+      const r = await fetch(API + "/screen.jpg?full=1", { credentials: "same-origin", cache: "no-store" });
+      if (r.status === 401) return showPair();
+      if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error((d.error && d.error.message) || "Screenshot failed"); }
+      const url = URL.createObjectURL(await r.blob());
+      const a = document.createElement("a");
+      const t = new Date();
+      a.href = url;
+      a.download = "Screenshot " + t.toISOString().slice(0, 19).replace("T", " ").replace(/:/g, "") + ".jpg";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      toast("Screenshot saved", true);
+    } catch (e) { toast(e.message, false); }
+  });
+  $("shotAsk").addEventListener("click", () => {
+    showTab("ai");
+    $("aiScreen").checked = true;
+    if (!$("aiText").value.trim()) $("aiText").value = "What's on my screen? Explain it and answer any question shown.";
+    $("aiText").focus();
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshScreen(); });
+
+  // ---------------------------------------------------------------- AI chat
+  let chat = [], aiBusy = false;
+  async function loadFeatures() {
+    try {
+      const f = await api("/features");
+      $("aiScreen").disabled = !f.screen;
+      if (!f.screen) $("aiScreen").checked = false;
+      $("aiInfo").textContent = f.ai ? "Ask about your screen or your script"
+                                     : "Add your Anthropic API key in Settings \u203a AI assistant on your computer";
+    } catch (e) { quiet(e); }
+  }
+  function bubble(role, text, extra) {
+    $("aiEmpty").hidden = true;
+    const d = document.createElement("div");
+    d.className = "msg " + role;
+    d.textContent = text;
+    if (extra) d.appendChild(extra);
+    $("aiLog").appendChild(d);
+    d.scrollIntoView({ block: "end", behavior: "smooth" });
+    return d;
+  }
+  function replyTools(text, sawScreen) {
+    const w = document.createElement("span");
+    w.className = "tag";
+    if (sawScreen) w.append("Looked at your screen \u00b7 ");
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "link"; b.textContent = "Send to prompter";
+    b.addEventListener("click", () => api("/scripts", { method: "POST",
+      json: { title: "AI: " + (chat.filter((m) => m.role === "user").slice(-1)[0] || { content: "" }).content.slice(0, 60),
+              body: text, load: true } })
+      .then(() => toast("Sent to the prompter", true)).catch(quiet));
+    w.appendChild(b);
+    return w;
+  }
+  async function sendAI(e) {
+    e.preventDefault();
+    const text = $("aiText").value.trim();
+    if (!text || aiBusy) return;
+    aiBusy = true; $("aiSend").disabled = true;
+    $("aiText").value = "";
+    chat.push({ role: "user", content: text });
+    bubble("user", text);
+    const wait = bubble("assistant thinking", $("aiScreen").checked ? "Looking at your screen..." : "Thinking...");
+    try {
+      const r = await api("/ai/chat", { method: "POST", json: { messages: chat.slice(-12), screen: $("aiScreen").checked } });
+      wait.remove();
+      chat.push({ role: "assistant", content: r.reply });
+      bubble("assistant", r.reply, replyTools(r.reply, r.saw_screen));
+    } catch (err) {
+      wait.remove();
+      chat.pop();
+      if (err.message !== "unauthorized") bubble("error", err.message);
+    } finally {
+      aiBusy = false; $("aiSend").disabled = false;
+    }
+  }
+  $("aiForm").addEventListener("submit", sendAI);
+  $("aiText").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("aiForm").requestSubmit(); }
+  });
+  $("aiClear").addEventListener("click", () => {
+    chat = [];
+    $("aiLog").querySelectorAll(".msg").forEach((m) => m.remove());
+    $("aiEmpty").hidden = false;
   });
 
   // ---------------------------------------------------------------- boot

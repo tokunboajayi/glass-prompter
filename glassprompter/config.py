@@ -35,6 +35,9 @@ class Settings:
     geometry: list = field(default_factory=list)      # [x, y, w, h] in logical pixels
     # privacy & remote
     hide_from_capture: bool = True
+    phone_screen: bool = True                          # paired phone may view this computer's screen
+    # AI assistant (phone chat, can look at the screen). The API key is kept in ai.key, not here.
+    ai_model: str = "claude-sonnet-5-5"
     remote_enabled: bool = True
     remote_port: int = 8765
     pin: str = ""
@@ -81,7 +84,7 @@ def validate(s):
             elif isinstance(d, float):
                 v = float(v)
             elif isinstance(d, str):
-                v = str(v)
+                v = d if v is None else str(v)
             elif isinstance(d, list):
                 v = list(v) if isinstance(v, (list, tuple)) else []
         except (TypeError, ValueError):
@@ -97,6 +100,8 @@ def validate(s):
         s.geometry = [int(n) for n in s.geometry]
         if s.geometry[2] < 200 or s.geometry[3] < 100:
             s.geometry = []
+    if not s.ai_model.strip():
+        s.ai_model = defaults.ai_model
     s.schema = SCHEMA
     return s
 

@@ -163,6 +163,14 @@ def draw(p, name, r, color):
         p.drawPath(e)
         p.drawEllipse(QPointF(10, 10), 2.4, 2.4)
         p.drawLine(QPointF(4, 16), QPointF(16, 4))
+    elif name == "camera":
+        body = QPainterPath()
+        body.addRoundedRect(QRectF(2.5, 6, 15, 10.5), 2.4, 2.4)
+        p.drawPath(body)
+        p.drawLine(QPointF(7, 6), QPointF(8.2, 3.8))
+        p.drawLine(QPointF(8.2, 3.8), QPointF(11.8, 3.8))
+        p.drawLine(QPointF(11.8, 3.8), QPointF(13, 6))
+        p.drawEllipse(QPointF(10, 11.2), 2.8, 2.8)
     elif name == "spark":                       # brand mark: four-point star
         p.setPen(Qt.PenStyle.NoPen)
         p.setBrush(c)

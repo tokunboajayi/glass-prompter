@@ -23,8 +23,8 @@ h2{font-size:18px;margin:0 0 4px}
 .note{margin-top:10px;font-size:14px;color:var(--ember)}
 .hint{font-size:13px;color:var(--muted);margin:6px 2px 0}
 .center{text-align:center;margin-top:24px}
-.tabs{display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border:1px solid var(--outline);border-radius:12px;padding:4px;margin-bottom:16px}
-.tabs button{min-height:44px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-weight:600;cursor:pointer}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border:1px solid var(--outline);border-radius:12px;padding:4px;margin-bottom:16px}
+.tabs button{min-height:44px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:600;cursor:pointer;padding:0 2px}
 .tabs button[aria-selected=true]{background:var(--surface-2);color:var(--on)}
 .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}
 .btn{min-height:56px;border-radius:14px;border:1px solid var(--outline);background:var(--surface-2);color:var(--on);font:inherit;font-weight:600;
@@ -104,3 +104,30 @@ h1,.status b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Sego
 }
 .grid .btn.full-soft{grid-column:1/-1}
 .sprite{position:absolute;width:0;height:0;overflow:hidden}
+
+/* ---------- screen view ---------- */
+.screen{position:relative;margin-top:10px;border-radius:14px;overflow:hidden;border:1px solid var(--outline);background:#000;min-height:160px;
+  display:flex;align-items:center;justify-content:center}
+.screen img{display:block;width:100%;height:auto;cursor:zoom-in}
+.screen img:not([src]){display:none}
+.screen .hint{position:absolute;inset:auto 0 12px;margin:0}
+.screen.full{position:fixed;inset:0;z-index:8;border-radius:0;border:0;overflow:auto;display:block;touch-action:pinch-zoom pan-x pan-y}
+.screen.full img{width:auto;max-width:none;cursor:zoom-out}
+/* ---------- AI chat ---------- */
+.chat{display:flex;flex-direction:column;gap:10px;margin-top:10px;min-height:30vh}
+.msg{max-width:88%;padding:10px 14px;border-radius:16px;white-space:pre-wrap;word-wrap:break-word;font-size:15px;
+  background:var(--surface);border:1px solid var(--outline)}
+.msg.user{align-self:flex-end;background:rgba(64,232,208,.16);border-color:rgba(64,232,208,.4)}
+.msg.assistant{align-self:flex-start}
+.msg.error{align-self:flex-start;color:var(--bad)}
+.msg.thinking{color:var(--muted);font-style:italic}
+.msg .tag{display:block;font-size:11px;color:var(--muted);margin-top:4px}
+.msg .link{padding:0 4px;min-height:44px;font-size:13px}
+.composer textarea.field{min-height:64px}
+.composer .row-between{align-items:center;margin-top:8px}
+.composer .btn{min-height:48px;padding:8px 22px}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);min-height:44px}
+.check input{width:20px;height:20px;accent-color:#40e8d0}
+.shot-actions{margin-top:10px}
+.shot-actions .btn{min-height:48px}
+.shot-actions small{font-size:14px;color:var(--on)}

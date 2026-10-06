@@ -139,6 +139,8 @@ Press <kbd>F1</kbd> in the app to see these at any time.
 | <kbd>PgUp</kbd> / <kbd>PgDn</kbd> | Previous / next section |
 | <kbd>C</kbd> | Screen-share privacy on/off |
 | <kbd>M</kbd> | Mirror text (for beam-splitter glass) |
+| <kbd>A</kbd> | AI assistant (chat that can see your screen) |
+| <kbd>S</kbd> | Screenshot to Pictures › Glass Prompter (also copied) |
 | <kbd>Esc</kbd> | Close sheets and dialogs |
 
 ---
@@ -155,9 +157,22 @@ From the phone you can:
 
 - play, change speed and jump between sections;
 - set the ghost level and start Read Aloud;
-- type or upload new scripts.
+- type or upload new scripts;
+- **see your computer's screen live** (Screen tab);
+- **chat with an AI that can see your screen and script** (AI tab).
 
 It works over your Wi-Fi only and never goes through the internet. On Windows, click **Allow** on the firewall prompt the first time.
+
+### Screen view and AI assistant
+
+- **Screen tab:** your computer's screen, refreshed about every 1.5 seconds. Tap it for full size and pinch to zoom. On Windows the prompter never appears in it. On a Mac, allow Glass Prompter under **System Settings &rsaquo; Privacy & Security &rsaquo; Screen Recording**. Turn it off in **Settings &rsaquo; Privacy &rsaquo; Phone can view my screen**.
+- **AI assistant on the computer:** press <kbd>A</kbd> on the prompter or choose **&#8943; &rsaquo; AI assistant**. Same chat, on your PC.
+- **Screenshots:** press <kbd>S</kbd> on the prompter, or tap **Save screenshot** on the phone's Screen tab.
+- **AI tab:** a chat with Claude that answers any question. It can look at your current screen, search the web and read the script on the prompter. Ask *"what should I say about this slide?"* or *"tighten my intro"*, then tap **Send to prompter** to read the answer.
+  1. Create an API key at [console.anthropic.com](https://console.anthropic.com/settings/keys). Usage is billed to your Anthropic account (typically a few cents or less per question with a screenshot).
+  2. Paste it into **Settings &rsaquo; AI assistant** on your computer.
+
+  The key stays on your computer and is never sent to the phone. Messages go from your computer straight to `api.anthropic.com`, and only when you press Send.
 
 ---
 
@@ -185,7 +200,7 @@ It works over your Wi-Fi only and never goes through the internet. On Windows, c
 | Windows | `%APPDATA%\GlassPrompter` |
 | Mac | `~/Library/Application Support/GlassPrompter` |
 
-Voice recognition and the read-aloud voice both run on your computer. Audio never leaves it. The only internet request is the optional daily update check to `api.github.com`.
+Voice recognition and the read-aloud voice both run on your computer. Audio never leaves it. The only internet requests are the optional daily update check to `api.github.com` and, if you set up the AI assistant, the messages you send to `api.anthropic.com`.
 
 ---
 

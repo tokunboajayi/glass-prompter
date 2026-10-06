@@ -9,7 +9,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const r = await fetch(base + '/api/v1/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: '246810' }) });
   token = (await r.json()).token;
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ ...devices['iPhone 13'] });
+  const ctx = await browser.newContext({ ...devices['iPhone 13'], acceptDownloads: true });
   const page = await ctx.newPage();
   const errors = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -85,10 +85,33 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   // edit
   await page.locator('#list .item').first().locator('button', { hasText: 'Edit' }).click(); await sleep(800);
   ok('Edit opens the script', /Editing/.test(await page.textContent('#editing')));
+  // screen view
+  await page.click('[data-tab="screen"]'); await sleep(2500);
+  const w1 = await page.$eval('#screenImg', i => i.naturalWidth);
+  ok('Screen tab shows the computer screen', w1 > 0, 'naturalWidth ' + w1 + ' / ' + await page.textContent('#screenMsg'));
+  const src1 = await page.$eval('#screenImg', i => i.src); await sleep(2200);
+  ok('Screen view refreshes', (await page.$eval('#screenImg', i => i.src)) !== src1);
+  await page.screenshot({ path: OUT + '/5_screen.png' });
+  await page.click('#screenPause'); const src2 = await page.$eval('#screenImg', i => i.src); await sleep(2200);
+  ok('Screen view pauses', (await page.$eval('#screenImg', i => i.src)) === src2 && /Resume/.test(await page.textContent('#screenPause')));
+  await page.click('#screenPause');
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 8000 }).catch(() => null), page.click('#shotSave')]);
+  const dlPath = dl ? await dl.path() : null;
+  const dlSize = dlPath ? require('fs').statSync(dlPath).size : 0;
+  ok('Save screenshot downloads a full-size image', dl && /\.jpg$/.test(dl.suggestedFilename()) && dlSize > 5000, dl ? dl.suggestedFilename() + ' ' + dlSize + ' bytes' : 'no download');
+  await page.click('#shotAsk'); await sleep(500);
+  ok('Ask AI about this opens the AI tab with the screen on', await page.isVisible('#tab-ai') && await page.isChecked('#aiScreen') && (await page.inputValue('#aiText')).length > 0);
+  await page.fill('#aiText', '');
+  // AI chat (no key on the test profile -> friendly guidance, never a crash)
+  await page.click('[data-tab="ai"]'); await sleep(800);
+  ok('AI tab explains where to add the key', /API key/.test(await page.textContent('#aiInfo')));
+  await page.fill('#aiText', 'What should I say next?'); await page.click('#aiSend'); await sleep(1500);
+  ok('AI without a key shows a friendly message', /Settings/.test(await page.textContent('#aiLog')) && (await page.$$('.msg.error')).length === 1);
+  await page.screenshot({ path: OUT + '/6_ai.png' });
   // touch targets
   const small = await page.$$eval('button', bs => bs.filter(b => b.offsetParent && (b.getBoundingClientRect().height < 44)).map(b => b.textContent.trim()).slice(0, 8));
   ok('touch targets >= 44px', small.length === 0, small.join(' | '));
-  ok('no console errors / CSP violations', errors.filter(e => !/401/.test(e)).length === 0, errors.join(' | ').slice(0, 300));
+  ok('no console errors / CSP violations', errors.filter(e => !/40[01] \(/.test(e)).length === 0, errors.join(' | ').slice(0, 300));
   await browser.close();
   console.log(`RESULT: ${fails.length ? 'FAILED (' + fails.length + '/' + n + '): ' + fails.join(', ') : 'OK (' + n + ' checks)'}`);
   process.exit(fails.length ? 1 : 0);

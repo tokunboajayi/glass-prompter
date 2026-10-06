@@ -439,6 +439,8 @@ class SettingsDialog(BaseDialog):
         card.row("Hide from screen share", switch(s.hide_from_capture, lambda v: self._set("hide_from_capture", v)),
                  note)
         card.row("Phone remote on this Wi-Fi", switch(s.remote_enabled, self._remote), "Protected by a PIN.")
+        card.row("Phone can view my screen", switch(s.phone_screen, lambda v: self._set("phone_screen", v)),
+                 "Live view and AI chat on your paired phone.")
         _section(left, card, "Privacy")
         left.addStretch(1)
 
@@ -455,6 +457,34 @@ class SettingsDialog(BaseDialog):
         card.row("Mirror for teleprompter glass", switch(s.mirror, lambda v: self._set("mirror", v)))
         card.row("Reduce motion", switch(s.reduce_motion, lambda v: self._set("reduce_motion", v)))
         _section(right, card, "Appearance")
+
+        from .. import ai
+        card = Card()
+        self.ai_key = QLineEdit(ai.load_key())
+        self.ai_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.ai_key.setPlaceholderText("sk-ant-...")
+        self.ai_key.setAccessibleName("Anthropic API key")
+        self.ai_key.setMinimumWidth(190)
+        self.ai_key.setMaximumWidth(220)
+        self.ai_key.textChanged.connect(ai.save_key)
+        card.row("API key", self.ai_key, "Your Anthropic key. It stays on this computer.")
+        self.ai_model = QComboBox()
+        self.ai_model.setAccessibleName("AI model")
+        self.ai_model.setMinimumWidth(190)
+        self.ai_model.setMaximumWidth(220)
+        for mid, name in ai.MODELS.items():
+            self.ai_model.addItem(name, mid)
+        i = self.ai_model.findData(s.ai_model)
+        if i < 0:
+            self.ai_model.addItem(s.ai_model, s.ai_model)
+            i = self.ai_model.count() - 1
+        self.ai_model.setCurrentIndex(i)
+        self.ai_model.currentIndexChanged.connect(lambda _: self._set("ai_model", self.ai_model.currentData()))
+        card.row("Model", self.ai_model)
+        b = button("Get a key", lambda: QDesktopServices.openUrl(QUrl("https://console.anthropic.com/settings/keys")))
+        b.setProperty("compact", True)
+        card.row("Chat from your phone", b, "Phone remote \u203a AI tab. Asks Claude about your screen and script.")
+        _section(right, card, "AI assistant")
 
 
         card = Card()

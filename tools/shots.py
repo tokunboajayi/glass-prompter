@@ -129,6 +129,26 @@ def run():
         app.processEvents()
         grab(d, name)
         d.close()
+    # AI assistant window with a sample conversation (no network: replies are injected)
+    from glassprompter.ui.assistant import make_assistant
+    a = make_assistant(ctl)
+    a.resize(560, 680)
+    a.show()
+    a.empty.deleteLater()
+    a.empty = None
+    a._bubble("user", "What does this error on my screen mean?")
+    a._bubble("assistant", "It's a port conflict: another copy of the app is already using port 8765, so the phone "
+                           "remote can't start.\n\nFix: close the other copy (tray icon \u203a Quit), then open "
+                           "Phone remote again.", reply=True)
+    a._bubble("user", "Write me a 20-second intro for my demo.")
+    a._bubble("note", "Thinking\u2026")
+    a.info.setText("Claude Sonnet 5.5 \u00b7 answers anything, can search the web and see your screen")
+    a.send_btn.setEnabled(True)
+    app.processEvents()
+    QTimer.singleShot(0, lambda: None)
+    app.processEvents()
+    grab(a, "10_assistant.png")
+    a.close()
     ctl.quit()
 
 
