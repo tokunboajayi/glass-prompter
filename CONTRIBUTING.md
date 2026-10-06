@@ -55,7 +55,7 @@ glassprompter/
   ui/                  prompter overlay, glass toolkit (menu, tooltips, dialogs), icons, design tokens
   fonts/               Inter (SIL OFL), bundled so type looks the same on every OS
 tests/                 pytest
-tools/                 shots.py (render every screen), marketing_images.py, self-tests
+tools/                 shots.py (render every screen), marketing_images.py, website_images_ai.py, phone_shots.js, self-tests
 docs/                  the website (GitHub Pages)
 packaging/             PyInstaller spec, Inno Setup, build scripts, winget + Homebrew manifests
 skills/                a guide for AI assistants writing scripts for the prompter

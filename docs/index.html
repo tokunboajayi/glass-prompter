@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Glass Prompter: a teleprompter under your webcam</title>
-<meta name="description" content="Free see-through teleprompter for Windows and macOS. Sits under your webcam, follows your voice word by word, reads aloud in a natural voice, and stays private on screen share.">
+<meta name="description" content="Free see-through teleprompter for Windows and macOS. Sits under your webcam, follows your voice word by word, reads aloud, and stays private on screen share. Built-in AI assistant that can see your screen, plus live screen view and screenshots on your phone.">
 <meta name="theme-color" content="#06070d">
 <meta property="og:title" content="Glass Prompter">
-<meta property="og:description" content="Read your script. Keep eye contact. A free teleprompter that follows your voice, for Windows and Mac.">
+<meta property="og:description" content="Read your script. Keep eye contact. A free teleprompter that follows your voice, with an AI assistant that can see your screen. For Windows and Mac.">
 <meta property="og:image" content="https://tokunboajayi.github.io/glass-prompter/img/hero.jpg">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -68,6 +68,8 @@ h2{font-size:clamp(28px,3.6vw,40px);letter-spacing:-.025em;line-height:1.15;marg
 .card{padding:24px}
 .card h3{font-size:17px;margin:14px 0 6px;font-weight:600}
 .card p{margin:0;color:var(--muted);font-size:15px}
+.new{display:inline-block;margin-left:6px;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;color:var(--aqua);
+  background:rgba(64,232,208,.12);vertical-align:2px}
 .ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(64,232,208,.1);color:var(--aqua)}
 .ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .split{display:grid;grid-template-columns:1fr 1.25fr;gap:48px;align-items:center}
@@ -146,6 +148,9 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
   <symbol id="i-win" viewBox="0 0 24 24"><path d="M3 5.5l7.5-1v7H3zM12 4.3L21 3v8.5h-9zM3 12.5h7.5v7l-7.5-1zM12 12.5h9V21l-9-1.3z" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-apple" viewBox="0 0 24 24"><path d="M16.5 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8s-1.9-.8-3.1-.8C6.9 7.2 5.4 8.1 4.6 9.6c-1.7 2.9-.4 7.3 1.2 9.7.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.1.8 2.1-1.2 2.8-2.4c.9-1.3 1.3-2.6 1.3-2.7 0 0-2.6-1-2.6-4zM14.2 5.5c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.8 1.4-.6.7-1.1 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.3z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8z"/></symbol>
+  <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M9 20h6M12 16v4"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7l1.5-3h4l1.5 3"/><circle cx="12" cy="13.5" r="3.3"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -156,6 +161,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <a class="brand" href="#"><img src="img/icon.svg" alt="">Glass Prompter</a>
     <div class="nav-links">
       <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#ai">AI assistant</a>
       <a class="hide-sm" href="#compare">Compare</a>
       <a class="hide-sm" href="#shortcuts">Shortcuts</a>
       <a href="#download">Download</a>
@@ -168,7 +174,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   <header class="hero">
     <span class="eyebrow"><i></i><span id="ver">Free for Windows and Mac</span></span>
     <h1>Read your script. Keep eye contact.</h1>
-    <p class="sub">A see-through teleprompter that sits right under your webcam, follows your voice word by word, and stays off the screen share.</p>
+    <p class="sub">A see-through teleprompter that sits right under your webcam, follows your voice word by word, and stays off the screen share. Now with an AI assistant that can see your screen.</p>
     <div class="cta">
       <a id="primary" class="btn primary" href="https://github.com/tokunboajayi/glass-prompter/releases/latest">
         <svg aria-hidden="true"><use href="#i-down"/></svg><span id="primaryText">Download free</span></a>
@@ -191,11 +197,17 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-ghost"/></svg></div>
         <h3>Ghost mode</h3><p>Clicks pass straight through to the app behind. Pick how see-through it is, from 15% to solid, with <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>[</kbd> <kbd>]</kbd>.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-shield"/></svg></div>
-        <h3>Private on screen share</h3><p>Hidden from Zoom, Teams, Meet and OBS on Windows. On macOS 15+ it tells you the truth: share a window, not your whole screen.</p></div>
+        <h3>Private on screen share</h3><p>The prompter and every window it opens stay out of Zoom, Teams, Meet, OBS and screenshots on Windows. On macOS 15+ it tells you the truth: share a window, not your whole screen.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-phone"/></svg></div>
-        <h3>Phone remote</h3><p>Scan a QR code and your phone becomes the remote: play, speed, sections, ghost level, and sending new scripts. PIN protected.</p></div>
+        <h3>Phone remote</h3><p>Scan a QR code and your phone becomes the remote: play, speed, sections, ghost level, new scripts, and a live view of your screen. PIN protected.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-chart"/></svg></div>
         <h3>Rehearsal coach</h3><p>After each practice run you get your pace, filler words, long pauses, skipped lines and a score you can watch improve.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-spark"/></svg></div>
+        <h3>AI assistant <span class="new">New</span></h3><p>Ask anything and get a straight answer. It can look at your screen, search the web, and send its answer to the prompter. Press <kbd>A</kbd>, or use your phone.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-screen"/></svg></div>
+        <h3>Your screen on your phone <span class="new">New</span></h3><p>See your computer's screen live on your phone, about every 1.5 seconds. Pinch to zoom, pause, or save a full-size copy.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-camera"/></svg></div>
+        <h3>One-key screenshots <span class="new">New</span></h3><p>Press <kbd>S</kbd> to save a full-resolution screenshot to Pictures and copy it. The prompter never appears in it.</p></div>
     </div>
   </div>
 </section>
@@ -215,6 +227,23 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   </div>
 </section>
 
+<section id="ai">
+  <div class="wrap split">
+    <div>
+      <h2>An AI that sees what you see</h2>
+      <p class="lead">Stuck on a slide, an error or a question mid-call? Ask. Claude looks at your screen and your script, and answers in seconds.</p>
+      <ul class="points">
+        <li><b>Answers anything.</b> Work, study, code, numbers, writing, the news. It searches the web when the answer depends on recent facts.</li>
+        <li><b>Sees your screen.</b> Keep <i>Include my screen</i> ticked and it reads what's in front of you. Glass Prompter's own windows never appear in that picture.</li>
+        <li><b>Straight to the prompter.</b> Tap <i>Send to prompter</i> and read the answer out, word for word.</li>
+        <li><b>On your PC or your phone.</b> Press <kbd>A</kbd> on the prompter, or open the AI tab on the phone remote.</li>
+        <li><b>Your key, your data.</b> Bring your own Anthropic API key. It stays on your computer, never reaches the phone, and nothing is sent until you press Send.</li>
+      </ul>
+    </div>
+    <img src="img/assistant.jpg" width="2400" height="1400" alt="The AI assistant window over a presentation slide, suggesting what to say about Q3 revenue and offering Send to prompter" loading="lazy">
+  </div>
+</section>
+
 <section id="compare">
   <div class="wrap">
     <h2>How it compares</h2>
@@ -228,6 +257,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
           <tr><td>Mic drops mid-take</td><td class="us">Reconnects by itself</td><td>Often freezes</td><td>Varies</td></tr>
           <tr><td>Screen share status</td><td class="us">Honest badge per OS</td><td>"Invisible" claims</td><td>Often undocumented on macOS 15+</td></tr>
           <tr><td>Natural read-aloud</td><td class="us">Built in, offline</td><td>Rare</td><td>Rare</td></tr>
+          <tr><td>AI assistant</td><td class="us">Sees your screen, answers anything, on PC and phone</td><td>Script rewriting at most</td><td>Rare</td></tr>
           <tr><td>Your scripts</td><td class="us">Daily backups and export</td><td>Lost-script reports are common</td><td>Varies</td></tr>
           <tr><td>Price</td><td class="us">Free</td><td>Subscription</td><td>$30 to $40</td></tr>
         </tbody>
@@ -238,14 +268,16 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 <section>
   <div class="wrap split">
-    <img src="img/phone.jpg" width="600" height="1200" alt="The phone remote: play, speed, ghost level, sections and read aloud" loading="lazy" style="max-width:340px;justify-self:center">
+    <img src="img/phone-ai.jpg" width="1700" height="1250" alt="Two phones: the Screen tab showing the computer's slide live, and the AI tab answering what to say about it" loading="lazy">
     <div>
       <h2>Your phone is the remote</h2>
       <p class="lead">No app to install. Scan the QR code on your computer, enter the PIN, and control everything from across the room.</p>
       <ul class="points">
         <li><b>Live state.</b> Playing, listening, pace and time left update instantly.</li>
+        <li><b>See your screen.</b> The Screen tab mirrors your computer live. Save a full-size screenshot or tap <i>Ask AI about this</i>.</li>
+        <li><b>Chat with the AI.</b> Ask anything from across the room, then send the answer to the prompter.</li>
         <li><b>Write and send scripts.</b> Type on your phone or upload a .docx, .md or .txt file.</li>
-        <li><b>Stays local.</b> It runs over your Wi-Fi and never touches the internet.</li>
+        <li><b>Stays local.</b> Phone and computer talk over your Wi-Fi only, protected by a PIN.</li>
       </ul>
     </div>
   </div>
@@ -322,6 +354,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <div class="krow">Next section<span><kbd>PgDn</kbd></span></div>
         <div class="krow">Screen-share privacy<span><kbd>C</kbd></span></div>
         <div class="krow">Mirror text<span><kbd>M</kbd></span></div>
+        <div class="krow">AI assistant<span><kbd>A</kbd></span></div>
+        <div class="krow">Screenshot<span><kbd>S</kbd></span></div>
       </div>
     </div>
   </div>
@@ -335,9 +369,13 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <details><summary>My Mac says the app can't be opened.</summary>
       <p>The first time, right-click Glass Prompter in Applications and choose <b>Open</b>. On macOS 15 or later, open System Settings, go to Privacy &amp; Security, and click <b>Open Anyway</b>. You only do this once.</p></details>
     <details><summary>Can people on the call see the prompter?</summary>
-      <p>On Windows 10 (2004+) and 11 it's excluded from screen sharing and recordings. macOS 15 and later lets screen recorders capture every window, so on a Mac share a single window or app instead of the whole screen. The badge on the prompter always shows the real state.</p></details>
+      <p>On Windows 10 (2004+) and 11, the prompter and every window Glass Prompter opens (settings, the AI assistant, menus, message boxes, even the file picker) are excluded from screen sharing, recordings and screenshots. macOS 15 and later lets screen recorders capture every window, so on a Mac share a single window or app instead of the whole screen. The badge on the prompter always shows the real state.</p></details>
     <details><summary>Does my voice or script go anywhere?</summary>
-      <p>No. Voice recognition and the read-aloud voice run on your computer. Scripts live in a local library. The only internet request is a once-a-day check for a new version on GitHub, which you can turn off.</p></details>
+      <p>No. Voice recognition and the read-aloud voice run on your computer. Scripts live in a local library. The only internet requests are a once-a-day check for a new version on GitHub (you can turn it off) and, only if you set up the AI assistant, the messages you choose to send to Anthropic.</p></details>
+    <details><summary>How do I turn on the AI assistant, and what does it cost?</summary>
+      <p>Create an API key at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a> and paste it into <b>Settings &rsaquo; AI assistant</b>. Glass Prompter itself stays free. Anthropic bills your account per question (typically a few cents or less with a screenshot), and web searches cost a little extra. The key stays on your computer.</p></details>
+    <details><summary>What does the AI see?</summary>
+      <p>Only what you send. When <i>Include my screen</i> is ticked, it gets one screenshot with your question; untick it to send text only. Glass Prompter's own windows are never in that screenshot. It also sees the script on your prompter so it can help with it. Close anything private, like passwords, before asking about your screen.</p></details>
     <details><summary>Is it really free?</summary>
       <p>Yes. No account, no trial, no watermark. It's also open source under the <a href="https://github.com/tokunboajayi/glass-prompter/blob/main/LICENSE">MIT License</a>, so you can read every line of code.</p></details>
   </div>
@@ -417,7 +455,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
     .then(function (rel) {
       var v = (rel.tag_name || "").replace(/^v/, "");
-      document.getElementById("ver").textContent = "Version " + v + " · free for Windows and Mac";
+      document.getElementById("ver").textContent = "Version " + v + " · new: AI assistant that sees your screen";
       var pick = {};
       (rel.assets || []).forEach(function (a) {
         if (/\.exe$/i.test(a.name)) pick.exe = a;

@@ -6,6 +6,7 @@
 
 **A see-through teleprompter that sits right under your webcam.**
 It follows your voice word by word, reads your script aloud, and stays off the screen share.
+**New in 2.5:** an AI assistant that can see your screen and answer anything, plus your screen live on your phone.
 Free and open source (MIT) for Windows and Mac.
 
 ### [Download from the website &rarr;](https://tokunboajayi.github.io/glass-prompter/)
@@ -26,7 +27,7 @@ Free and open source (MIT) for Windows and Mac.
 1. [Install](#install): [Windows](#windows) · [Mac](#mac) · [Linux](#linux-from-source)
 2. [First five minutes](#first-five-minutes)
 3. [Keyboard shortcuts](#keyboard-shortcuts)
-4. [Phone remote](#phone-remote)
+4. [Phone remote, screen view and AI assistant](#phone-remote)
 5. [Updates, uninstall and your data](#updates-uninstall-and-your-data)
 6. [Troubleshooting](#troubleshooting)
 7. [For developers](#for-developers)
@@ -164,6 +165,8 @@ From the phone you can:
 It works over your Wi-Fi only and never goes through the internet. On Windows, click **Allow** on the firewall prompt the first time.
 
 ### Screen view and AI assistant
+
+<img src="docs/img/assistant.jpg" width="820" alt="The AI assistant window over a slide, suggesting what to say">
 
 - **Screen tab:** your computer's screen, refreshed about every 1.5 seconds. Tap it for full size and pinch to zoom. On Windows the prompter never appears in it. On a Mac, allow Glass Prompter under **System Settings &rsaquo; Privacy & Security &rsaquo; Screen Recording**. Turn it off in **Settings &rsaquo; Privacy &rsaquo; Phone can view my screen**.
 - **AI assistant on the computer:** press <kbd>A</kbd> on the prompter or choose **&#8943; &rsaquo; AI assistant**. Same chat, on your PC.

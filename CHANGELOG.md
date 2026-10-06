@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.1 - 2026-10-06
+Polish for the AI assistant, and a refreshed website.
+
+- The AI chat window now keeps the newest message at the bottom, like any messaging app, and the welcome tip
+  disappears as soon as you ask your first question.
+- The phone's AI tab says what the assistant can do: answer anything, see your screen, search the web.
+- Website: new AI assistant section, phone screen-view images, updated shortcuts (<kbd>A</kbd>, <kbd>S</kbd>),
+  comparison table and FAQ (how to turn on the AI, what it costs, what it sees).
+
 ## 2.5.0 - 2026-10-05
 Your phone can now see your computer screen, and an AI assistant can help you with what's on it.
 

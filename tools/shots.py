@@ -134,18 +134,24 @@ def run():
     a = make_assistant(ctl)
     a.resize(560, 680)
     a.show()
+    a.empty.hide()
     a.empty.deleteLater()
     a.empty = None
-    a._bubble("user", "What does this error on my screen mean?")
-    a._bubble("assistant", "It's a port conflict: another copy of the app is already using port 8765, so the phone "
-                           "remote can't start.\n\nFix: close the other copy (tray icon \u203a Quit), then open "
-                           "Phone remote again.", reply=True)
-    a._bubble("user", "Write me a 20-second intro for my demo.")
-    a._bubble("note", "Thinking\u2026")
+    a._bubble("user", "What should I say about this slide?")
+    a._bubble("assistant", "Lead with the headline: revenue grew 18% to $5.4M, the best quarter on the chart.\n\n"
+                           "Then explain why: subscriptions are now 62% of revenue and churn fell 9%, so the growth "
+                           "should hold next quarter.", reply=True)
+    a._bubble("user", "Give me a 15-second version to read out.")
+    a._bubble("assistant", "Q3 was our strongest quarter yet. Revenue grew 18% to $5.4 million, driven by "
+                           "subscriptions, which are now 62% of the business, while churn fell 9%.", reply=True)
     a.info.setText("Claude Sonnet 5.5 \u00b7 answers anything, can search the web and see your screen")
     a.send_btn.setEnabled(True)
     app.processEvents()
-    QTimer.singleShot(0, lambda: None)
+    import time as _t
+    for _ in range(6):                               # let layout settle and the auto-scroll timer fire
+        _t.sleep(0.05)
+        app.processEvents()
+    a.scroll.verticalScrollBar().setValue(a.scroll.verticalScrollBar().maximum())
     app.processEvents()
     grab(a, "10_assistant.png")
     a.close()

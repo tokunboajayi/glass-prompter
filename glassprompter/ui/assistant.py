@@ -144,7 +144,7 @@ def make_assistant(controller):
             else:
                 h.addWidget(box, 6)
                 h.addStretch(1)
-            self.log_lay.insertWidget(self.log_lay.count() - 1, wrap)
+            self.log_lay.addWidget(wrap)                 # stretch sits on top: chat hugs the bottom
             QTimer.singleShot(30, lambda: self.scroll.verticalScrollBar().setValue(
                 self.scroll.verticalScrollBar().maximum()))
             return wrap
@@ -178,6 +178,7 @@ def make_assistant(controller):
                 except Exception as e:                # noqa: BLE001 - answer without the screen
                     self._bubble("note", "Couldn't capture the screen (%s). Answering without it." % e)
             if self.empty is not None:
+                self.empty.hide()
                 self.empty.deleteLater()
                 self.empty = None
             self.text.clear()
@@ -215,8 +216,8 @@ def make_assistant(controller):
 
         def clear(self):
             self.history = []
-            while self.log_lay.count() > 1:
-                it = self.log_lay.takeAt(0)
+            while self.log_lay.count() > 1:            # keep the stretch at index 0
+                it = self.log_lay.takeAt(1)
                 if it.widget():
                     it.widget().deleteLater()
             self.empty = self._bubble("note", "New chat. Ask anything.")

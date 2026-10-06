@@ -291,7 +291,7 @@
       const f = await api("/features");
       $("aiScreen").disabled = !f.screen;
       if (!f.screen) $("aiScreen").checked = false;
-      $("aiInfo").textContent = f.ai ? "Ask about your screen or your script"
+      $("aiInfo").textContent = f.ai ? "Ask anything. It can see your screen and search the web."
                                      : "Add your Anthropic API key in Settings \u203a AI assistant on your computer";
     } catch (e) { quiet(e); }
   }
