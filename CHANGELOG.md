@@ -1,8 +1,15 @@
 # Changelog
 
 ## 2.5.1 - 2026-10-06
-Polish for the AI assistant, and a refreshed website.
+Fixes the Mac phone-remote freeze, checks your AI key as you paste it, and refreshes the website.
 
+- **Mac: Phone remote (and other windows) opened behind the prompter, and nothing was clickable.** The prompter floats
+  at a very high level so it stays above full-screen apps, and dialogs opened on that same level, sometimes underneath
+  it. The dialog then blocked the app from behind. Dialogs now always open above the prompter, and while one is open
+  the prompter steps down a level, so message boxes and the file picker can't hide behind it either.
+- **AI key check.** Settings › AI assistant now tests your key as soon as you paste it: ✓ *Key works*, or ✗ with the
+  reason (for example a key that was only partly copied). Line breaks and spaces picked up while copying are removed
+  automatically.
 - The AI chat window now keeps the newest message at the bottom, like any messaging app, and the welcome tip
   disappears as soon as you ask your first question.
 - The phone's AI tab says what the assistant can do: answer anything, see your screen, search the web.

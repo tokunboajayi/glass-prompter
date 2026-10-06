@@ -204,3 +204,23 @@ def test_every_platform_can_hide_all_windows():
     assert native.exclude_all_windows(()) == 0          # headless test run: nothing to hide
     import glassprompter.app as gpapp
     assert hasattr(gpapp.Controller, "guard_capture") and hasattr(gpapp.Controller, "eventFilter")
+
+
+def test_clean_key_repairs_copy_damage():
+    assert ai.clean_key(" sk-ant-abc\n def \t") == "sk-ant-abcdef"
+    assert ai.clean_key('"sk-ant-x"') == "sk-ant-x"
+    ai.save_key("sk-ant-one\ntwo ")
+    assert ai.load_key() == "sk-ant-onetwo"
+
+
+def test_check_key_rejects_obvious_mistakes_offline():
+    assert ai.check_key("")[0] is False
+    ok, msg = ai.check_key("hello")
+    assert ok is False and "sk-ant-" in msg
+
+
+def test_dialog_stacking_api_exists_on_every_platform():
+    from glassprompter import platform as native
+    assert callable(native.lower_for_dialogs) and callable(native.prepare_window)
+    import inspect
+    assert "above_prompter" in inspect.signature(native.prepare_window).parameters

@@ -61,9 +61,39 @@ def load_key():
         return ""
 
 
+def clean_key(text):
+    """Keys get mangled by copying: line breaks where the page wrapped them, spaces, quotes. Remove all of that."""
+    import re
+    return re.sub(r"\s+", "", str(text or "")).strip("\"'")
+
+
+def check_key(key, timeout=20):
+    """Ask Anthropic whether this key works (a 1-token request). Returns (ok, message for a person)."""
+    key = clean_key(key)
+    if not key:
+        return False, "No key yet."
+    if not key.startswith("sk-ant-"):
+        return False, "That doesn't look like an Anthropic key (they start with sk-ant-)."
+    body = {"model": "claude-haiku-4-5-20251001", "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]}
+    try:
+        _post(key, body, timeout)
+        return True, "Key works."
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            return False, ("Anthropic rejected this key. It's %d characters long; full keys are about 100. "
+                           "Copy the whole key again (it may wrap onto two lines) or create a new one." % len(key))
+        if e.code in (402, 429):
+            return False, "The key is valid, but the account has no credit left or is rate-limited."
+        if e.code == 403:
+            return False, "The key is valid but isn't allowed to use the API. Check it in the Anthropic Console."
+        return True, "Key accepted (Anthropic answered %s)." % e.code
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False, "Couldn't reach Anthropic to check the key. Is this computer online?"
+
+
 def save_key(key):
     import os
-    key = (key or "").strip()
+    key = clean_key(key)
     path = key_path()
     if not key:
         try:
@@ -132,7 +162,8 @@ def _error_detail(e):
 
 def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_text="", timeout=90, web=True):
     """Ask Claude. Returns the answer text. Raises AIError with a message a person can act on."""
-    if not (key or "").strip():
+    key = clean_key(key)
+    if not key:
         raise AIError("Add your Anthropic API key in Settings > AI assistant on your computer.")
     body = build_request(messages, model, screen_jpeg, script_title, script_text, web)
     try:
@@ -150,7 +181,8 @@ def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_te
     except urllib.error.HTTPError as e:
         detail = getattr(e, "detail", None) or _error_detail(e)
         if e.code == 401:
-            raise AIError("The API key was rejected. Check it in Settings > AI assistant.")
+            raise AIError("The API key was rejected (it's %d characters; full keys are about 100). Paste the whole "
+                          "key again in Settings > AI assistant and wait for 'Key works'." % len(key))
         if e.code == 429:
             raise AIError("Too many requests or no credit left on your Anthropic account. Try again shortly.")
         if e.code == 529:

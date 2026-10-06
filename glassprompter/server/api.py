@@ -316,9 +316,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     def _json_body(self):
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+        raw = self._body()          # read the body first: answering with unread data makes Windows reset the socket
         if ctype != "application/json":
             raise ApiError(415, "unsupported_media_type", "Send JSON with Content-Type: application/json")
-        raw = self._body()
         try:
             data = json.loads(raw.decode("utf-8") or "{}")
         except (UnicodeDecodeError, json.JSONDecodeError):

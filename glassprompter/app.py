@@ -356,7 +356,11 @@ class Controller(QObject):
         box.addButton("Later", QMessageBox.ButtonRole.RejectRole)
         skip = box.addButton("Skip this version", QMessageBox.ButtonRole.DestructiveRole)
         box.setDefaultButton(ok)
-        box.exec()
+        native.lower_for_dialogs(self.prompter, True)
+        try:
+            box.exec()
+        finally:
+            native.lower_for_dialogs(self.prompter, False)
         if box.clickedButton() is skip:
             self.cfg.s.skipped_version = u["version"]
             self.update = None
@@ -700,10 +704,12 @@ class Controller(QObject):
             self.dialog.activateWindow()
             return None
         self.dialog = dlg
+        native.lower_for_dialogs(self.prompter, True)      # macOS: nothing may open behind the prompter
         try:
             return dlg.exec()
         finally:
             self.dialog = None
+            native.lower_for_dialogs(self.prompter, False)
             self.prompter.activateWindow()
 
     def open_library(self):

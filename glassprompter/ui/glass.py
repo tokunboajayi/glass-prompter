@@ -160,7 +160,10 @@ class GlassDialog(QDialog):
             if not self.resizable:
                 self.resize(self.width(), max(self.height(), self.layout().totalSizeHint().height()))
         super().showEvent(e)
-        native.prepare_window(self)
+        native.prepare_window(self, above_prompter=True)
+        # Qt can re-apply its own window level right after showing; re-assert ours once it has settled (macOS)
+        QTimer.singleShot(0, self, lambda: native.prepare_window(self, above_prompter=True))
+        QTimer.singleShot(120, self, lambda: self.isVisible() and native.prepare_window(self, above_prompter=True))
         if self.frosted:
             self.frosted = bool(native.apply_backdrop(self, "acrylic"))
         native.set_capture_excluded(self, True)

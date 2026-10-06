@@ -55,7 +55,11 @@ def set_app_id():
         pass
 
 
-def prepare_window(w):
+def lower_for_dialogs(w, lowered):
+    return False          # Windows/Linux: Qt's stacking already keeps dialogs on top
+
+
+def prepare_window(w, above_prompter=False):
     """Nothing extra needed on Windows: Qt's Tool + StaysOnTop already does the job."""
     return True
 

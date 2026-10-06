@@ -65,19 +65,43 @@ def set_app_id():
     pass
 
 
-def prepare_window(w):
-    """Float above full-screen apps on every Space and never hide when another app is focused."""
+def prepare_window(w, above_prompter=False):
+    """Float above full-screen apps on every Space and never hide when another app is focused.
+
+    Dialogs (Settings, Phone remote, Scripts, the AI window) pass above_prompter=True: they go one level ABOVE the
+    prompter and come to the front. On the same level they could open behind it, and because most are modal the
+    whole app then looked frozen (nothing clickable)."""
     win = _nswindow(w)
     if win is None:
         return False
     try:
         win.setHidesOnDeactivate_(False)
         win.setCollectionBehavior_(CAN_JOIN_ALL_SPACES | STATIONARY | FULLSCREEN_AUX)
-        win.setLevel_(NSStatusWindowLevel)
+        win.setLevel_(NSStatusWindowLevel + 1 if above_prompter else NSStatusWindowLevel)
         win.setAppearance_(NSAppearance.appearanceNamed_("NSAppearanceNameVibrantDark"))
+        if above_prompter:
+            win.orderFrontRegardless()
+            win.makeKeyWindow()
         return True
     except Exception as ex:
         log.debug("prepare_window: %s", ex)
+        return False
+
+
+NSFloatingWindowLevel = 3
+
+
+def lower_for_dialogs(w, lowered):
+    """While a dialog is open, drop the prompter to the normal floating level, so system windows (message boxes,
+    the file picker, permission prompts) can never open behind it and leave the app unclickable."""
+    win = _nswindow(w)
+    if win is None:
+        return False
+    try:
+        win.setLevel_(NSFloatingWindowLevel if lowered else NSStatusWindowLevel)
+        return True
+    except Exception as ex:
+        log.debug("lower_for_dialogs: %s", ex)
         return False
 
 

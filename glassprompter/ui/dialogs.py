@@ -466,8 +466,17 @@ class SettingsDialog(BaseDialog):
         self.ai_key.setAccessibleName("Anthropic API key")
         self.ai_key.setMinimumWidth(190)
         self.ai_key.setMaximumWidth(220)
-        self.ai_key.textChanged.connect(ai.save_key)
-        card.row("API key", self.ai_key, "Your Anthropic key. It stays on this computer.")
+        self.ai_key.textChanged.connect(self._key_changed)
+        self.key_hint = card.row("API key", self.ai_key, "Your Anthropic key. It stays on this computer.")
+        self.key_timer = QTimer(self, singleShot=True, interval=700, timeout=self._check_key)
+        from PySide6.QtCore import QObject, Signal
+
+        class _Relay(QObject):
+            done = Signal(bool, str)
+        self.key_relay = _Relay(self)
+        self.key_relay.done.connect(self._key_checked)
+        if ai.load_key():
+            self.key_timer.start()
         self.ai_model = QComboBox()
         self.ai_model.setAccessibleName("AI model")
         self.ai_model.setMinimumWidth(190)
@@ -516,6 +525,26 @@ class SettingsDialog(BaseDialog):
     def _set(self, key, value):
         setattr(self.c.cfg.s, key, value)
         self.c.settings_changed(live=True)
+
+    # ---- AI key: clean, save, and test it so a half-copied key never fails silently
+    def _key_changed(self, text):
+        from .. import ai
+        ai.save_key(text)
+        self.key_hint.setText("Checking the key…" if ai.clean_key(text)
+                              else "Your Anthropic key. It stays on this computer.")
+        self.key_hint.setStyleSheet("")
+        self.key_timer.start()
+
+    def _check_key(self):
+        import threading
+        from .. import ai
+        key = ai.load_key()
+        if key:
+            threading.Thread(target=lambda: self.key_relay.done.emit(*ai.check_key(key)), daemon=True).start()
+
+    def _key_checked(self, ok, msg):
+        self.key_hint.setText(("✓ " if ok else "✗ ") + msg)
+        self.key_hint.setStyleSheet("color: %s;" % ("#3DDC97" if ok else "#FF8DA3"))
 
     def _remote(self, on):
         self.c.cfg.s.remote_enabled = on
