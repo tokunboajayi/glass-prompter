@@ -1,9 +1,9 @@
 cask "glass-prompter" do
   arch arm: "arm64", intel: "x86_64"
 
-  version "2.6.0"
-  sha256 arm:   "f65166b46f687975f3e38e377640e86e08cfceb89ab5c37c5ea0f30d3512bcfa",
-         intel: "39290e441f1c930a232aea4d7511fa1d0dc3b644667baf4ec18bc5e6d727c9b4"
+  version "2.6.1"
+  sha256 arm:   "c35df3f8c8a0da13370c49ca827c7703451d5c337f5806c7c562233abcc3b4b1",
+         intel: "e126c98cd2b5ed8618468e3f6f86d1a3eceee353779b303426177248430604bb"
 
   url "https://github.com/tokunboajayi/glass-prompter/releases/download/v#{version}/GlassPrompter-#{version}-macOS-#{arch}.dmg"
   name "Glass Prompter"
