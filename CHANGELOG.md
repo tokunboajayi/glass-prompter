@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.6.1 - 2026-10-07
+Small fixes to the AI assistant and Mac screenshots.
+
+- **Switching AI provider just works.** Changing provider in Settings forgets the old provider's model, and a model
+  name from one provider is never sent to another (for example a Claude model to Gemini).
+- **Retired models don't break the assistant.** If a provider retires its default model, the app switches to that
+  provider's newest model instead of showing an error. A model you typed yourself is never swapped silently.
+- **Mac: clearer help when a screenshot comes back gray.** An app update can reset the Screen Recording permission;
+  the app now says to switch Glass Prompter off and on in System Settings, then reopen it.
+- **Fewer false alarms:** a mostly white slide is no longer mistaken for a blank capture.
+
 ## 2.6.0 - 2026-10-07
 Use any AI you like, longer answers, and screenshots that work on a Mac.
 
@@ -21,9 +32,6 @@ Use any AI you like, longer answers, and screenshots that work on a Mac.
   open the right System Settings page if it's off.
 - **The Windows installer closes a running Glass Prompter** before updating, so "DeleteFile failed; code 5" can't happen.
 - Settings is laid out in three columns, so it fits on a laptop screen.
-- Switching provider forgets the old provider's model, and a saved model from another provider is never sent to the
-  wrong API. If a provider retires its default model, the app picks its newest one instead of failing.
-- On a Mac, if an update resets the Screen Recording permission, the app tells you exactly how to switch it back on.
 
 ## 2.5.2 - 2026-10-06
 - **No accidental exposure.** Pressing <kbd>C</kbd> to let viewers see the prompter now needs a second press within
