@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Download, setup and FAQ
+    url: https://tokunboajayi.github.io/glass-prompter/#faq
+    about: How to install, get an AI key, and keep the prompter hidden on screen share.
+  - name: Report a security issue privately
+    url: https://github.com/tokunboajayi/glass-prompter/security/advisories/new
+    about: Please don't post security problems in public issues.

@@ -1,0 +1,27 @@
+name: Suggest a feature
+description: An idea that would make Glass Prompter more useful for you.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation (a sales call, a recorded video, a class presentation...) and what gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How would you like it to work?
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Which computer do you use?
+      multiple: true
+      options:
+        - Windows
+        - Mac
+        - Linux

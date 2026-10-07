@@ -12,3 +12,6 @@ shots/
 .agents/
 .build_log.txt
 Claude outputs/
+
+# release checksum files belong on the GitHub release, not in the repo root
+/GlassPrompter-*.sha256.txt

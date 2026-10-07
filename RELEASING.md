@@ -43,9 +43,47 @@ git add packaging && git commit -m "winget + Homebrew manifests for 2.5.0" && gi
 
 ## 4. Code signing (not set up yet)
 
-| | What it removes | Cost |
-|---|---|---|
-| Windows | The "Windows protected your PC" SmartScreen warning | Azure Artifact Signing, about $10/month |
-| macOS | The "can't be opened" Gatekeeper warning, plus the caveat in the Homebrew cask | Apple Developer ID, $99/year, plus notarization |
+Signing is what takes Glass Prompter from public beta to "anyone can install it". Unsigned builds work, but
+first-time users see a scary warning, and on macOS every unsigned update looks like a new app, so the Screen
+Recording permission resets after each update.
 
-When you have them, add the certificates as repository secrets and add a signing step to `release.yml`.
+| | What it removes | Cost | Do it |
+|---|---|---|---|
+| macOS (do first) | The "can't be opened" warning, the Homebrew caveat, and Screen Recording resets after updates | Apple Developer Program, $99/year | Step A |
+| Windows | The "Windows protected your PC" SmartScreen warning | Azure Artifact (Trusted) Signing, about $10/month | Step B |
+
+### Step A: macOS (Developer ID + notarization)
+
+1. Join the Apple Developer Program as an individual (developer.apple.com/programs). Approval can take 1-2 days.
+2. In Xcode or the developer site, create a **Developer ID Application** certificate. Export it from Keychain as a
+   `.p12` file with a password.
+3. Create an **app-specific password** for your Apple ID (account.apple.com > Sign-In and Security) and note your
+   **Team ID** (developer.apple.com > Membership).
+4. Add these repository secrets (GitHub > Settings > Secrets and variables > Actions):
+   `MACOS_CERT_P12` (the .p12, base64-encoded), `MACOS_CERT_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`,
+   `APPLE_APP_PASSWORD`.
+5. In `packaging/build_mac.sh`, replace the ad-hoc `codesign --sign -` with a real signature when the secrets are
+   present, using the hardened runtime and an entitlements file that allows the microphone
+   (`com.apple.security.device.audio-input`) and what PyInstaller needs
+   (`com.apple.security.cs.allow-unsigned-executable-memory`, `com.apple.security.cs.disable-library-validation`):
+   `codesign --force --deep --options runtime --timestamp --entitlements packaging/entitlements.plist --sign "Developer ID Application: <Name> (<TEAMID>)" "$APP"`
+6. Notarize and staple the .dmg:
+   `xcrun notarytool submit GlassPrompter-*.dmg --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait`
+   then `xcrun stapler staple GlassPrompter-*.dmg`.
+7. Import the certificate into a temporary keychain in `release.yml` before the build, then remove the
+   "not notarized" caveat from the Homebrew cask and the Mac FAQ on the website.
+
+### Step B: Windows (Azure Artifact Signing)
+
+1. Create an Azure account and an **Artifact Signing** (formerly Trusted Signing) account; complete identity
+   validation as an individual.
+2. Create a certificate profile and an app registration (service principal) with the *Artifact Signing
+   Certificate Profile Signer* role.
+3. Add repository secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, plus the account endpoint,
+   account name and profile name.
+4. In `release.yml`, sign `dist/GlassPrompter/GlassPrompter.exe` before Inno Setup runs and the finished
+   `GlassPrompter-Setup-<version>.exe` after, using the `azure/trusted-signing-action`.
+5. Remove the SmartScreen FAQ entry once signed builds have been out for a few weeks (SmartScreen reputation
+   builds up over time even for signed apps).
+
+Never commit certificates, passwords or keys. Secrets live only in GitHub Actions secrets.

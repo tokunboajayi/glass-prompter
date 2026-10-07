@@ -131,6 +131,9 @@ summary::-webkit-details-marker{display:none}
 summary::after{content:"+";color:var(--dim);font-weight:400;font-size:22px;line-height:1}
 details[open] summary::after{content:"\2212"}
 details p{color:var(--muted);margin:10px 0 0;max-width:760px}
+details ol{color:var(--muted);margin:10px 0 0 20px;max-width:740px;padding:0}
+details li{margin:6px 0}
+details code{font:600 13px/1 ui-monospace,Consolas,monospace;padding:2px 6px;border-radius:6px;background:rgba(255,255,255,.08);color:var(--on)}
 footer{padding:48px 0 64px;color:var(--dim);font-size:14px;border-top:1px solid var(--line)}
 footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 @media (max-width:900px){.grid,.dl{grid-template-columns:1fr 1fr}.split{grid-template-columns:1fr}.keys{grid-template-columns:1fr}}
@@ -172,7 +175,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 
 <div class="wrap">
   <header class="hero">
-    <span class="eyebrow"><i></i><span id="ver">Free for Windows and Mac</span></span>
+    <span class="eyebrow"><i></i><span id="ver">Free for Windows and Mac &middot; public beta</span></span>
     <h1>Read your script. Keep eye contact.</h1>
     <p class="sub">A see-through teleprompter that sits right under your webcam, follows your voice word by word, and stays off the screen share. Now with an AI assistant that can see your screen.</p>
     <div class="cta">
@@ -372,11 +375,21 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <details><summary>Can people on the call see the prompter?</summary>
       <p>On Windows 10 (2004+) and 11, the prompter and every window Glass Prompter opens (settings, the AI assistant, menus, message boxes, even the file picker) are excluded from screen sharing, recordings and screenshots. macOS 15 and later lets screen recorders capture every window, so on a Mac share a single window or app instead of the whole screen. The badge on the prompter always shows the real state.</p></details>
     <details><summary>Does my voice or script go anywhere?</summary>
-      <p>No. Voice recognition and the read-aloud voice run on your computer. Scripts live in a local library. The only internet requests are a once-a-day check for a new version on GitHub (you can turn it off) and, only if you set up the AI assistant, the messages you choose to send to Anthropic.</p></details>
+      <p>No. Voice recognition and the read-aloud voice run on your computer. Scripts live in a local library. The only internet requests are a once-a-day check for a new version on GitHub (you can turn it off) and, only if you set up the AI assistant, the messages you choose to send to the AI provider you picked.</p></details>
     <details><summary>How do I turn on the AI assistant, and what does it cost?</summary>
-      <p>Get an API key from any provider (Anthropic, OpenAI, Google Gemini, xAI, DeepSeek, Mistral, Groq, Perplexity, Together or OpenRouter) and paste it into <b>Settings &rsaquo; AI assistant</b>. The provider is detected from the key and the newest model is chosen for you. Glass Prompter itself stays free; your provider bills per question, typically a few cents or less. Or use <a href="https://ollama.com">Ollama</a> to run a model on your own computer for free. The key stays on your computer.</p></details>
+      <p>Glass Prompter itself stays free. The AI runs on your own account with an AI company, which bills you per question (usually a few cents or less). An <b>API key</b> is just a password that lets Glass Prompter use that account. Setup takes about two minutes:</p>
+      <ol>
+        <li>Pick a provider and open its key page: <a href="https://console.anthropic.com/settings/keys">Anthropic (Claude)</a>, <a href="https://platform.openai.com/api-keys">OpenAI (ChatGPT)</a>, <a href="https://aistudio.google.com/apikey">Google (Gemini)</a>, <a href="https://console.x.ai">xAI (Grok)</a>, or <a href="https://openrouter.ai/keys">OpenRouter</a> (one key for hundreds of models).</li>
+        <li>Sign in, add a payment method or credits if asked (a $5 top-up lasts most people a long time), and click <b>Create key</b>.</li>
+        <li>Copy the key. It's a long line that starts with something like <code>sk-</code> or <code>AIza</code>.</li>
+        <li>In Glass Prompter open <b>Settings &rsaquo; AI assistant</b> and paste it. The provider is detected, the key is tested straight away, and the newest model is picked for you.</li>
+        <li>Press <kbd>A</kbd> and ask anything.</li>
+      </ol>
+      <p>Prefer free and fully offline? Install <a href="https://ollama.com">Ollama</a>, choose <i>Ollama</i> as the provider, and no key is needed. Your key stays on your computer and is never sent to the phone. Never share it or paste it into a bug report.</p></details>
     <details><summary>What does the AI see?</summary>
       <p>Only what you send. When <i>Include my screen</i> is ticked, it gets one screenshot with your question; untick it to send text only. Glass Prompter's own windows are never in that screenshot. It also sees the script on your prompter so it can help with it. Close anything private, like passwords, before asking about your screen.</p></details>
+    <details><summary>Found a bug or have an idea?</summary>
+      <p>Glass Prompter is in public beta, so feedback shapes what comes next. In the app, open the menu and choose <b>Report a problem</b> or <b>Suggest a feature</b>; it opens a GitHub form with your app version and system already filled in (nothing personal). You can also <a href="https://github.com/tokunboajayi/glass-prompter/issues/new/choose">open one here</a>. Found a security problem? Please <a href="https://github.com/tokunboajayi/glass-prompter/security/advisories/new">report it privately</a>.</p></details>
     <details><summary>Is it really free?</summary>
       <p>Yes. No account, no trial, no watermark. It's also open source under the <a href="https://github.com/tokunboajayi/glass-prompter/blob/main/LICENSE">MIT License</a>, so you can read every line of code.</p></details>
   </div>
@@ -385,7 +398,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 <footer>
   <div class="wrap">
     <span>&copy; 2026 Olatokunbo Ajayi &middot; Glass Prompter &middot; <a href="https://github.com/tokunboajayi/glass-prompter/blob/main/LICENSE">MIT License</a></span>
-    <span><a href="https://github.com/tokunboajayi/glass-prompter/releases">Release notes</a> &middot; <a href="https://github.com/tokunboajayi/glass-prompter/issues">Report a problem</a></span>
+    <span><a href="https://github.com/tokunboajayi/glass-prompter/releases">Release notes</a> &middot; <a href="https://github.com/tokunboajayi/glass-prompter/issues/new/choose">Report a problem</a> &middot; <a href="https://github.com/tokunboajayi/glass-prompter/blob/main/SECURITY.md">Privacy &amp; security</a></span>
   </div>
 </footer>
 
@@ -456,7 +469,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
     .then(function (rel) {
       var v = (rel.tag_name || "").replace(/^v/, "");
-      document.getElementById("ver").textContent = "Version " + v + " · new: AI assistant that sees your screen";
+      document.getElementById("ver").textContent = "Version " + v + " · public beta · works with any AI";
       var pick = {};
       (rel.assets || []).forEach(function (a) {
         if (/\.exe$/i.test(a.name)) pick.exe = a;

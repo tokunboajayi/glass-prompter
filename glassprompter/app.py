@@ -8,8 +8,8 @@ import sys
 import threading
 import time
 
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
-from PySide6.QtGui import QAction, QGuiApplication
+from PySide6.QtCore import QObject, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QDesktopServices, QGuiApplication
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
@@ -804,7 +804,13 @@ class Controller(QObject):
         self.cfg.save()
 
     def open_about(self):
-        self.show_dialog(AboutDialog(None, lambda: self.check_updates(True)))
+        self.show_dialog(AboutDialog(None, lambda: self.check_updates(True), self.report_problem))
+
+    def report_problem(self, kind="bug"):
+        """Open a pre-filled GitHub issue (version + OS only, nothing personal)."""
+        from . import support
+        state = getattr(self.prompter, "cap_state", None)
+        QDesktopServices.openUrl(QUrl(support.report_url(kind, state)))
 
     # ------------------------------------------------------------ tray
     def setup_tray(self):
@@ -844,6 +850,8 @@ class Controller(QObject):
         self.act_update.setVisible(False)
         m.addAction(self.act_update)
         m.addAction(QAction("Check for updates", m, triggered=lambda: self.check_updates(True)))
+        m.addAction(QAction("Report a problem" + theme.ELLIPSIS, m, triggered=lambda: self.report_problem("bug")))
+        m.addAction(QAction("Suggest a feature" + theme.ELLIPSIS, m, triggered=lambda: self.report_problem("feature")))
         m.addAction(QAction("About Glass Prompter", m, triggered=self.open_about))
         m.addAction(QAction("Quit", m, triggered=self.quit))
         m.aboutToShow.connect(self.update_tray)

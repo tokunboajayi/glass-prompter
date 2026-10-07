@@ -804,9 +804,9 @@ def _clear_layout(layout):
 
 # ====================================================================== about
 class AboutDialog(BaseDialog):
-    def __init__(self, parent, check_updates=None):
+    def __init__(self, parent, check_updates=None, report=None):
         super().__init__(parent, "About")
-        self.setFixedWidth(440)
+        self.setFixedWidth(520)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(28, 24, 28, 24)
         lay.setSpacing(10)
@@ -815,15 +815,23 @@ class AboutDialog(BaseDialog):
         lay.addWidget(label("A see-through teleprompter that sits under your webcam, so you can read your script "
                             "and keep eye contact on calls, demos and videos.", None, True))
         lay.addWidget(label("Your scripts and settings stay on this computer:\n" + paths.data_dir(), "muted", True))
+        lay.addWidget(label("This is a public beta. Found a bug or have an idea? Report a problem opens a "
+                            "pre-filled GitHub issue with your app version and OS only.", "muted", True))
         row = QHBoxLayout()
         row.addWidget(button("Open data folder", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(paths.data_dir()))))
         row.addWidget(button("Open logs", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(paths.log_dir()))))
         if check_updates:
             row.addWidget(button("Check for updates", lambda: (check_updates(), self.accept())))
         row.addStretch(1)
-        row.addWidget(button("Close", self.accept, primary=True))
+        row2 = QHBoxLayout()
+        if report:
+            row2.addWidget(button("Report a problem", lambda: (report("bug"), self.accept())))
+            row2.addWidget(button("Suggest a feature", lambda: (report("feature"), self.accept())))
+        row2.addStretch(1)
+        row2.addWidget(button("Close", self.accept, primary=True))
         lay.addSpacing(6)
         lay.addLayout(row)
+        lay.addLayout(row2)
 
 
 # ====================================================================== welcome

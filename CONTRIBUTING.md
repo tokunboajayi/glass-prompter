@@ -9,7 +9,7 @@ git clone https://github.com/tokunboajayi/glass-prompter.git
 cd glass-prompter
 python -m pip install -r requirements.txt
 python glass_prompter.pyw          # starts the app
-python -m pytest -q tests          # 115 tests, runs headless on all three OSes
+python -m pytest -q tests          # 120 tests, runs headless on all three OSes
 ```
 
 **Voice Follow from source** needs the offline speech model. The installers bundle it.

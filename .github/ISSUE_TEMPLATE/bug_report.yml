@@ -1,0 +1,65 @@
+name: Report a problem
+description: Something isn't working the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make Glass Prompter better. If you opened this from the app, your version and system
+        are already filled in below. **Never paste an API key, password or private script here** - issues are public.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+      placeholder: |
+        1. I pressed S to take a screenshot
+        2. I expected it to save to Pictures
+        3. Instead I got a gray image
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Prompter / scrolling
+        - Voice Follow
+        - Hidden from screen share
+        - AI assistant
+        - Screenshots / phone Screen view
+        - Phone remote
+        - Read aloud
+        - Install / update
+        - Something else
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: How often?
+      options:
+        - Every time
+        - Sometimes
+        - Happened once
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Shown in the menu under About Glass Prompter.
+      placeholder: "2.6.2"
+    validations:
+      required: true
+  - type: textarea
+    id: system
+    attributes:
+      label: System
+      description: Filled in automatically when you use Report a problem in the app.
+      placeholder: "Windows 11 / macOS 15.1 (Apple silicon)"
+      render: text
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots or logs (optional)
+      description: |
+        Drag in a screenshot. Logs: About Glass Prompter > Open logs. Check them for anything private before attaching.

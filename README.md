@@ -7,14 +7,15 @@
 **A see-through teleprompter that sits right under your webcam.**
 It follows your voice word by word, reads your script aloud, and stays off the screen share.
 **New in 2.6:** an AI assistant that works with any AI provider (Claude, ChatGPT, Gemini, Grok and more), can see your screen and answer anything, plus your screen live on your phone.
-Free and open source (MIT) for Windows and Mac.
+Free and open source (MIT) for Windows and Mac. **Public beta:** feedback is very welcome.
 
 ### [Download from the website &rarr;](https://tokunboajayi.github.io/glass-prompter/)
 
 [Website](https://tokunboajayi.github.io/glass-prompter/) &nbsp;&middot;&nbsp;
 [All downloads](https://github.com/tokunboajayi/glass-prompter/releases/latest) &nbsp;&middot;&nbsp;
 [What's new](CHANGELOG.md) &nbsp;&middot;&nbsp;
-[Report a problem](https://github.com/tokunboajayi/glass-prompter/issues)
+[Report a problem](https://github.com/tokunboajayi/glass-prompter/issues/new/choose) &nbsp;&middot;&nbsp;
+[Privacy & security](SECURITY.md)
 
 <img src="docs/img/hero.jpg" width="900" alt="Glass Prompter under a webcam during a video call">
 
@@ -240,7 +241,7 @@ The app isn't code-signed yet. See step 3 of [Windows](#windows) or [Mac](#mac).
 
 </details>
 
-Still stuck? [Open an issue](https://github.com/tokunboajayi/glass-prompter/issues) and attach the log file from the `logs` folder inside your data folder.
+Still stuck? In the app's menu choose **Report a problem**. It opens a GitHub form with your app version and system already filled in (nothing personal). Or [open one here](https://github.com/tokunboajayi/glass-prompter/issues/new/choose). Logs are under **About Glass Prompter › Open logs**; check them for anything private before attaching. Security problems: please [report privately](SECURITY.md).
 
 ---
 
