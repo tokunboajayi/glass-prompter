@@ -267,14 +267,25 @@ def _rank(pid, ids, created):
         return ids
 
 
-def pick_model(provider, key, model="", base_url=""):
-    """The model to use: the user's choice, else the provider's best current model."""
-    pid, p, base = resolve(provider, key, base_url)
-    model = (model or "").strip()
-    if model and (pid != "anthropic" and not model.startswith("claude") or pid == "anthropic"):
-        return model
-    if p.get("default"):
-        return p["default"]
+_FAMILIES = {"anthropic": ("claude",), "gemini": ("gemini", "gemma"), "openai": ("gpt", "o1", "o3", "o4", "chatgpt"),
+             "xai": ("grok",), "deepseek": ("deepseek",), "mistral": ("mistral", "codestral", "pixtral", "magistral",
+                                                                         "ministral", "open-mistral"),
+             "perplexity": ("sonar", "r1-")}
+_AGGREGATORS = ("openrouter", "together", "groq", "custom", "ollama")
+
+
+def _foreign_model(pid, model):
+    """True when `model` clearly belongs to another provider (e.g. a saved claude model after switching to Gemini)."""
+    if pid in _AGGREGATORS:
+        return False
+    low = model.lower().split("/")[-1]
+    mine = _FAMILIES.get(pid, ())
+    if mine and low.startswith(mine):
+        return False
+    return any(low.startswith(f) for other, fams in _FAMILIES.items() if other != pid for f in fams)
+
+
+def _best_listed(pid, p, key, base):
     try:
         ids = list_models(pid, key, base)
     except Exception as e:                                  # noqa: BLE001
@@ -283,6 +294,24 @@ def pick_model(provider, key, model="", base_url=""):
     if not ids:
         raise AIError("%s returned no chat models. Type a model name in Settings > AI assistant." % p["name"])
     return ids[0]
+
+
+def pick_model(provider, key, model="", base_url=""):
+    """The model to use: the user's choice, else the provider's best current model."""
+    pid, p, base = resolve(provider, key, base_url)
+    model = (model or "").strip()
+    if model and not _foreign_model(pid, model):
+        return model
+    if p.get("default"):
+        return p["default"]
+    return _best_listed(pid, p, key, base)
+
+
+def _model_missing(code, detail):
+    low = (detail or "").lower()
+    return code in (400, 404) and "model" in low and any(
+        t in low for t in ("not found", "not_found", "does not exist", "unknown", "invalid model", "no such",
+                           "not supported", "unsupported", "deprecated", "decommissioned"))
 
 
 def _bad_key(code, detail):
@@ -438,7 +467,9 @@ def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_te
     pid, p, base = resolve(provider, key, base_url)
     if not key and not p.get("nokey"):
         raise AIError("Add your AI API key in Settings > AI assistant on your computer.")
-    model = pick_model(pid, key, model, base)
+    chosen = (model or "").strip()
+    model = pick_model(pid, key, chosen, base)
+    auto_model = model != chosen                  # we picked it, so we may pick again if it's gone
     hdr = _auth_headers(pid, p, key)
     note = ""
     tokens = int(max_tokens or DEFAULT_MAX_TOKENS)
@@ -478,6 +509,13 @@ def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_te
         except urllib.error.HTTPError as e:
             detail = _error_detail(e)
             low = detail.lower()
+            if auto_model and _model_missing(e.code, detail):
+                auto_model = False                                # default alias retired: use the live list
+                _cache.pop((pid, base, key[-8:]), None)
+                best = _best_listed(pid, p, key, base)
+                if best != model:
+                    model = best
+                    continue
             if e.code == 400 and use_web and any(t in low for t in ("tool", "web_search", "google_search", "search")):
                 use_web = False                                   # account/model without web search
                 continue

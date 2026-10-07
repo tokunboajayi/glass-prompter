@@ -108,6 +108,9 @@ def lower_for_dialogs(w, lowered):
 # ------------------------------------------------------------------ taking screenshots (screen view, AI, S key)
 SCREEN_PERMISSION_MSG = ("Allow Glass Prompter in System Settings \u203a Privacy & Security \u203a Screen & System Audio "
                          "Recording, then quit and reopen Glass Prompter.")
+SCREEN_BLANK_MSG = ("macOS gave a blank picture. Open System Settings \u203a Privacy & Security \u203a Screen & System "
+                    "Audio Recording, switch Glass Prompter off and on again (an update can reset it), then quit "
+                    "and reopen Glass Prompter.")
 _asked_screen = False
 
 

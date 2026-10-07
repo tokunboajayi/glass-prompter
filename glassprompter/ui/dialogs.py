@@ -570,6 +570,12 @@ class SettingsDialog(BaseDialog):
 
     def _provider_changed(self, _):
         self._set("ai_provider", self.ai_provider.currentData())
+        self._set("ai_model", "")                 # a model from the old provider won't exist on the new one
+        self.ai_model.blockSignals(True)
+        self.ai_model.clear()
+        self.ai_model.addItem("Best available (automatic)", "")
+        self.ai_model.setCurrentIndex(0)
+        self.ai_model.blockSignals(False)
         self.key_timer.start()
 
     def _model_changed(self, text):

@@ -86,11 +86,11 @@ def _looks_blank(img):
     if img.isNull() or img.width() < 8 or img.height() < 8:
         return True
     seen = set()
-    for i in range(1, 9):
-        for j in range(1, 9):
-            c = img.pixel(img.width() * i // 9, img.height() * j // 9)
+    for i in range(1, 17):              # 256 samples, so a mostly-white slide with some text isn't "blank"
+        for j in range(1, 17):
+            c = img.pixel(img.width() * i // 17, img.height() * j // 17)
             seen.add(c & 0xF0F0F0)
-            if len(seen) > 3:
+            if len(seen) > 2:
                 return False
     return True
 
@@ -108,7 +108,7 @@ def capture_image(widget=None, rect=None):
         img = QImage.fromData(native.grab_screen_png(rect) or b"")
         if _looks_blank(img):
             native.request_screen_capture()
-            raise RuntimeError(native.SCREEN_PERMISSION_MSG)
+            raise RuntimeError(getattr(native, "SCREEN_BLANK_MSG", native.SCREEN_PERMISSION_MSG))
         return img
     screen, _ = _screen_rect(widget)
     pix = screen.grabWindow(0)

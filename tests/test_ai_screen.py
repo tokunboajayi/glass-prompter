@@ -376,3 +376,101 @@ def test_blank_capture_is_detected():
         for y in range(100):
             busy.setPixel(x, y, QColor((x * 7) % 256, (y * 13) % 256, (x * y) % 256).rgb())
     assert not _looks_blank(busy)
+
+
+def test_saved_model_from_another_provider_is_ignored(monkeypatch):
+    ai._cache.clear()
+    monkeypatch.setattr(ai, "_http", lambda url, body=None, headers=None, timeout=30: {
+        "models": [{"name": "models/gemini-9-pro", "supportedGenerationMethods": ["generateContent"]}],
+        "data": [{"id": "claude-sonnet-9", "created_at": "2026-01-01T00:00:00Z"}]})
+    assert ai.pick_model("gemini", "AIzaX", "claude-sonnet-5-5") != "claude-sonnet-5-5"
+    assert ai.pick_model("anthropic", "sk-ant-x", "gpt-5") != "gpt-5"
+    assert ai.pick_model("deepseek", "sk-x", "grok-4") == "deepseek-chat"
+    assert ai.pick_model("openrouter", "sk-or-x", "anthropic/claude-sonnet-5") == "anthropic/claude-sonnet-5"
+    assert ai.pick_model("gemini", "AIzaX", "gemini-custom") == "gemini-custom"
+    assert ai.pick_model("openai", "sk-x", "ft:my-tuned") == "ft:my-tuned"
+
+
+def test_retired_default_model_falls_back_to_live_list(monkeypatch):
+    ai._cache.clear()
+    calls = []
+
+    def fake_http(url, body=None, headers=None, timeout=30):
+        if url.endswith("/models"):
+            return {"data": [{"id": "deepseek-v9", "created": 9}]}
+        calls.append(body["model"])
+        if body["model"] == "deepseek-chat":
+            raise _http_error(400, "Model Not Exist: the model deepseek-chat does not exist")
+        return {"choices": [{"message": {"content": "ok"}}]}
+    monkeypatch.setattr(ai, "_http", fake_http)
+    assert ai.chat("sk-x", [{"role": "user", "content": "q"}], provider="deepseek") == "ok"
+    assert calls == ["deepseek-chat", "deepseek-v9"]
+
+
+def test_users_own_model_is_not_swapped_silently(monkeypatch):
+    def fake_http(url, body=None, headers=None, timeout=30):
+        raise _http_error(404, "The model my-model does not exist")
+    monkeypatch.setattr(ai, "_http", fake_http)
+    with pytest.raises(ai.AIError):
+        ai.chat("sk-x", [{"role": "user", "content": "q"}], "my-model", provider="deepseek")
+
+
+def _png(color=None):
+    from PySide6.QtCore import QBuffer
+    from PySide6.QtGui import QColor, QImage
+    img = QImage(320, 200, QImage.Format.Format_RGB32)
+    if color:
+        img.fill(QColor(*color))
+    else:
+        for x in range(320):
+            for y in range(200):
+                img.setPixel(x, y, QColor((x * 7) % 256, (y * 13) % 256, (x * y) % 256).rgb())
+    buf = QBuffer()
+    buf.open(QBuffer.OpenModeFlag.WriteOnly)
+    img.save(buf, "PNG")
+    return bytes(buf.data())
+
+
+@pytest.fixture
+def mac(monkeypatch):
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from glassprompter import app as gapp
+    from glassprompter.platform import macos
+    state = {"allowed": True, "png": _png(), "asked": 0, "rect": None}
+    monkeypatch.setattr(gapp.native, "OS", "macos")
+    monkeypatch.setattr(gapp.native, "screen_capture_allowed", lambda: state["allowed"], raising=False)
+    monkeypatch.setattr(gapp.native, "request_screen_capture",
+                        lambda: state.__setitem__("asked", state["asked"] + 1), raising=False)
+    monkeypatch.setattr(gapp.native, "grab_screen_png",
+                        lambda rect: (state.__setitem__("rect", rect), state["png"])[1], raising=False)
+    monkeypatch.setattr(gapp.native, "SCREEN_PERMISSION_MSG", macos.SCREEN_PERMISSION_MSG, raising=False)
+    monkeypatch.setattr(gapp.native, "SCREEN_BLANK_MSG", macos.SCREEN_BLANK_MSG, raising=False)
+    return gapp, state
+
+
+def test_mac_capture_uses_screencapture(mac):
+    gapp, state = mac
+    img = gapp.capture_image(rect=(0, 0, 320, 200))
+    assert img.width() == 320 and state["rect"] == (0, 0, 320, 200) and state["asked"] == 0
+    assert gapp.encode_jpeg(img, 1280, 80)[:2] == b"\xff\xd8"
+
+
+def test_mac_capture_without_permission_asks(mac):
+    gapp, state = mac
+    state["allowed"] = False
+    with pytest.raises(RuntimeError, match="Screen & System Audio Recording"):
+        gapp.capture_image(rect=(0, 0, 320, 200))
+    assert state["asked"] == 1
+
+
+def test_mac_gray_capture_explains_the_fix(mac):
+    gapp, state = mac
+    state["png"] = _png((128, 128, 128))
+    with pytest.raises(RuntimeError, match="off and on again"):
+        gapp.capture_image(rect=(0, 0, 320, 200))
+    state["png"] = b""
+    with pytest.raises(RuntimeError):
+        gapp.capture_image(rect=(0, 0, 320, 200))
