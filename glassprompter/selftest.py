@@ -36,9 +36,8 @@ def _one(name):
         return f
     if name == "read_aloud_synth":
         from . import tts
-        from piper import PiperVoice
         t0 = time.time()
-        voice = PiperVoice.load(tts.voice_file(tts.DEFAULT_VOICE))
+        voice = tts.load_voice(tts.voice_file(tts.DEFAULT_VOICE))
         audio = b"".join(c.audio_int16_bytes for c in voice.synthesize("Good morning everyone."))
         if len(audio) < 4000:
             raise RuntimeError("synthesis produced no audio")

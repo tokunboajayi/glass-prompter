@@ -43,6 +43,15 @@ done
 "${APP}/Contents/MacOS/GlassPrompter" --selftest "${BUILD}/selftest.txt" || { cat "${BUILD}/selftest.txt"; exit 1; }
 cat "${BUILD}/selftest.txt"
 
+echo "-- self-test from an App Translocation-length path (app opened from the disk image or Downloads)"
+LONG="${BUILD}/translocated/AppTranslocation/00000000-0000-0000-0000-000000000000/d/padding-to-the-length-a-real-translocated-path-has"
+rm -rf "${BUILD}/translocated" && mkdir -p "${LONG}"
+cp -R "${APP}" "${LONG}/"
+"${LONG}/Glass Prompter.app/Contents/MacOS/GlassPrompter" --selftest "${BUILD}/selftest-long.txt" \
+  || { cat "${BUILD}/selftest-long.txt"; exit 1; }
+cat "${BUILD}/selftest-long.txt"
+rm -rf "${BUILD}/translocated"
+
 echo "-- end-to-end audit of the built app (launch race, phone API, every control, ghost, Read Aloud)"
 "${APP}/Contents/MacOS/GlassPrompter" --e2e "${BUILD}/e2e.txt" & E2E=$!
 ( sleep 600; kill -9 ${E2E} 2>/dev/null ) & WATCH=$!

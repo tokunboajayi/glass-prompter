@@ -277,8 +277,9 @@ class Prompter(QWidget):
         self.stateChanged.emit()
 
     def apply_backdrop(self):
-        """Real frosted blur behind the panel (Windows 11 acrylic, macOS vibrancy); none in text-only mode."""
-        if self.cfg.clear_mode:
+        """Real frosted blur behind the panel (Windows 11 acrylic, macOS vibrancy); none in text-only mode.
+        None in ghost mode either: the OS draws it opaque, which would undo the see-through level."""
+        if self.cfg.clear_mode or self.ghost:
             native.apply_backdrop(self, "none")
             self.frosted = ""
         else:
@@ -1124,12 +1125,7 @@ class Prompter(QWidget):
         self.ghost = bool(on) and native.set_click_through(self, True)
         if not on:
             native.set_click_through(self, False)
-        # the frosted backdrop is drawn by the OS and would stay opaque: drop it while ghosted
-        if self.ghost and not self.cfg.clear_mode:
-            native.apply_backdrop(self, "none")
-            self.frosted = ""
-        else:
-            self.apply_backdrop()
+        self.apply_backdrop()                      # drops the backdrop while ghosted
         if self.ghost:
             self.toast("Ghost %d%%  %s  clicks pass through  %s  %s+[ ]  adjust  %s  %s+G  exit"
                        % (round(self.cfg.ghost_opacity * 100), DOT, DOT, native.MOD, DOT, native.MOD), T.aqua, 4)

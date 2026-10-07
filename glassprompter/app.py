@@ -61,6 +61,12 @@ Files whose names start with an underscore (like this one) are ignored.
 """
 
 
+def needs_probe(s):
+    """Run the native crash test again for a new version, or when the app runs from somewhere else: a Mac app first
+    opened from App Translocation and then moved to Applications must not stay degraded for the whole version."""
+    return s.probe_version != __version__ or s.probe_exe != sys.executable
+
+
 class GuardSignals(QObject):
     done = Signal(list)
 
@@ -285,7 +291,7 @@ class Controller(QObject):
         QTimer.singleShot(1200, self._probe_network)
         self.guard = GuardSignals()
         self.guard.done.connect(self._guard_done)
-        if self.cfg.s.probe_version == __version__:
+        if not needs_probe(self.cfg.s):
             self._guard_done(list(self.cfg.s.native_crashes), first=False)
         else:
             self.speaker.safe = False                            # system voice until the crash test passes
@@ -344,6 +350,7 @@ class Controller(QObject):
     def _guard_done(self, crashed, first=True):
         if first:
             self.cfg.s.native_crashes, self.cfg.s.probe_version = list(crashed), __version__
+            self.cfg.s.probe_exe = sys.executable
             self.cfg.save()
         self.voice_blocked = "voice_follow" in crashed
         self.speaker.safe = "read_aloud" not in crashed
