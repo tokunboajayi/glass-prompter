@@ -138,7 +138,7 @@ Press <kbd>F1</kbd> in the app to see these at any time.
 | <kbd>E</kbd> | Scripts library |
 | <kbd>+</kbd> / <kbd>-</kbd> | Bigger / smaller text |
 | <kbd>PgUp</kbd> / <kbd>PgDn</kbd> | Previous / next section |
-| <kbd>C</kbd> | Screen-share privacy on/off |
+| <kbd>C</kbd> | Screen-share privacy on/off (press twice within 3 s to let viewers see it) |
 | <kbd>M</kbd> | Mirror text (for beam-splitter glass) |
 | <kbd>A</kbd> | AI assistant (chat that can see your screen) |
 | <kbd>S</kbd> | Screenshot to Pictures › Glass Prompter (also copied) |

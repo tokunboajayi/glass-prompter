@@ -1203,6 +1203,17 @@ class Prompter(QWidget):
         self.toast("Text-only mode" if self.cfg.clear_mode else "Glass panel mode")
         self.settingsChanged.emit()
 
+    def key_toggle_capture(self):
+        """The C key. Hiding is one press; SHOWING the prompter to viewers needs a second press within 3 s,
+        so a stray C (for example typing while the prompter has focus) can never expose it on a call."""
+        import time as _t
+        if self.cfg.hide_from_capture and _t.monotonic() - getattr(self, "_reveal_armed", 0) > 3:
+            self._reveal_armed = _t.monotonic()
+            self.toast("Press C again to let viewers see the prompter", T.warn, 3)
+            return
+        self._reveal_armed = 0
+        self.toggle_capture()
+
     def toggle_capture(self):
         self.cfg.hide_from_capture = not self.cfg.hide_from_capture
         self.apply_capture()
@@ -1363,7 +1374,7 @@ class Prompter(QWidget):
             K.Key_Plus: lambda: self.change_font(2), K.Key_Equal: lambda: self.change_font(2),
             K.Key_Minus: lambda: self.change_font(-2), K.Key_BracketLeft: lambda: self.change_glass(-0.05),
             K.Key_BracketRight: lambda: self.change_glass(0.05), K.Key_T: self.toggle_clear,
-            K.Key_C: self.toggle_capture, K.Key_E: self.requestLibrary.emit, K.Key_P: self.requestPhone.emit,
+            K.Key_C: self.key_toggle_capture, K.Key_E: self.requestLibrary.emit, K.Key_P: self.requestPhone.emit,
             K.Key_A: self.requestAI.emit, K.Key_S: self.requestScreenshot.emit,
             K.Key_F1: self.toggle_help, K.Key_Question: self.toggle_help,
         }.get(k)

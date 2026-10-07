@@ -301,7 +301,27 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self._send(status, json.dumps(obj, separators=(",", ":")), headers=headers)
 
     def _error(self, e):
+        self._drain()
         self._json(e.status, {"error": {"code": e.code, "message": e.message}}, e.headers)
+
+    def _drain(self):
+        """Read whatever is left of the request body before answering with an error. Replying while the client is
+        still sending makes Windows reset the connection (WinError 10053/10054), so the client sees a crash instead
+        of our clear 401/415. Oversized bodies are not read: we close the connection instead."""
+        if getattr(self, "_consumed", True):
+            return
+        self._consumed = True
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if 0 < n <= MAX_BODY:
+            try:
+                self.rfile.read(n)
+            except OSError:
+                pass
+        elif n > MAX_BODY:
+            self.close_connection = True
 
     def _body(self, max_len=MAX_BODY):
         try:
@@ -312,6 +332,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             raise ApiError(400, "bad_request", "Invalid Content-Length")
         if n > max_len:
             raise ApiError(413, "too_large", "Request is too large (8 MB max)")
+        self._consumed = True
         return self.rfile.read(n) if n else b""
 
     def _json_body(self):
@@ -346,6 +367,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     # ---------------------------------------------------------------- dispatch
     def _dispatch(self, method):
+        self._consumed = False
         try:
             if not host_allowed(self.headers.get("Host")):
                 raise ApiError(421, "bad_host", "Unknown host")

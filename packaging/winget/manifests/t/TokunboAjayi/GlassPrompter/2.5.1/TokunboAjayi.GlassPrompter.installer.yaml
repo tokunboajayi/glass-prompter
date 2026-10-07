@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+
+PackageIdentifier: TokunboAjayi.GlassPrompter
+PackageVersion: 2.5.1
+InstallerType: inno
+Scope: user
+InstallModes:
+- interactive
+- silent
+- silentWithProgress
+UpgradeBehavior: install
+ReleaseDate: 2026-10-06
+Installers:
+- Architecture: x64
+  InstallerUrl: https://github.com/tokunboajayi/glass-prompter/releases/download/v2.5.1/GlassPrompter-Setup-2.5.1.exe
+  InstallerSha256: B89D8C6265013F13DDBFD5839196B37C2222A44F63A24BDB9E06E65093F0B632
+  ProductCode: '{6F1C2D4E-8B7A-4C3D-9E21-5A7C3B9D0E14}_is1'
+ManifestType: installer
+ManifestVersion: 1.6.0

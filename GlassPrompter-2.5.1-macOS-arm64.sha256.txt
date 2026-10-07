@@ -1,0 +1,1 @@
+7006cfe49d5df45f63b2f6880784b7ad3213745d510c5190f27cf2ae5af4e60c  dist/GlassPrompter-2.5.1-macOS-arm64.dmg

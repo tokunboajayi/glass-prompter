@@ -224,3 +224,29 @@ def test_dialog_stacking_api_exists_on_every_platform():
     assert callable(native.lower_for_dialogs) and callable(native.prepare_window)
     import inspect
     assert "above_prompter" in inspect.signature(native.prepare_window).parameters
+
+
+def test_c_key_needs_two_presses_to_reveal(monkeypatch):
+    import glassprompter.ui.prompter as pm
+
+    class Fake:
+        _reveal_armed = 0
+        toasts = []
+
+        def __init__(self):
+            self.cfg = type("C", (), {"hide_from_capture": True})()
+            self.toggled = 0
+
+        def toast(self, msg, *a):
+            self.toasts.append(msg)
+
+        def toggle_capture(self):
+            self.toggled += 1
+            self.cfg.hide_from_capture = not self.cfg.hide_from_capture
+    f = Fake()
+    pm.Prompter.key_toggle_capture(f)
+    assert f.toggled == 0 and "again" in f.toasts[-1]          # first press only warns
+    pm.Prompter.key_toggle_capture(f)
+    assert f.toggled == 1 and f.cfg.hide_from_capture is False  # second press reveals
+    pm.Prompter.key_toggle_capture(f)
+    assert f.toggled == 2 and f.cfg.hide_from_capture is True   # hiding again is a single press
