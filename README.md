@@ -6,7 +6,7 @@
 
 **A see-through teleprompter that sits right under your webcam.**
 It follows your voice word by word, reads your script aloud, and stays off the screen share.
-**New in 2.5:** an AI assistant that can see your screen and answer anything, plus your screen live on your phone.
+**New in 2.6:** an AI assistant that works with any AI provider (Claude, ChatGPT, Gemini, Grok and more), can see your screen and answer anything, plus your screen live on your phone.
 Free and open source (MIT) for Windows and Mac.
 
 ### [Download from the website &rarr;](https://tokunboajayi.github.io/glass-prompter/)
@@ -172,10 +172,12 @@ It works over your Wi-Fi only and never goes through the internet. On Windows, c
 - **AI assistant on the computer:** press <kbd>A</kbd> on the prompter or choose **&#8943; &rsaquo; AI assistant**. Same chat, on your PC.
 - **Screenshots:** press <kbd>S</kbd> on the prompter, or tap **Save screenshot** on the phone's Screen tab.
 - **AI tab:** a chat with Claude that answers any question. It can look at your current screen, search the web and read the script on the prompter. Ask *"what should I say about this slide?"* or *"tighten my intro"*, then tap **Send to prompter** to read the answer.
-  1. Create an API key at [console.anthropic.com](https://console.anthropic.com/settings/keys). Usage is billed to your Anthropic account (typically a few cents or less per question with a screenshot).
-  2. Paste it into **Settings &rsaquo; AI assistant** on your computer.
+  1. Get an API key from any AI provider: [Anthropic (Claude)](https://console.anthropic.com/settings/keys), [OpenAI (ChatGPT)](https://platform.openai.com/api-keys), [Google (Gemini)](https://aistudio.google.com/apikey), [xAI (Grok)](https://console.x.ai), DeepSeek, Mistral, Groq, Perplexity, Together, or [OpenRouter](https://openrouter.ai/keys) (hundreds of models with one key). Or run a free model on your own computer with [Ollama](https://ollama.com).
+  2. Paste it into **Settings &rsaquo; AI assistant** on your computer. The provider is detected from the key, the key is tested straight away, and the newest model is picked for you (you can choose another).
 
-  The key stays on your computer and is never sent to the phone. Messages go from your computer straight to `api.anthropic.com`, and only when you press Send.
+  Your provider bills you per question, usually a few cents or less. The key stays on your computer and is never sent to the phone. Messages go from your computer straight to the provider you chose, and only when you press Send.
+
+  On a Mac, allow Glass Prompter under **System Settings &rsaquo; Privacy & Security &rsaquo; Screen & System Audio Recording** so it can see your screen.
 
 ---
 
@@ -203,7 +205,7 @@ It works over your Wi-Fi only and never goes through the internet. On Windows, c
 | Windows | `%APPDATA%\GlassPrompter` |
 | Mac | `~/Library/Application Support/GlassPrompter` |
 
-Voice recognition and the read-aloud voice both run on your computer. Audio never leaves it. The only internet requests are the optional daily update check to `api.github.com` and, if you set up the AI assistant, the messages you send to `api.anthropic.com`.
+Voice recognition and the read-aloud voice both run on your computer. Audio never leaves it. The only internet requests are the optional daily update check to `api.github.com` and, if you set up the AI assistant, the messages you send to the AI provider you chose.
 
 ---
 

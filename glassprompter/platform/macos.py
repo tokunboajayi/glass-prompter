@@ -105,6 +105,66 @@ def lower_for_dialogs(w, lowered):
         return False
 
 
+# ------------------------------------------------------------------ taking screenshots (screen view, AI, S key)
+SCREEN_PERMISSION_MSG = ("Allow Glass Prompter in System Settings \u203a Privacy & Security \u203a Screen & System Audio "
+                         "Recording, then quit and reopen Glass Prompter.")
+_asked_screen = False
+
+
+def _coregraphics():
+    return ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics")
+
+
+def screen_capture_allowed():
+    """macOS 10.15+: has the user allowed this app to record the screen? (Without it, captures come back gray or
+    show only the wallpaper.)"""
+    try:
+        f = _coregraphics().CGPreflightScreenCaptureAccess
+        f.restype = ctypes.c_bool
+        return bool(f())
+    except Exception:                                # older macOS / no CoreGraphics symbol: just try
+        return True
+
+
+def request_screen_capture():
+    """Ask once per session: macOS shows its permission prompt the first time, after that we open the right
+    System Settings page so the user can switch it on."""
+    global _asked_screen
+    try:
+        f = _coregraphics().CGRequestScreenCaptureAccess
+        f.restype = ctypes.c_bool
+        ok = bool(f())
+    except Exception:
+        ok = False
+    if not ok and not _asked_screen:
+        _asked_screen = True
+        try:
+            subprocess.Popen(["open", "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"])
+        except OSError:
+            pass
+    return ok
+
+
+def grab_screen_png(rect=None, timeout=10):
+    """PNG bytes of the screen (or the rect x,y,w,h in points) using macOS's own screencapture tool. It works on
+    every macOS version, unlike the older capture call Qt uses, which returns a gray image on recent macOS."""
+    import tempfile
+    fd, path = tempfile.mkstemp(prefix="gp_shot_", suffix=".png")
+    os.close(fd)
+    args = ["/usr/sbin/screencapture", "-x", "-t", "png"]
+    if rect:
+        args += ["-R", "%d,%d,%d,%d" % tuple(int(v) for v in rect)]
+    try:
+        subprocess.run(args + [path], timeout=timeout, capture_output=True, check=False)
+        with open(path, "rb") as f:
+            return f.read()
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 # ------------------------------------------------------------------ screen-capture exclusion
 def capture_support():
     if objc is None:

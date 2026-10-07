@@ -374,17 +374,16 @@ class SettingsDialog(BaseDialog):
         super().__init__(parent, "Settings")
         self.c = controller
         s = controller.cfg.s
-        self.setFixedWidth(860)
+        self.setFixedWidth(1240)                      # three columns: short enough for a laptop screen
         outer = QVBoxLayout(self)
         outer.setContentsMargins(24, 20, 24, 20)
         outer.setSpacing(0)
         cols = QHBoxLayout()
         cols.setSpacing(20)
-        left, right = QVBoxLayout(), QVBoxLayout()
-        left.setSpacing(6)
-        right.setSpacing(6)
-        cols.addLayout(left, 1)
-        cols.addLayout(right, 1)
+        left, mid, right = QVBoxLayout(), QVBoxLayout(), QVBoxLayout()
+        for col in (left, mid, right):
+            col.setSpacing(6)
+            cols.addLayout(col, 1)
         outer.addLayout(cols)
 
         # ---- left: reading, voice, read aloud
@@ -441,8 +440,8 @@ class SettingsDialog(BaseDialog):
         card.row("Phone remote on this Wi-Fi", switch(s.remote_enabled, self._remote), "Protected by a PIN.")
         card.row("Phone can view my screen", switch(s.phone_screen, lambda v: self._set("phone_screen", v)),
                  "Live view and AI chat on your paired phone.")
-        _section(left, card, "Privacy")
         left.addStretch(1)
+        _section(mid, card, "Privacy")
 
         # ---- right: appearance, privacy, system
         card = Card()
@@ -460,40 +459,69 @@ class SettingsDialog(BaseDialog):
 
         from .. import ai
         card = Card()
+        self.ai_provider = QComboBox()
+        self.ai_provider.setAccessibleName("AI provider")
+        self.ai_provider.setMinimumWidth(190)
+        self.ai_provider.setMaximumWidth(220)
+        self.ai_provider.addItem("Detect from my key", ai.AUTO)
+        for pid, prov in ai.PROVIDERS.items():
+            self.ai_provider.addItem(prov["name"], pid)
+        self.ai_provider.setCurrentIndex(max(0, self.ai_provider.findData(s.ai_provider)))
+        self.ai_provider.currentIndexChanged.connect(self._provider_changed)
+        card.row("Provider", self.ai_provider, "Claude, GPT, Gemini\u2026")
         self.ai_key = QLineEdit(ai.load_key())
         self.ai_key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.ai_key.setPlaceholderText("sk-ant-...")
-        self.ai_key.setAccessibleName("Anthropic API key")
+        self.ai_key.setPlaceholderText("Paste your API key")
+        self.ai_key.setAccessibleName("AI API key")
         self.ai_key.setMinimumWidth(190)
         self.ai_key.setMaximumWidth(220)
         self.ai_key.textChanged.connect(self._key_changed)
-        self.key_hint = card.row("API key", self.ai_key, "Your Anthropic key. It stays on this computer.")
+        self.key_hint = card.row("API key", self.ai_key, "Stays on this computer.")
+        self.ai_url = QLineEdit(s.ai_base_url)
+        self.ai_url.setPlaceholderText("Only for Ollama or Other")
+        self.ai_url.setAccessibleName("AI server URL")
+        self.ai_url.setMinimumWidth(190)
+        self.ai_url.setMaximumWidth(220)
+        self.ai_url.textChanged.connect(lambda t: (self._set("ai_base_url", t.strip()), self.key_timer.start()))
+        card.row("Server URL", self.ai_url)
+        self.ai_model = QComboBox()
+        self.ai_model.setEditable(True)
+        self.ai_model.setAccessibleName("AI model")
+        self.ai_model.setMinimumWidth(190)
+        self.ai_model.setMaximumWidth(220)
+        self.ai_model.addItem("Best available (automatic)", "")
+        if s.ai_model:
+            self.ai_model.addItem(s.ai_model, s.ai_model)
+            self.ai_model.setCurrentIndex(1)
+        self.ai_model.currentTextChanged.connect(self._model_changed)
+        self.model_hint = card.row("Model", self.ai_model, "Or type any name.")
+        self.ai_len = QComboBox()
+        self.ai_len.setAccessibleName("Answer length")
+        self.ai_len.setMinimumWidth(190)
+        self.ai_len.setMaximumWidth(220)
+        for n, name in ai.ANSWER_LENGTHS.items():
+            self.ai_len.addItem(name, n)
+        i = self.ai_len.findData(s.ai_max_tokens)
+        if i < 0:
+            self.ai_len.addItem("%d tokens" % s.ai_max_tokens, s.ai_max_tokens)
+            i = self.ai_len.count() - 1
+        self.ai_len.setCurrentIndex(i)
+        self.ai_len.currentIndexChanged.connect(lambda _: self._set("ai_max_tokens", int(self.ai_len.currentData())))
+        card.row("Answer length", self.ai_len, "Pay only for use.")
+        b = button("Get a key", self._open_key_page)
+        b.setProperty("compact", True)
+        card.row("Chat", b, "Press A to ask.")
         self.key_timer = QTimer(self, singleShot=True, interval=700, timeout=self._check_key)
         from PySide6.QtCore import QObject, Signal
 
         class _Relay(QObject):
-            done = Signal(bool, str)
+            done = Signal(bool, str, list)
         self.key_relay = _Relay(self)
         self.key_relay.done.connect(self._key_checked)
-        if ai.load_key():
+        if ai.load_key() or s.ai_provider == "ollama":
             self.key_timer.start()
-        self.ai_model = QComboBox()
-        self.ai_model.setAccessibleName("AI model")
-        self.ai_model.setMinimumWidth(190)
-        self.ai_model.setMaximumWidth(220)
-        for mid, name in ai.MODELS.items():
-            self.ai_model.addItem(name, mid)
-        i = self.ai_model.findData(s.ai_model)
-        if i < 0:
-            self.ai_model.addItem(s.ai_model, s.ai_model)
-            i = self.ai_model.count() - 1
-        self.ai_model.setCurrentIndex(i)
-        self.ai_model.currentIndexChanged.connect(lambda _: self._set("ai_model", self.ai_model.currentData()))
-        card.row("Model", self.ai_model)
-        b = button("Get a key", lambda: QDesktopServices.openUrl(QUrl("https://console.anthropic.com/settings/keys")))
-        b.setProperty("compact", True)
-        card.row("Chat from your phone", b, "Phone remote \u203a AI tab. Asks Claude about your screen and script.")
-        _section(right, card, "AI assistant")
+        _section(mid, card, "AI assistant")
+        mid.addStretch(1)
 
 
         card = Card()
@@ -526,25 +554,72 @@ class SettingsDialog(BaseDialog):
         setattr(self.c.cfg.s, key, value)
         self.c.settings_changed(live=True)
 
-    # ---- AI key: clean, save, and test it so a half-copied key never fails silently
+    # ---- AI: provider, key, model. The key is cleaned, saved and tested as you paste it (free model-list call),
+    #      and the model list is filled from the provider so new models appear without an app update.
     def _key_changed(self, text):
         from .. import ai
         ai.save_key(text)
-        self.key_hint.setText("Checking the key…" if ai.clean_key(text)
-                              else "Your Anthropic key. It stays on this computer.")
+        key = ai.clean_key(text)
+        if key and self.c.cfg.s.ai_provider == ai.AUTO:
+            pid = ai.detect_provider(key)
+            self.key_hint.setText("Checking the key (%s)\u2026" % (ai.PROVIDERS[pid]["name"] if pid else "OpenAI-compatible"))
+        else:
+            self.key_hint.setText("Checking the key\u2026" if key else "Stays on this computer.")
         self.key_hint.setStyleSheet("")
         self.key_timer.start()
+
+    def _provider_changed(self, _):
+        self._set("ai_provider", self.ai_provider.currentData())
+        self.key_timer.start()
+
+    def _model_changed(self, text):
+        idx = self.ai_model.findText(text)
+        data = self.ai_model.itemData(idx) if idx >= 0 else text.strip()
+        self._set("ai_model", data if data is not None else text.strip())
+
+    def _open_key_page(self):
+        from .. import ai
+        try:
+            _, prov, _ = ai.resolve(self.c.cfg.s.ai_provider, ai.load_key(), self.c.cfg.s.ai_base_url or "x")
+            url = prov.get("keys") or "https://console.anthropic.com/settings/keys"
+        except ai.AIError:
+            url = "https://openrouter.ai/keys"
+        QDesktopServices.openUrl(QUrl(url))
 
     def _check_key(self):
         import threading
         from .. import ai
-        key = ai.load_key()
-        if key:
-            threading.Thread(target=lambda: self.key_relay.done.emit(*ai.check_key(key)), daemon=True).start()
+        s = self.c.cfg.s
+        key, prov, url = ai.load_key(), s.ai_provider, s.ai_base_url
 
-    def _key_checked(self, ok, msg):
-        self.key_hint.setText(("✓ " if ok else "✗ ") + msg)
+        def work():
+            ok, msg = ai.check_key(key, prov, url)
+            models = []
+            if ok:
+                try:
+                    models = ai.list_models(prov, key, url)[:60]
+                except Exception:                     # noqa: BLE001 - the list is a convenience
+                    models = []
+            self.key_relay.done.emit(ok, msg, models)
+        if key or prov == "ollama":
+            threading.Thread(target=work, daemon=True).start()
+
+    def _key_checked(self, ok, msg, models):
+        self.key_hint.setText(("\u2713 " if ok else "\u2717 ") + msg)
         self.key_hint.setStyleSheet("color: %s;" % ("#3DDC97" if ok else "#FF8DA3"))
+        if ok and models:
+            current = self.c.cfg.s.ai_model
+            self.ai_model.blockSignals(True)
+            self.ai_model.clear()
+            self.ai_model.addItem("Best available (automatic): " + models[0], "")
+            for m in models:
+                self.ai_model.addItem(m, m)
+            i = self.ai_model.findData(current) if current else 0
+            if i < 0:
+                self.ai_model.addItem(current, current)
+                i = self.ai_model.count() - 1
+            self.ai_model.setCurrentIndex(i)
+            self.ai_model.blockSignals(False)
 
     def _remote(self, on):
         self.c.cfg.s.remote_enabled = on

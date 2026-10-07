@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Glass Prompter: a teleprompter under your webcam</title>
-<meta name="description" content="Free see-through teleprompter for Windows and macOS. Sits under your webcam, follows your voice word by word, reads aloud, and stays private on screen share. Built-in AI assistant that can see your screen, plus live screen view and screenshots on your phone.">
+<meta name="description" content="Free see-through teleprompter for Windows and macOS. Sits under your webcam, follows your voice word by word, reads aloud, and stays private on screen share. Built-in AI assistant for any provider (Claude, ChatGPT, Gemini, Grok) that can see your screen, plus live screen view on your phone.">
 <meta name="theme-color" content="#06070d">
 <meta property="og:title" content="Glass Prompter">
 <meta property="og:description" content="Read your script. Keep eye contact. A free teleprompter that follows your voice, with an AI assistant that can see your screen. For Windows and Mac.">
@@ -203,7 +203,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-chart"/></svg></div>
         <h3>Rehearsal coach</h3><p>After each practice run you get your pace, filler words, long pauses, skipped lines and a score you can watch improve.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-spark"/></svg></div>
-        <h3>AI assistant <span class="new">New</span></h3><p>Ask anything and get a straight answer. It can look at your screen, search the web, and send its answer to the prompter. Press <kbd>A</kbd>, or use your phone.</p></div>
+        <h3>AI assistant <span class="new">New</span></h3><p>Ask anything and get a straight answer. Works with Claude, ChatGPT, Gemini, Grok and more. It can look at your screen and send its answer to the prompter. Press <kbd>A</kbd>, or use your phone.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-screen"/></svg></div>
         <h3>Your screen on your phone <span class="new">New</span></h3><p>See your computer's screen live on your phone, about every 1.5 seconds. Pinch to zoom, pause, or save a full-size copy.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-camera"/></svg></div>
@@ -231,13 +231,14 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   <div class="wrap split">
     <div>
       <h2>An AI that sees what you see</h2>
-      <p class="lead">Stuck on a slide, an error or a question mid-call? Ask. Claude looks at your screen and your script, and answers in seconds.</p>
+      <p class="lead">Stuck on a slide, an error or a question mid-call? Ask. The AI of your choice looks at your screen and your script, and answers in seconds.</p>
       <ul class="points">
         <li><b>Answers anything.</b> Work, study, code, numbers, writing, the news. It searches the web when the answer depends on recent facts.</li>
         <li><b>Sees your screen.</b> Keep <i>Include my screen</i> ticked and it reads what's in front of you. Glass Prompter's own windows never appear in that picture.</li>
         <li><b>Straight to the prompter.</b> Tap <i>Send to prompter</i> and read the answer out, word for word.</li>
         <li><b>On your PC or your phone.</b> Press <kbd>A</kbd> on the prompter, or open the AI tab on the phone remote.</li>
-        <li><b>Your key, your data.</b> Bring your own Anthropic API key. It stays on your computer, never reaches the phone, and nothing is sent until you press Send.</li>
+        <li><b>Any AI you like.</b> Paste a key from Anthropic, OpenAI, Google, xAI, DeepSeek, Mistral, Groq, Perplexity or OpenRouter, or run a free model locally with Ollama. The newest model is picked for you.</li>
+        <li><b>Your key, your data.</b> The key stays on your computer, never reaches the phone, and nothing is sent until you press Send.</li>
       </ul>
     </div>
     <img src="img/assistant.jpg" width="2400" height="1400" alt="The AI assistant window over a presentation slide, suggesting what to say about Q3 revenue and offering Send to prompter" loading="lazy">
@@ -257,7 +258,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
           <tr><td>Mic drops mid-take</td><td class="us">Reconnects by itself</td><td>Often freezes</td><td>Varies</td></tr>
           <tr><td>Screen share status</td><td class="us">Honest badge per OS</td><td>"Invisible" claims</td><td>Often undocumented on macOS 15+</td></tr>
           <tr><td>Natural read-aloud</td><td class="us">Built in, offline</td><td>Rare</td><td>Rare</td></tr>
-          <tr><td>AI assistant</td><td class="us">Sees your screen, answers anything, on PC and phone</td><td>Script rewriting at most</td><td>Rare</td></tr>
+          <tr><td>AI assistant</td><td class="us">Any provider (Claude, ChatGPT, Gemini, Grok&hellip;), sees your screen, on PC and phone</td><td>Script rewriting at most</td><td>Rare</td></tr>
           <tr><td>Your scripts</td><td class="us">Daily backups and export</td><td>Lost-script reports are common</td><td>Varies</td></tr>
           <tr><td>Price</td><td class="us">Free</td><td>Subscription</td><td>$30 to $40</td></tr>
         </tbody>
@@ -373,7 +374,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <details><summary>Does my voice or script go anywhere?</summary>
       <p>No. Voice recognition and the read-aloud voice run on your computer. Scripts live in a local library. The only internet requests are a once-a-day check for a new version on GitHub (you can turn it off) and, only if you set up the AI assistant, the messages you choose to send to Anthropic.</p></details>
     <details><summary>How do I turn on the AI assistant, and what does it cost?</summary>
-      <p>Create an API key at <a href="https://console.anthropic.com/settings/keys">console.anthropic.com</a> and paste it into <b>Settings &rsaquo; AI assistant</b>. Glass Prompter itself stays free. Anthropic bills your account per question (typically a few cents or less with a screenshot), and web searches cost a little extra. The key stays on your computer.</p></details>
+      <p>Get an API key from any provider (Anthropic, OpenAI, Google Gemini, xAI, DeepSeek, Mistral, Groq, Perplexity, Together or OpenRouter) and paste it into <b>Settings &rsaquo; AI assistant</b>. The provider is detected from the key and the newest model is chosen for you. Glass Prompter itself stays free; your provider bills per question, typically a few cents or less. Or use <a href="https://ollama.com">Ollama</a> to run a model on your own computer for free. The key stays on your computer.</p></details>
     <details><summary>What does the AI see?</summary>
       <p>Only what you send. When <i>Include my screen</i> is ticked, it gets one screenshot with your question; untick it to send text only. Glass Prompter's own windows are never in that screenshot. It also sees the script on your prompter so it can help with it. Close anything private, like passwords, before asking about your screen.</p></details>
     <details><summary>Is it really free?</summary>

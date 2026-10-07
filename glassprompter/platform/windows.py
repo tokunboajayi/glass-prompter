@@ -55,6 +55,21 @@ def set_app_id():
         pass
 
 
+SCREEN_PERMISSION_MSG = "Screen capture isn't allowed on this computer."
+
+
+def screen_capture_allowed():
+    return True
+
+
+def request_screen_capture():
+    return True
+
+
+def grab_screen_png(rect=None, timeout=10):
+    return None                  # Qt's own grab works here
+
+
 def lower_for_dialogs(w, lowered):
     return False          # Windows/Linux: Qt's stacking already keeps dialogs on top
 

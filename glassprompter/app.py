@@ -73,15 +73,52 @@ class UpdateSignals(QObject):
     ready = Signal(str)
 
 
-def grab_screen_jpeg(widget=None, max_w=1280, quality=70):
-    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
+def _screen_rect(widget=None):
     screen = (widget.screen() if widget is not None else None) or QGuiApplication.primaryScreen()
     if screen is None:
         raise RuntimeError("no screen")
+    g = screen.geometry()
+    return screen, (g.x(), g.y(), g.width(), g.height())
+
+
+def _looks_blank(img):
+    """A capture without permission comes back as one flat colour (gray/black). Sample a grid to spot that."""
+    if img.isNull() or img.width() < 8 or img.height() < 8:
+        return True
+    seen = set()
+    for i in range(1, 9):
+        for j in range(1, 9):
+            c = img.pixel(img.width() * i // 9, img.height() * j // 9)
+            seen.add(c & 0xF0F0F0)
+            if len(seen) > 3:
+                return False
+    return True
+
+
+def capture_image(widget=None, rect=None):
+    """QImage of the screen the prompter is on. macOS uses the system screencapture tool and checks the Screen
+    Recording permission first; Windows/Linux use Qt (safe to call from the UI thread only)."""
+    from PySide6.QtGui import QImage
+    if native.OS == "macos":
+        if rect is None:
+            _, rect = _screen_rect(widget)
+        if not native.screen_capture_allowed():
+            native.request_screen_capture()
+            raise RuntimeError(native.SCREEN_PERMISSION_MSG)
+        img = QImage.fromData(native.grab_screen_png(rect) or b"")
+        if _looks_blank(img):
+            native.request_screen_capture()
+            raise RuntimeError(native.SCREEN_PERMISSION_MSG)
+        return img
+    screen, _ = _screen_rect(widget)
     pix = screen.grabWindow(0)
     if pix.isNull():
         raise RuntimeError("screen capture is not allowed on this computer")
-    img = pix.toImage()
+    return pix.toImage()
+
+
+def encode_jpeg(img, max_w=1280, quality=70):
+    from PySide6.QtCore import QBuffer, QByteArray, QIODevice
     if img.width() > max_w:
         img = img.scaledToWidth(max_w, Qt.SmoothTransformation)
     ba = QByteArray()
@@ -91,6 +128,10 @@ def grab_screen_jpeg(widget=None, max_w=1280, quality=70):
         raise RuntimeError("could not encode the screenshot")
     buf.close()
     return bytes(ba.data())
+
+
+def grab_screen_jpeg(widget=None, max_w=1280, quality=70):
+    return encode_jpeg(capture_image(widget), max_w, quality)
 
 
 def screenshots_dir():
@@ -104,14 +145,11 @@ def screenshots_dir():
 def save_screenshot(widget=None):
     """Full-resolution PNG of the screen the prompter is on, saved to Pictures/Glass Prompter and copied to the
     clipboard. The prompter and its windows are hidden from capture, so they never appear in it (Windows)."""
-    screen = (widget.screen() if widget is not None else None) or QGuiApplication.primaryScreen()
-    pix = screen.grabWindow(0)
-    if pix.isNull():
-        raise RuntimeError("screen capture is not allowed on this computer")
+    img = capture_image(widget)
     path = os.path.join(screenshots_dir(), time.strftime("Screenshot %Y-%m-%d %H%M%S.png"))
-    if not pix.save(path, "PNG"):
+    if not img.save(path, "PNG"):
         raise RuntimeError("couldn't save the screenshot")
-    QGuiApplication.clipboard().setPixmap(pix)
+    QGuiApplication.clipboard().setImage(img)
     return path
 
 
@@ -142,8 +180,14 @@ class Bridge(QObject):
     def screen_allowed(self):
         return bool(self.settings and self.settings.phone_screen)
 
+    screen_rect = None                                # (x, y, w, h) of the prompter's screen, kept fresh by the UI
+
     def screenshot(self, timeout=5.0, full=False):
-        """JPEG bytes of the screen the prompter is on. The grab runs on the UI thread; we wait for it."""
+        """JPEG bytes of the screen the prompter is on. On macOS the system screencapture tool runs right here on
+        the server thread (no UI freeze); elsewhere the grab runs on the UI thread and we wait for it."""
+        if native.OS == "macos" and self.screen_rect:
+            img = capture_image(rect=self.screen_rect)
+            return encode_jpeg(img, 3840, 90) if full else encode_jpeg(img)
         box = {"done": threading.Event(), "data": None, "error": None, "full": bool(full)}
         self.screenRequested.emit(box)
         if not box["done"].wait(timeout):
@@ -156,6 +200,15 @@ class Bridge(QObject):
         from . import ai
         s = self.settings
         return ai.load_key(), (s.ai_model if s else "")
+
+    def ai_config(self):
+        """Everything the AI call needs. The key never leaves this computer (the phone only gets yes/no)."""
+        from . import ai
+        s = self.settings
+        if not s:
+            return {}
+        return {"key": ai.load_key(), "provider": s.ai_provider, "model": s.ai_model, "base_url": s.ai_base_url,
+                "max_tokens": s.ai_max_tokens}
 
     def script_context(self):
         try:
@@ -488,6 +541,10 @@ class Controller(QObject):
         self.update_tray()
 
     def periodic(self):
+        try:
+            self.bridge.screen_rect = _screen_rect(self.prompter)[1]      # for macOS phone screen view
+        except Exception:                                               # noqa: BLE001
+            pass
         connected = bool(self.server and self.server.running and self.server.connected())
         if connected != self.prompter.remote_connected:
             self.prompter.remote_connected = connected

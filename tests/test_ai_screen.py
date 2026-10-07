@@ -74,7 +74,7 @@ def test_full_resolution_screenshot(mk):
 def test_requests_answer_anything_with_web_search():
     body = ai.build_request([{"role": "user", "content": "What's the capital of Ghana?"}], None)
     assert body["tools"][0]["name"] == "web_search" and body["max_tokens"] >= 2000
-    assert "ANY question" in body["system"]
+    assert "ANY question" in "".join(b["text"] for b in body["system"])
     assert "tools" not in ai.build_request([{"role": "user", "content": "x"}], None, web=False)
 
 
@@ -90,7 +90,7 @@ def test_features_never_expose_the_key(mk):
     s = mk(key="sk-ant-secret-123")
     tok = login(s)
     r, d = req(s, "GET", "/api/v1/features", token=tok)
-    assert r.status == 200 and d == {"screen": True, "ai": True, "ai_model": "claude-sonnet-5-5"}
+    assert r.status == 200 and d["screen"] is True and d["ai"] is True and d["ai_model"] == "claude-sonnet-5-5"
     assert b"secret" not in json.dumps(d).encode()
 
 
@@ -162,7 +162,9 @@ def test_build_request_adds_image_and_script():
     body = ai.build_request([{"role": "user", "content": "help"}], "claude-haiku-4-5-20251001",
                             screen_jpeg=JPEG, script_title="Pitch", script_text="Hello world")
     assert body["model"] == "claude-haiku-4-5-20251001"
-    assert "Pitch" in body["system"] and "Hello world" in body["system"]
+    system = "".join(b["text"] for b in body["system"])
+    assert "Pitch" in system and "Hello world" in system
+    assert body["system"][-1]["cache_control"] == {"type": "ephemeral"}      # prompt caching saves tokens
     content = body["messages"][-1]["content"]
     assert content[0]["type"] == "image" and base64.b64decode(content[0]["source"]["data"]) == JPEG
     assert content[0]["source"]["media_type"] == "image/jpeg" and content[1]["text"].endswith("help")
@@ -176,9 +178,10 @@ def test_chat_without_key_raises_before_network():
 
 
 def test_settings_defaults_and_validation():
-    s = config.validate(config.Settings(phone_screen="yes", ai_model=None))
-    assert isinstance(s.phone_screen, bool) and s.ai_model == config.Settings().ai_model
-    assert config.Settings().phone_screen is True and config.Settings().ai_model in ai.MODELS
+    s = config.validate(config.Settings(phone_screen="yes", ai_model=None, ai_provider="nonsense", ai_max_tokens=10**9))
+    assert isinstance(s.phone_screen, bool) and s.ai_model == ""
+    assert s.ai_provider == "auto" and s.ai_max_tokens == 64000
+    assert config.Settings().phone_screen is True and config.Settings().ai_model == ""
     assert not hasattr(config.Settings(), "ai_key")                  # the key never goes in settings.json
 
 
@@ -215,8 +218,8 @@ def test_clean_key_repairs_copy_damage():
 
 def test_check_key_rejects_obvious_mistakes_offline():
     assert ai.check_key("")[0] is False
-    ok, msg = ai.check_key("hello")
-    assert ok is False and "sk-ant-" in msg
+    ok, msg = ai.check_key("abc", provider="custom", base_url="")
+    assert ok is False and "server URL" in msg
 
 
 def test_dialog_stacking_api_exists_on_every_platform():
@@ -250,3 +253,126 @@ def test_c_key_needs_two_presses_to_reveal(monkeypatch):
     assert f.toggled == 1 and f.cfg.hide_from_capture is False  # second press reveals
     pm.Prompter.key_toggle_capture(f)
     assert f.toggled == 2 and f.cfg.hide_from_capture is True   # hiding again is a single press
+
+
+
+# ------------------------------------------------------------------ any AI provider
+def test_detects_provider_from_key():
+    cases = {"sk-ant-api03-x": "anthropic", "sk-or-v1-x": "openrouter", "sk-proj-abc": "openai", "sk-abc": "openai",
+             "AIzaSyX": "gemini", "xai-abc": "xai", "gsk_abc": "groq", "pplx-abc": "perplexity", "weird": None}
+    for key, want in cases.items():
+        assert ai.detect_provider(key) == want, key
+    assert ai.resolve("auto", "weird")[0] == "openai"                 # unknown keys: OpenAI-compatible
+    assert ai.resolve("ollama", "", "http://pc:11434/v1/")[2] == "http://pc:11434/v1"
+    with pytest.raises(ai.AIError):
+        ai.resolve("custom", "k", "")
+
+
+def test_ranks_full_size_stable_newest_first():
+    ids = ["gpt-4o-mini", "gpt-5", "gpt-6-preview", "gpt-6", "gpt-4o"]
+    created = {"gpt-4o-mini": 3, "gpt-5": 5, "gpt-6-preview": 7, "gpt-6": 6, "gpt-4o": 2}
+    assert ai._rank("openai", ids, created)[0] == "gpt-6"
+    g = ai._rank("gemini", ["gemini-3.7-flash", "gemini-3.8-flash-lite", "gemini-3.8-flash", "gemini-3.5-pro"], {})
+    assert g[0] == "gemini-3.5-pro" and g[-1] == "gemini-3.8-flash-lite"
+    a = ai._rank("anthropic", ["claude-haiku-4-5", "claude-opus-5-5", "claude-sonnet-5-5"],
+                 {"claude-sonnet-5-5": "2026-08-01T00:00:00Z"})
+    assert a[0] == "claude-sonnet-5-5"
+
+
+def test_openai_and_gemini_bodies_carry_the_screenshot():
+    msgs = [{"role": "user", "content": "what is this?"}]
+    b = ai._openai_body("openai", "gpt-x", msgs, JPEG, "T", "script", 9000)
+    assert b["messages"][0]["role"] == "system" and b["max_completion_tokens"] == 9000
+    parts = b["messages"][-1]["content"]
+    assert parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+    assert "max_tokens" in ai._openai_body("xai", "grok", msgs, None, "", "", 500)
+    g = ai._gemini_body(msgs, JPEG, "", "", 7000, True)
+    assert g["contents"][-1]["parts"][0]["inline_data"]["mime_type"] == "image/jpeg"
+    assert g["generationConfig"]["maxOutputTokens"] == 7000 and g["tools"] == [{"google_search": {}}]
+
+
+class _HTTPErr(Exception):
+    pass
+
+
+def _http_error(code, msg):
+    import io
+    import urllib.error
+    return urllib.error.HTTPError("u", code, "x", {}, io.BytesIO(json.dumps({"error": {"message": msg}}).encode()))
+
+
+def test_chat_adapts_to_text_only_models_and_smaller_limits(monkeypatch):
+    calls = []
+
+    def fake_http(url, body=None, headers=None, timeout=30):
+        calls.append(body)
+        if len(calls) == 1:
+            raise _http_error(400, "This model does not support image input")
+        if len(calls) == 2:
+            raise _http_error(400, "max_tokens is too large: 16000. This model supports at most 8192")
+        return {"choices": [{"message": {"content": "Answer."}}]}
+    monkeypatch.setattr(ai, "_http", fake_http)
+    out = ai.chat("sk-abc", [{"role": "user", "content": "hi"}], "some-model", JPEG, provider="deepseek")
+    assert out.endswith("Answer.") and "can't see images" in out
+    assert isinstance(calls[0]["messages"][-1]["content"], list) and isinstance(calls[1]["messages"][-1]["content"], str)
+    assert calls[2]["max_tokens"] == 8000                               # halved after the limit error
+    assert calls[0]["messages"][0]["role"] == "system"
+
+
+def test_chat_gemini_and_anthropic_parse_answers(monkeypatch):
+    monkeypatch.setattr(ai, "_http", lambda url, body=None, headers=None, timeout=30: (
+        {"candidates": [{"content": {"parts": [{"text": "G"}]}}]} if "generateContent" in url else
+        {"content": [{"type": "text", "text": "C"}], "stop_reason": "end_turn"}))
+    assert ai.chat("AIzaX", [{"role": "user", "content": "q"}], "gemini-x") == "G"
+    assert ai.chat("sk-ant-x", [{"role": "user", "content": "q"}], "claude-x") == "C"
+
+
+def test_rejected_key_message_names_the_provider(monkeypatch):
+    def boom(*a, **k):
+        raise _http_error(401, "invalid key")
+    monkeypatch.setattr(ai, "_http", boom)
+    with pytest.raises(ai.AIError, match="OpenAI"):
+        ai.chat("sk-proj-abc", [{"role": "user", "content": "q"}], "gpt-x")
+
+
+def test_model_is_chosen_automatically(monkeypatch):
+    ai._cache.clear()
+    monkeypatch.setattr(ai, "_http", lambda url, body=None, headers=None, timeout=30: {
+        "data": [{"id": "gpt-old", "created": 1}, {"id": "gpt-new", "created": 9}, {"id": "whisper-1", "created": 99},
+                 {"id": "gpt-new-mini", "created": 10}]})
+    assert ai.pick_model("openai", "sk-abc") == "gpt-new"
+    assert ai.pick_model("openrouter", "sk-or-x") == "openrouter/auto"
+    assert ai.pick_model("openai", "sk-abc", "claude-sonnet-5-5") == "gpt-new"   # old Claude default ignored
+    assert ai.pick_model("openai", "sk-abc", "my-model") == "my-model"
+
+
+def test_api_passes_provider_settings_through(mk, monkeypatch):
+    seen = {}
+
+    def fake_chat(key, messages, model=None, screen_jpeg=None, script_title="", script_text="", **kw):
+        seen.update(kw, key=key, model=model)
+        return "ok"
+    monkeypatch.setattr(ai, "chat", fake_chat)
+    s = mk(key="AIzaX")
+    s.bridge.ai_config = lambda: {"key": "AIzaX", "provider": "gemini", "model": "", "base_url": "",
+                                  "max_tokens": 32000}
+    tok = login(s)
+    r, d = req(s, "GET", "/api/v1/features", token=tok)
+    assert d["ai"] is True and d["ai_provider"] == "Google Gemini" and "AIza" not in json.dumps(d)
+    r, d = req(s, "POST", "/api/v1/ai/chat", {"messages": [{"role": "user", "content": "x"}]}, token=tok)
+    assert r.status == 200 and seen["provider"] == "gemini" and seen["max_tokens"] == 32000
+
+
+def test_blank_capture_is_detected():
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtGui import QColor, QImage
+    from glassprompter.app import _looks_blank
+    flat = QImage(200, 100, QImage.Format.Format_RGB32)
+    flat.fill(QColor(128, 128, 128))
+    assert _looks_blank(flat)
+    busy = QImage(200, 100, QImage.Format.Format_RGB32)
+    for x in range(200):
+        for y in range(100):
+            busy.setPixel(x, y, QColor((x * 7) % 256, (y * 13) % 256, (x * y) % 256).rgb())
+    assert not _looks_blank(busy)

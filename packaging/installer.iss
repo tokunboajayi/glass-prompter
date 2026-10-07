@@ -73,5 +73,16 @@ begin
   Result := ExpandConstant('{param:UPDATE|0}') = '1';
 end;
 
+{ Glass Prompter lives in the tray, so Windows' Restart Manager doesn't always manage to close it, and the
+  install then stops with "DeleteFile failed; code 5. Access is denied." Close it ourselves before copying files. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#AppExe}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(800);
+  Result := '';
+end;
+
 [Messages]
 FinishedLabel=Setup has finished installing [name]. It lives in the tray (bottom-right of the taskbar). Your scripts and settings are kept in %APPDATA%\GlassPrompter even if you uninstall.

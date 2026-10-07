@@ -106,13 +106,16 @@ def make_assistant(controller):
 
         # ---------------------------------------------------------------- state
         def refresh_info(self):
+            s = self.c.cfg.s
             key = ai.load_key()
-            model = ai.MODELS.get(self.c.cfg.s.ai_model, self.c.cfg.s.ai_model).split(" · ")[0]
-            if key:
-                self.info.setText("Claude %s · answers anything, can search the web and see your screen" % model)
+            ready = bool(key) or s.ai_provider == "ollama"
+            if ready:
+                name = ai.provider_name(s.ai_provider, key)
+                self.info.setText("%s · %s · answers anything and can see your screen"
+                                  % (name, s.ai_model or "best model"))
             else:
-                self.info.setText("Add your Anthropic API key in Settings › AI assistant to start.")
-            self.send_btn.setEnabled(bool(key) and not self.busy)
+                self.info.setText("Add an API key from any AI provider in Settings › AI assistant to start.")
+            self.send_btn.setEnabled(ready and not self.busy)
 
         def _bubble(self, role, text, reply=False):
             wrap = QWidget()
@@ -168,7 +171,7 @@ def make_assistant(controller):
             if not q or self.busy:
                 return
             key = ai.load_key()
-            if not key:
+            if not key and self.c.cfg.s.ai_provider != "ollama":
                 self.refresh_info()
                 return
             jpeg = None
@@ -189,11 +192,13 @@ def make_assistant(controller):
             self.refresh_info()
             msgs = list(self.history[-ai.MAX_TURNS:])
             title, script = self.c.prompter.script_title, self.c.prompter.script_text
-            model = self.c.cfg.s.ai_model
+            cfg = self.c.cfg.s
+            model, extra = cfg.ai_model, {"provider": cfg.ai_provider, "base_url": cfg.ai_base_url,
+                                          "max_tokens": cfg.ai_max_tokens}
 
             def work():
                 try:
-                    self.relay.done.emit(ai.chat(key, msgs, model, jpeg, title, script), None)
+                    self.relay.done.emit(ai.chat(key, msgs, model, jpeg, title, script, **extra), None)
                 except ai.AIError as e:
                     self.relay.done.emit(None, str(e))
                 except Exception as e:                # noqa: BLE001

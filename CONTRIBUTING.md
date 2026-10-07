@@ -31,7 +31,7 @@ Handy environment variables:
 | `GLASSPROMPTER_HOME` | Use a different data folder (great for a clean test profile) |
 | `GLASSPROMPTER_ALLOW_CAPTURE=1` | Don't hide windows from screen capture, so screenshots work |
 | `GLASSPROMPTER_MODEL` | Path to a Vosk model folder |
-| `GLASSPROMPTER_AI_KEY` | Anthropic API key for the AI assistant (otherwise read from `ai.key` in the data folder) |
+| `GLASSPROMPTER_AI_KEY` | API key for the AI assistant, any provider (otherwise read from `ai.key` in the data folder) |
 
 ## Project layout
 
@@ -46,7 +46,7 @@ glassprompter/
   tts.py               Read Aloud: Piper neural voices, sentence-ahead synthesis, word-level progress
   coach.py             rehearsal scoring
   scripts.py           SQLite library, import (.txt/.md/.docx), backup, Markdown export
-  ai.py                AI assistant: Claude Messages API client (stdlib only), key stays on the PC
+  ai.py                AI assistant for any provider (Anthropic, Gemini, any OpenAI-compatible API), live model lists
   config.py            versioned, validated settings with atomic writes and migration
   updater.py           GitHub Releases check, SHA-256 verified download, silent install
   server/api.py        phone remote: REST /api/v1 + SSE, sessions, rate limiting, security headers

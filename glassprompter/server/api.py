@@ -586,9 +586,23 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     def h_features(self, qs):
         self._require_auth()
-        key, model = self._bridge_call("ai_settings", default=("", "")) or ("", "")
+        from .. import ai
+        cfg = self._ai_config()
+        try:
+            _, prov, _ = ai.resolve(cfg.get("provider", ai.AUTO), cfg.get("key", ""), cfg.get("base_url", ""))
+            ready = bool(cfg.get("key")) or bool(prov.get("nokey") and cfg.get("provider") == "ollama")
+            name = prov["name"]
+        except ai.AIError:
+            ready, name = False, ""
         self._json(200, {"screen": bool(self._bridge_call("screen_allowed", default=False)),
-                         "ai": bool((key or "").strip()), "ai_model": model or ""})
+                         "ai": ready, "ai_model": cfg.get("model") or "", "ai_provider": name})
+
+    def _ai_config(self):
+        cfg = self._bridge_call("ai_config", default=None)
+        if cfg is None:                                   # older bridges: key + model only
+            key, model = self._bridge_call("ai_settings", default=("", "")) or ("", "")
+            cfg = {"key": key, "model": model}
+        return cfg
 
     def h_screen(self, qs):
         self._require_auth()
@@ -621,9 +635,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         messages = data.get("messages")
         if not isinstance(messages, list) or not messages:
             raise ApiError(400, "bad_request", "Send messages: [{role, content}]")
-        key, model = self._bridge_call("ai_settings", default=("", "")) or ("", "")
-        if not (key or "").strip():
-            raise ApiError(400, "ai_no_key", "Add your Anthropic API key in Settings > AI assistant on your computer.")
+        cfg = self._ai_config()
+        key = cfg.get("key", "")
+        if not (key or "").strip() and cfg.get("provider") != "ollama":
+            raise ApiError(400, "ai_no_key", "Add your AI API key in Settings > AI assistant on your computer.")
         jpeg = None
         if data.get("screen") and self._bridge_call("screen_allowed", default=False):
             try:
@@ -636,7 +651,8 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if not self.srv.ai_lock.acquire(timeout=1):
             raise ApiError(429, "ai_busy", "Still answering your last message")
         try:
-            reply = ai.chat(key, messages, model, jpeg, title, text)
+            extra = {k: cfg[k] for k in ("provider", "base_url", "max_tokens") if cfg.get(k)}
+            reply = ai.chat(key, messages, cfg.get("model"), jpeg, title, text, **extra)
         except ai.AIError as e:
             raise ApiError(502, "ai_error", str(e))
         finally:
