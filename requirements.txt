@@ -5,6 +5,8 @@ certifi>=2024.2  # HTTPS certificates for updates and the AI assistant in frozen
 vosk>=0.3.45; sys_platform != "darwin"
 vosk==0.3.44; sys_platform == "darwin"
 sounddevice>=0.4.6
+# Meeting copilot: hear the other side of a call (system audio loopback on Windows/Linux)
+soundcard>=0.4.4; sys_platform != "darwin"
 # Natural Read Aloud (offline neural voice)
 piper-tts>=1.3
 # onnxruntime dropped Intel-Mac wheels after 1.23 and needs macOS 14 from 1.24; 1.23 covers macOS 13+ on both chips

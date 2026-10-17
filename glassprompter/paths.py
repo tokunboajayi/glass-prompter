@@ -85,6 +85,23 @@ def model_dir():
     return None
 
 
+def speech_models():
+    """Every Vosk model the meeting copilot can use -> {folder name: path}. Drop any language's model from
+    alphacephei.com/vosk/models into the data folder's `models` folder and it shows up here."""
+    found = {}
+    for base in (os.path.join(package_dir(), "models"), os.path.join(data_dir(), "models"),
+                 os.path.join(build_dir(), "models")):
+        try:
+            names = sorted(os.listdir(base))
+        except OSError:
+            continue
+        for name in names:
+            path = os.path.join(base, name)
+            if name not in found and os.path.isfile(os.path.join(path, "am", "final.mdl")):
+                found[name] = path
+    return found
+
+
 def default_drop_dir():
     return os.path.join(documents_dir(), APP_NAME)
 

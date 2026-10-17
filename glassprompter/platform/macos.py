@@ -270,7 +270,8 @@ def apply_backdrop(w, kind="acrylic"):
 
 # ------------------------------------------------------------------ global hotkeys (Carbon)
 KEYCODES = {"SPACE": 49, "LEFT": 123, "RIGHT": 124, "DOWN": 125, "UP": 126, "R": 15, "H": 4, "E": 14,
-            "V": 9, "G": 5, "PGUP": 116, "PGDN": 121, "LBRACKET": 33, "RBRACKET": 30}
+            "V": 9, "G": 5, "PGUP": 116, "PGDN": 121, "LBRACKET": 33, "RBRACKET": 30,
+            "ENTER": 36, "M": 46}
 CONTROL_KEY, OPTION_KEY = 0x1000, 0x0800
 
 

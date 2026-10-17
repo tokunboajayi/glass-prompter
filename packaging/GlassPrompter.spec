@@ -32,6 +32,7 @@ hidden = ["qrcode", "qrcode.constants", "vosk", "sounddevice", "_sounddevice_dat
 if MAC:
     hidden += ["objc", "AppKit", "Foundation", "glassprompter.platform.macos"]
 else:
+    hidden += ["soundcard", "numpy"]           # meeting copilot hears the call (WASAPI loopback); soundcard has its own hook
     hidden += ["glassprompter.platform.windows"]
 
 # vosk loads its engine with dlopen("libvosk.dyld") on macOS (.dll / .so elsewhere). PyInstaller's

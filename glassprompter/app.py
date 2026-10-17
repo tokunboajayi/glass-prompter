@@ -13,7 +13,7 @@ from PySide6.QtGui import QAction, QDesktopServices, QGuiApplication
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
-from . import APP_ID, APP_NAME, ORG, __version__, config, engine, paths, scripts
+from . import APP_ID, APP_NAME, ORG, __version__, config, engine, meeting, paths, scripts
 from . import log as logsetup
 from . import platform as native
 from .server import RemoteServer
@@ -29,7 +29,8 @@ log = logging.getLogger("glassprompter")
 HOTKEYS = {1: ("SPACE", "play"), 2: ("UP", "faster"), 3: ("DOWN", "slower"), 4: ("LEFT", "back"),
            5: ("RIGHT", "ahead"), 6: ("R", "restart"), 7: ("H", "toggle"), 8: ("E", "library"),
            9: ("V", "voice"), 10: ("G", "ghost"), 11: ("PGUP", "prev_section"), 12: ("PGDN", "next_section"),
-           13: ("LBRACKET", "ghost_less"), 14: ("RBRACKET", "ghost_more")}
+           13: ("LBRACKET", "ghost_less"), 14: ("RBRACKET", "ghost_more"), 15: ("ENTER", "assist"),
+           16: ("M", "meeting")}
 assert all(k in native.HOTKEY_KEYS for k, _ in HOTKEYS.values())
 DROP_EXT = (".txt", ".md", ".docx")
 WELCOME_SCRIPT = """Welcome to Glass Prompter.
@@ -227,6 +228,9 @@ class Controller(QObject):
         self.server = None
         self.dialog = None
         self.assistant = None
+        self.copilot = None
+        self.meetings_window = None
+        self.meetings = meeting.MeetingStore()
         self.drop_mtimes = {}
         self.network_note = ""
 
@@ -235,6 +239,7 @@ class Controller(QObject):
         self.prompter.requestLibrary.connect(self.open_library)
         self.prompter.requestPhone.connect(self.open_phone)
         self.prompter.requestAI.connect(self.open_ai)
+        self.prompter.requestCopilot.connect(self.open_copilot)
         self.prompter.requestScreenshot.connect(self.take_screenshot)
         self.prompter.requestSettings.connect(self.open_settings)
         self.prompter.settingsChanged.connect(self.settings_changed)
@@ -735,6 +740,12 @@ class Controller(QObject):
     def on_hotkey(self, hid):
         action = HOTKEYS.get(hid, (None, None))[1]
         p = self.prompter
+        if action == "assist":                              # Cluely-style: help me right now, from any app
+            self.open_copilot(focus=False)
+            return self.copilot.run_action("assist")
+        if action == "meeting":
+            self.open_copilot(focus=False)
+            return self.copilot.toggle_meeting()
         if action == "toggle":
             return p.toggle_window()
         if action == "library":
@@ -790,6 +801,27 @@ class Controller(QObject):
         self.assistant.activateWindow()
         self.assistant.text.setFocus()
 
+    def open_copilot(self, focus=True):
+        """The meeting copilot: live transcript, Assist and quick actions, notes when the meeting ends."""
+        if self.copilot is None:
+            from .ui.copilot import make_copilot
+            self.copilot = make_copilot(self)
+            self.copilot.show()
+        self.copilot.raise_()
+        if focus:
+            self.copilot.activateWindow()
+        return self.copilot
+
+    def open_meetings(self):
+        if self.meetings_window is None:
+            from .ui.copilot import make_meetings
+            self.meetings_window = make_meetings(self)
+            self.meetings_window.show()
+        else:
+            self.meetings_window.refresh()
+        self.meetings_window.raise_()
+        self.meetings_window.activateWindow()
+
     def take_screenshot(self):
         try:
             path = save_screenshot(self.prompter)
@@ -828,6 +860,8 @@ class Controller(QObject):
         m.addSeparator()
         m.addAction(QAction("Scripts" + theme.ELLIPSIS, m, triggered=self.open_library))
         m.addAction(QAction("Phone remote" + theme.ELLIPSIS, m, triggered=self.open_phone))
+        m.addAction(QAction("Meeting copilot" + theme.ELLIPSIS, m, triggered=self.open_copilot))
+        m.addAction(QAction("Meeting history" + theme.ELLIPSIS, m, triggered=self.open_meetings))
         m.addAction(QAction("Settings" + theme.ELLIPSIS, m, triggered=self.open_settings))
         m.addSeparator()
         self.act_voice = QAction("Voice Follow (scroll as I speak)", m, checkable=True,
@@ -896,11 +930,14 @@ class Controller(QObject):
     def quit(self):
         log.info("Quitting")
         self.voice.stop()
+        if self.copilot is not None:
+            self.copilot.done(0)                          # ends a running meeting so its transcript is saved
         self.speaker.stop()
         self.unregister_hotkeys()
         self.stop_server()
         self.cfg.save()
         self.store.close()
+        self.meetings.close()
         self.tray.hide()
         self.app.quit()
 

@@ -41,6 +41,16 @@ class Settings:
     ai_model: str = ""                                 # "" = the provider's best current model
     ai_base_url: str = ""                              # for Ollama / any OpenAI-compatible server
     ai_max_tokens: int = 16000                         # longest answer; you only pay for what's used
+    # meeting copilot (live transcript + AI suggestions). Transcripts and notes live in meetings.db.
+    copilot_mode: str = "meeting"                      # see meeting.MODES, or "custom:<name>"
+    copilot_modes: list = field(default_factory=list)  # custom modes: [{"name": ..., "prompt": ...}]
+    copilot_notes: str = ""                            # the user's own context (who they are, what they offer)
+    copilot_files: list = field(default_factory=list)  # knowledge files (.txt/.md/.docx) the AI may use
+    copilot_system_audio: bool = True                  # also transcribe the computer's sound (the other side)
+    copilot_smart: bool = True                         # suggest an answer when someone asks you a question
+    copilot_screen: bool = True                        # actions may include a screenshot
+    copilot_model: str = ""                            # speech model folder name; "" = the bundled English one
+    copilot_consent_seen: bool = False
     remote_enabled: bool = True
     remote_port: int = 8765
     pin: str = ""

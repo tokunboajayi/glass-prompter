@@ -381,8 +381,10 @@ def _clean(messages):
     return out
 
 
-def _system(script_title, script_text):
+def _system(script_title, script_text, context=""):
     s = SYSTEM
+    if (context or "").strip():
+        s += "\n\n" + context.strip()
     if (script_text or "").strip():
         s += ("\n\nFor context only (use it when the question is about their script), the script currently on "
               "the prompter (%s):\n<script>\n%s\n</script>") % (script_title or "untitled",
@@ -394,7 +396,7 @@ SCREEN_NOTE = "(Screenshot of my computer screen right now.)\n\n"
 
 
 def build_request(messages, model, screen_jpeg=None, script_title="", script_text="", web=True,
-                  max_tokens=DEFAULT_MAX_TOKENS):
+                  max_tokens=DEFAULT_MAX_TOKENS, context=""):
     """Anthropic Messages API body (kept as a public helper; tests use it)."""
     msgs = _clean(messages)
     if screen_jpeg:
@@ -407,7 +409,7 @@ def build_request(messages, model, screen_jpeg=None, script_title="", script_tex
     body = {"model": model or "claude-sonnet-5-5", "max_tokens": int(max_tokens),
             # prompt caching: the system prompt + script is reused across a conversation, so later questions are
             # cheaper and faster
-            "system": [{"type": "text", "text": _system(script_title, script_text),
+            "system": [{"type": "text", "text": _system(script_title, script_text, context),
                         "cache_control": {"type": "ephemeral"}}],
             "messages": msgs}
     if web:
@@ -415,8 +417,8 @@ def build_request(messages, model, screen_jpeg=None, script_title="", script_tex
     return body
 
 
-def _openai_body(pid, model, messages, screen_jpeg, script_title, script_text, max_tokens):
-    msgs = [{"role": "system", "content": _system(script_title, script_text)}] + _clean(messages)
+def _openai_body(pid, model, messages, screen_jpeg, script_title, script_text, max_tokens, context=""):
+    msgs = [{"role": "system", "content": _system(script_title, script_text, context)}] + _clean(messages)
     if screen_jpeg:
         last = msgs[-1]
         last["content"] = [
@@ -430,7 +432,7 @@ def _openai_body(pid, model, messages, screen_jpeg, script_title, script_text, m
     return body
 
 
-def _gemini_body(messages, screen_jpeg, script_title, script_text, max_tokens, web):
+def _gemini_body(messages, screen_jpeg, script_title, script_text, max_tokens, web, context=""):
     contents = []
     for m in _clean(messages):
         contents.append({"role": "user" if m["role"] == "user" else "model", "parts": [{"text": m["content"]}]})
@@ -438,7 +440,8 @@ def _gemini_body(messages, screen_jpeg, script_title, script_text, max_tokens, w
         contents[-1]["parts"] = [{"inline_data": {"mime_type": "image/jpeg",
                                                   "data": base64.b64encode(screen_jpeg).decode("ascii")}},
                                  {"text": SCREEN_NOTE + contents[-1]["parts"][0]["text"]}]
-    body = {"systemInstruction": {"parts": [{"text": _system(script_title, script_text)}]}, "contents": contents}
+    body = {"systemInstruction": {"parts": [{"text": _system(script_title, script_text, context)}]},
+            "contents": contents}
     if max_tokens:
         body["generationConfig"] = {"maxOutputTokens": int(max_tokens)}
     if web:
@@ -461,8 +464,9 @@ def _friendly(pid, p, key, e, detail):
 
 
 def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_text="", timeout=TIMEOUT, web=True,
-         provider=AUTO, base_url="", max_tokens=DEFAULT_MAX_TOKENS):
-    """Ask the AI. Returns the answer text. Raises AIError with a message a person can act on."""
+         provider=AUTO, base_url="", max_tokens=DEFAULT_MAX_TOKENS, context=""):
+    """Ask the AI. Returns the answer text. Raises AIError with a message a person can act on.
+    `context` is extra system-prompt text (the meeting copilot's mode, knowledge and live transcript)."""
     key = clean_key(key)
     pid, p, base = resolve(provider, key, base_url)
     if not key and not p.get("nokey"):
@@ -477,7 +481,7 @@ def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_te
     for _attempt in range(5):                     # adapt to what this provider/model accepts, then give up
         try:
             if p["kind"] == "anthropic":
-                body = build_request(messages, model, image, script_title, script_text, use_web, tokens)
+                body = build_request(messages, model, image, script_title, script_text, use_web, tokens, context)
                 data = _http(base + "/messages", body, hdr, timeout)
                 content = list(data.get("content", []))
                 for _ in range(2):                # long web searches can pause; let Claude continue its turn
@@ -488,7 +492,7 @@ def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_te
                     content += data.get("content", [])
                 text = "".join(b.get("text", "") for b in content if b.get("type") == "text")
             elif p["kind"] == "gemini":
-                body = _gemini_body(messages, image, script_title, script_text, tokens, use_web)
+                body = _gemini_body(messages, image, script_title, script_text, tokens, use_web, context)
                 url = "%s/models/%s:generateContent" % (base, urllib.parse.quote(model, safe="-._"))
                 data = _http(url, body, hdr, timeout)
                 cand = (data.get("candidates") or [{}])[0]
@@ -496,7 +500,7 @@ def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_te
                 if not text and cand.get("finishReason") == "SAFETY":
                     raise AIError("Gemini declined to answer that (safety filter).")
             else:
-                body = _openai_body(pid, model, messages, image, script_title, script_text, tokens)
+                body = _openai_body(pid, model, messages, image, script_title, script_text, tokens, context)
                 data = _http(base + "/chat/completions", body, hdr, timeout)
                 msg = (data.get("choices") or [{}])[0].get("message", {})
                 text = msg.get("content") or ""

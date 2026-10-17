@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+**Meeting copilot**: live help during calls, still invisible on screen share.
+
+- **Live transcript of both sides.** Your microphone is labelled *You* and the computer's sound (Zoom, Teams, Meet,
+  Webex, Slack...) is *Them*. Speech is recognized offline; audio never leaves the computer. On a Mac only your
+  microphone is heard unless you use a loopback device such as BlackHole.
+- **Assist from any app:** Ctrl+Alt+Enter (Control+Option+Return on a Mac) reads the conversation and your screen and
+  tells you what to say. Ctrl+Alt+M starts and ends a meeting. K on the prompter opens the copilot.
+- **Quick actions:** What should I say?, Follow-up questions, Recap, Fact-check (with web search) and Explain, plus a
+  box to ask anything about the meeting or your screen.
+- **Smart answers:** when someone asks you a question, a suggested answer appears on its own.
+- **Modes and context:** General meeting, Sales call, Presentation & Q&A, Customer support, Negotiation, Lecture, or
+  your own custom modes. Add your notes and knowledge files (.txt, .md, .docx) and the AI treats them as the truth.
+- **Meeting notes when you end the call:** title, summary, key points, decisions, action items, open questions and a
+  ready-to-send follow-up email.
+- **Meeting history:** search past meetings, copy notes or the email, export to Markdown, send to the prompter, or
+  rewrite the notes.
+- **Any language Vosk supports:** drop another speech model into the data folder's `models` folder and pick it in
+  the copilot's Context window.
+
 ## 2.6.2 - 2026-10-08
 Public beta: easier to give feedback, clearer setup.
 

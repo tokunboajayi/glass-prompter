@@ -4,7 +4,7 @@ A see-through teleprompter that sits right under your webcam, follows your voice
 
 | Your computer | File | Or run |
 |---|---|---|
-| Windows 10 (2004+) / 11, 64-bit | `GlassPrompter-Setup-<version>.exe` | `winget install TokunboAjayi.GlassPrompter` |
+| Windows 10 (2004+) / 11, 64-bit | `GlassPrompter-Setup-<version>.exe` | `winget install TokunboAjayi.GlassPrompter` (in review at Microsoft; use the installer until it's approved) |
 | Mac with Apple silicon (M1 to M4), macOS 13+ | `GlassPrompter-<version>-macOS-arm64.dmg` | `brew install --cask tokunboajayi/tap/glass-prompter` |
 | Intel Mac, macOS 13+ | `GlassPrompter-<version>-macOS-x86_64.dmg` | same Homebrew command |
 

@@ -29,6 +29,7 @@ Free and open source (MIT) for Windows and Mac. **Public beta:** feedback is ver
 2. [First five minutes](#first-five-minutes)
 3. [Keyboard shortcuts](#keyboard-shortcuts)
 4. [Phone remote, screen view and AI assistant](#phone-remote)
+5. [Meeting copilot](#meeting-copilot)
 5. [Updates, uninstall and your data](#updates-uninstall-and-your-data)
 6. [Troubleshooting](#troubleshooting)
 7. [For developers](#for-developers)
@@ -129,6 +130,8 @@ Press <kbd>F1</kbd> in the app to see these at any time.
 | <kbd>H</kbd> | Show / hide the prompter |
 | <kbd>G</kbd> | Ghost mode: see-through and click-through |
 | <kbd>[</kbd> / <kbd>]</kbd> | Ghost more see-through / more solid |
+| <kbd>Enter</kbd> | **Assist:** the meeting copilot tells you what to say right now |
+| <kbd>M</kbd> | Start / end a meeting (live transcript, notes at the end) |
 
 **While the prompter is focused:**
 
@@ -142,6 +145,7 @@ Press <kbd>F1</kbd> in the app to see these at any time.
 | <kbd>C</kbd> | Screen-share privacy on/off (press twice within 3 s to let viewers see it) |
 | <kbd>M</kbd> | Mirror text (for beam-splitter glass) |
 | <kbd>A</kbd> | AI assistant (chat that can see your screen) |
+| <kbd>K</kbd> | Meeting copilot |
 | <kbd>S</kbd> | Screenshot to Pictures › Glass Prompter (also copied) |
 | <kbd>Esc</kbd> | Close sheets and dialogs |
 
@@ -179,6 +183,30 @@ It works over your Wi-Fi only and never goes through the internet. On Windows, c
   Your provider bills you per question, usually a few cents or less. The key stays on your computer and is never sent to the phone. Messages go from your computer straight to the provider you chose, and only when you press Send.
 
   On a Mac, allow Glass Prompter under **System Settings &rsaquo; Privacy & Security &rsaquo; Screen & System Audio Recording** so it can see your screen.
+
+---
+
+## Meeting copilot
+
+Live help during calls, in a window nobody else can see on screen share. Open it with <kbd>K</kbd> on the prompter,
+**&#8943; &rsaquo; Meeting copilot**, or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> from any app.
+
+1. Press **Start meeting**. Your microphone is transcribed as *You* and the computer's sound (Zoom, Teams, Meet...)
+   as *Them*. Recognition runs offline on your computer.
+2. Whenever you need help, press **Assist** or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Enter</kbd> from any app. The AI
+   reads the conversation (and your screen, if you allow it) and tells you what to say.
+3. Or use a quick action: **What should I say?**, **Follow-up questions**, **Recap**, **Fact-check**, **Explain**.
+   With **Smart answers** on, a suggestion appears by itself when someone asks you a question.
+4. Press **End meeting**. You get a summary, decisions, action items and a follow-up email, saved in
+   **Meeting history** (search, export to Markdown, copy the email).
+
+**Context:** pick a mode (sales call, presentation Q&A, support, negotiation, lecture, or your own) and add your notes
+and files: product sheets, prices, agendas. The AI treats them as the truth and won't make up facts beyond them.
+
+It uses the same AI key as the assistant. The AI only sees the transcript when you press an action or Smart answers
+spots a question. Let people know you're taking notes: some places require everyone's consent to record or
+transcribe a call. On a Mac only your microphone is heard, unless you route the call through a loopback device
+such as BlackHole.
 
 ---
 

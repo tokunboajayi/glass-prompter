@@ -4,9 +4,9 @@ import sys
 
 # Global shortcut keys (same letters on every OS; the modifier differs: Ctrl+Alt / Control+Option).
 HOTKEY_KEYS = ("SPACE", "UP", "DOWN", "LEFT", "RIGHT", "R", "H", "E", "V", "G", "PGUP", "PGDN",
-               "LBRACKET", "RBRACKET")
+               "LBRACKET", "RBRACKET", "ENTER", "M")
 KEY_NAMES = {"SPACE": "Space", "UP": "Up", "DOWN": "Down", "LEFT": "Left", "RIGHT": "Right",
-             "PGUP": "PgUp", "PGDN": "PgDn", "LBRACKET": "[", "RBRACKET": "]"}
+             "PGUP": "PgUp", "PGDN": "PgDn", "LBRACKET": "[", "RBRACKET": "]", "ENTER": "Enter"}
 
 
 def hotkey_label(mod, key):
