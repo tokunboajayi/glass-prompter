@@ -6,7 +6,7 @@
 
 **A see-through teleprompter that sits right under your webcam.**
 It follows your voice word by word, reads your script aloud, and stays off the screen share.
-**New in 2.6:** an AI assistant that works with any AI provider (Claude, ChatGPT, Gemini, Grok and more), can see your screen and answer anything, plus your screen live on your phone.
+**New in 2.7:** a meeting copilot that transcribes both sides of a call, tells you what to say (Ctrl+Alt+Enter from any app) and writes your notes and follow-up email, all invisible on screen share. Plus the 2.6 AI assistant that works with any AI provider and can see your screen.
 Free and open source (MIT) for Windows and Mac. **Public beta:** feedback is very welcome.
 
 ### [Download from the website &rarr;](https://tokunboajayi.github.io/glass-prompter/)

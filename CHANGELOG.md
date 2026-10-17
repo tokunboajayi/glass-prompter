@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.7.0 - 2026-10-16
 **Meeting copilot**: live help during calls, still invisible on screen share.
 
 - **Live transcript of both sides.** Your microphone is labelled *You* and the computer's sound (Zoom, Teams, Meet,
