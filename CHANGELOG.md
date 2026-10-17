@@ -1,5 +1,41 @@
 # Changelog
 
+## 2.7.2 - 2026-10-16
+**A cleaner, deeper look with the meeting copilot built in.** Same Aurora Glass style, checked window by window.
+
+- **No crash when quitting.** After saving everything, the app now exits straight away instead of letting Python
+  tear down its windows in an unpredictable order, which could crash right after a clean quit.
+
+- **The AI assistant can listen to meetings.** Turn on *Listen to meeting* in the assistant and it transcribes your
+  microphone and the call's sound offline. With *Auto-suggest* on, it offers an answer when someone asks you a
+  question, and questions you could ask after the others have talked for a while. Anything you type also sees the
+  conversation. If the meeting copilot is already running a meeting, the assistant follows that one instead of
+  opening the microphone twice, and carries on by itself when the copilot's meeting ends.
+- **Copilot on your phone.** The phone remote's AI tab has a Meeting copilot card: start or end the meeting, tap
+  Assist, read the latest answer and send it to the prompter. A *Meeting live* chip shows on the status card.
+  The phone gets live state and answers only, never the transcript.
+- **The prompter shows a Meeting badge** in its status bar while the copilot is listening.
+- **Welcome** has a fourth step for the meeting copilot, and About and Phone remote mention the new AI features.
+- **Phone app:** the aurora Assist button, toggle switches, deeper cards and inset fields, like the desktop.
+- **Website:** a Meeting copilot section with a real screenshot, a feature card, a comparison row, the new
+  shortcuts and an FAQ about recording.
+- **Copilot one click away:** a new copilot button on the toolbar lights up while a meeting is live. The menu has an
+  *AI* group with Meeting copilot, Meeting history and AI assistant.
+- **Copilot window redesigned:** a Live pill with the timer, the transcript and answers on lit glass cards, a large
+  Assist button, five quick-action chips, and toggle switches instead of plain checkboxes. Buttons pause while
+  the AI is thinking.
+- **Notes are never lost:** closing the copilot while the AI is still writing notes no longer drops them.
+- **Meeting history** shows formatted notes (headings, bullets, the follow-up email with its line breaks) with the
+  date, length, word count and mode.
+- **Settings:** a new *Meeting copilot* section. Columns are rebalanced, and the window scrolls on short laptop
+  screens instead of clipping text. The model box no longer cuts off its first letter, and the list of conflicting
+  shortcuts is now a single line.
+- **Copilot context** uses the same cards as Settings and scrolls on short screens instead of overlapping.
+- **Keyboard shortcuts sheet:** three columns (Anywhere, On the prompter, Tools), so rows no longer overflow.
+- **Depth:** cards are lit from above, fields sit slightly inset, and Assist uses the aqua-to-violet aurora.
+- Fixed: the copilot's live status showed "25cf" instead of a dot, and the screenshot icon in the menu could draw
+  faintly.
+
 ## 2.7.1 - 2026-10-16
 - **Quit button.** The prompter toolbar has an &times; button and the &#8943; menu has *Quit Glass Prompter*
   (Ctrl+Q, or Cmd+Q on a Mac), so you can close the app without the tray or menu bar. Ctrl+Alt+H still just hides it.

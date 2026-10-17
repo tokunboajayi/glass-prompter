@@ -51,6 +51,7 @@ class Settings:
     copilot_screen: bool = True                        # actions may include a screenshot
     copilot_model: str = ""                            # speech model folder name; "" = the bundled English one
     copilot_consent_seen: bool = False
+    assistant_suggest: bool = True                     # AI assistant: suggest answers/questions while it listens
     remote_enabled: bool = True
     remote_port: int = 8765
     pin: str = ""

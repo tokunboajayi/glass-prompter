@@ -44,6 +44,17 @@ def draw(p, name, r, color):
         p.drawArc(QRectF(4.6, 5.6, 10.8, 9.4), 200 * 16, 140 * 16)
         p.drawLine(QPointF(10, 15), QPointF(10, 17.4))
         p.drawLine(QPointF(7.4, 17.4), QPointF(12.6, 17.4))
+    elif name == "wave":                                    # meeting copilot: a live conversation
+        _pen(p, c)
+        for x, half in ((4, 2.2), (7, 4.6), (10, 6.6), (13, 4.6), (16, 2.2)):
+            p.drawLine(QPointF(x, 10 - half), QPointF(x, 10 + half))
+    elif name == "history":                                 # meeting history: clock with a rewind arrow
+        _pen(p, c)
+        p.drawArc(QRectF(3.5, 3.5, 13, 13), 120 * 16, 300 * 16)
+        p.drawLine(QPointF(3.4, 5.6), QPointF(4.4, 8.4))
+        p.drawLine(QPointF(4.4, 8.4), QPointF(7.2, 7.6))
+        p.drawLine(QPointF(10, 6.6), QPointF(10, 10.2))
+        p.drawLine(QPointF(10, 10.2), QPointF(12.4, 11.8))
     elif name == "speaker":
         _pen(p, c)
         body = QPainterPath()
@@ -164,6 +175,7 @@ def draw(p, name, r, color):
         p.drawEllipse(QPointF(10, 10), 2.4, 2.4)
         p.drawLine(QPointF(4, 16), QPointF(16, 4))
     elif name == "camera":
+        _pen(p, c)
         body = QPainterPath()
         body.addRoundedRect(QRectF(2.5, 6, 15, 10.5), 2.4, 2.4)
         p.drawPath(body)

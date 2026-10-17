@@ -240,6 +240,7 @@ class Controller(QObject):
         self.prompter.requestPhone.connect(self.open_phone)
         self.prompter.requestAI.connect(self.open_ai)
         self.prompter.requestCopilot.connect(self.open_copilot)
+        self.prompter.requestMeetings.connect(self.open_meetings)
         self.prompter.requestScreenshot.connect(self.take_screenshot)
         self.prompter.requestSettings.connect(self.open_settings)
         self.prompter.requestQuit.connect(self.quit)
@@ -543,7 +544,9 @@ class Controller(QObject):
 
     def publish(self):
         if self.server and self.server.running:
-            self.server.publish_state(self.prompter.snapshot())
+            state = self.prompter.snapshot()
+            state["copilot"] = self.copilot.snapshot() if self.copilot is not None else {"live": False}
+            self.server.publish_state(state)
         self.update_tray()
 
     def periodic(self):
@@ -556,7 +559,7 @@ class Controller(QObject):
             self.prompter.remote_connected = connected
             self.prompter.update()
         p = self.prompter
-        if p.playing or p.reading_aloud or p.listening:          # keep the phone's live view moving
+        if p.playing or p.reading_aloud or p.listening or p.copilot_live:   # keep the phone's live view moving
             self.publish()
 
     # ------------------------------------------------------------ scripts
@@ -715,7 +718,9 @@ class Controller(QObject):
          "hide": p.toggle_window, "voice": p.toggle_voice, "ghost": p.toggle_ghost,
          "ghost_less": lambda: p.change_ghost_opacity(-0.1), "ghost_more": lambda: p.change_ghost_opacity(0.1),
          "read_aloud": p.toggle_read_aloud,
-         "next_section": lambda: p.jump_section(1), "prev_section": lambda: p.jump_section(-1)}[action]()
+         "next_section": lambda: p.jump_section(1), "prev_section": lambda: p.jump_section(-1),
+         "meeting": lambda: self.open_copilot(focus=False).toggle_meeting(),
+         "assist": lambda: self.open_copilot(focus=False).run_action("assist")}[action]()
         self.schedule_publish()
 
     # ------------------------------------------------------------ hotkeys
@@ -734,6 +739,17 @@ class Controller(QObject):
                     "react too." % (", ".join(failed), "is" if len(failed) == 1 else "are"))
         return "%s couldn't be registered (another app owns %s)." % (", ".join(failed),
                                                                     "it" if len(failed) == 1 else "them")
+
+    def hotkey_summary(self):
+        """One short line for Settings; hotkey_report() has the details (shown as its tooltip)."""
+        n, failed = len(HOTKEYS), len(self.hotkeys.failed())
+        if not failed:
+            return "All %d %s shortcuts work from any app." % (n, native.MOD)
+        if failed == n and native.OS != "windows":
+            return "Not available on this system; keys still work on the prompter."
+        if native.OS == "windows":
+            return "%d of %d shared with another app; they still work." % (failed, n)
+        return "%d of %d are taken by another app." % (failed, n)
 
     def unregister_hotkeys(self):
         self.hotkeys.unregister_all()
@@ -808,6 +824,8 @@ class Controller(QObject):
             from .ui.copilot import make_copilot
             self.copilot = make_copilot(self)
             self.copilot.show()
+        else:
+            self.copilot.sync_settings()
         self.copilot.raise_()
         if focus:
             self.copilot.activateWindow()
@@ -1040,4 +1058,11 @@ def main(argv=None):
         ctl.show_from_other_instance(bytes(conn.readAll()).decode("utf-8", "ignore"))
         conn.disconnectFromServer()
     instance.newConnection.connect(incoming)
-    return app.exec()
+    code = app.exec()
+    # Controller.quit() has saved settings, closed the databases and stopped every thread by now. Skip Python's
+    # interpreter teardown: PySide can destroy the remaining Qt objects in an unsafe order there and crash after a
+    # clean quit (seen in CI as a silent exit 1 on Windows and a glibc abort on Linux).
+    logging.shutdown()
+    sys.stdout and sys.stdout.flush()
+    sys.stderr and sys.stderr.flush()
+    os._exit(code)

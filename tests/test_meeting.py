@@ -97,9 +97,24 @@ def test_meeting_store_round_trip_search_and_markdown(tmp_path):
     assert m["title"] == "Security review" and m["words"] == 3 and m["segments"][0]["who"] == "them"
     assert [x["id"] for x in st.list("security")] == [mid] and st.list("nothing-like-this") == []
     md = meeting.to_markdown(m)
-    assert md.startswith("# Security review") and "**Them** [0:05]: what about security" in md
+    assert md.startswith("# Security review") and "**Them** · 0:05  \nwhat about security" in md
+    assert "### Summary\n\nTalked security." in md
     st.delete(mid)
     assert st.get(mid) is None
+    st.close()
+
+
+def test_notes_are_saved_with_title_and_email_from_any_thread(tmp_path):
+    import threading
+    st = meeting.MeetingStore(str(tmp_path / "m.db"))
+    mid = st.create(1_700_000_000.0, "sales")
+    reply = "TITLE\n**Acme pilot kickoff**\nSUMMARY\nAgreed a pilot.\nFOLLOW-UP EMAIL\nSubject: Next steps\nHi Jo,"
+    t = threading.Thread(target=meeting.save_notes, args=(st, mid, reply))
+    t.start()
+    t.join()
+    m = st.get(mid)
+    assert m["title"] == "Acme pilot kickoff" and m["email"].startswith("Subject: Next steps")
+    assert meeting.notes_markdown(m["notes"]).startswith("### Summary")
     st.close()
 
 
@@ -120,3 +135,24 @@ def test_copilot_hotkeys_are_registered_everywhere():
     actions = {a for _, a in app.HOTKEYS.values()}
     assert {"assist", "meeting"} <= actions
     assert "ENTER" in native.HOTKEY_KEYS and "M" in native.HOTKEY_KEYS
+
+
+def test_suggestions_fire_on_their_questions_and_after_a_long_stretch():
+    t = meeting.SuggestionTrigger(answer_gap=8, followup_gap=45, followup_words=20)
+    assert t.on_segment(meeting.ME, "what do you think about pricing", 0) is None      # my own words never trigger
+    assert t.on_segment(meeting.THEM, "what does pricing look like for us", 1) == (
+        "answer", "what does pricing look like for us")
+    assert t.on_segment(meeting.THEM, "and how long is onboarding", 3) is None          # too soon after the last one
+    talk = "we have been growing quickly and the team now spans three offices"         # 12 words, no question
+    assert t.on_segment(meeting.THEM, talk, 20) is None
+    assert t.on_segment(meeting.THEM, talk, 30) is None                                 # 24 words but only 29 s
+    assert t.on_segment(meeting.THEM, talk, 60) == ("followups", "")
+    assert t.on_segment(meeting.THEM, "so can you send the contract", 70) == ("answer", "so can you send the contract")
+
+
+def test_listen_context_carries_the_transcript_only_when_there_is_one():
+    assert meeting.listen_context(None) == "" and meeting.listen_context(meeting.Transcript()) == ""
+    tr = meeting.Transcript(started=0.0)
+    tr.add(meeting.THEM, "how much is the pro plan", at=2.0)
+    ctx = meeting.listen_context(tr)
+    assert "Them: how much is the pro plan" in ctx and "<transcript>" in ctx

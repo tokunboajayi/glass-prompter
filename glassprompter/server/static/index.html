@@ -30,6 +30,7 @@
     <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.6 7.6 0 0 1 0 11"/></symbol>
     <symbol id="i-prev" viewBox="0 0 24 24"><path d="M6 5v14M18 6l-8 6 8 6z"/></symbol>
     <symbol id="i-next" viewBox="0 0 24 24"><path d="M18 5v14M6 6l8 6-8 6z"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M5 10v4M8.5 7v10M12 4v16M15.5 7v10M19 10v4"/></symbol>
   </defs>
 </svg>
 <main>
@@ -57,6 +58,7 @@
       <div id="scriptTitle" class="script-title"></div>
       <div class="bar"><div id="prog"></div></div>
       <div id="queued" class="note" hidden>New script waiting. Pause to load it.</div>
+      <button id="meetingChip" class="chip-live" type="button" hidden><i></i><span>Meeting live</span></button>
     </section>
 
     <nav class="tabs" role="tablist">
@@ -111,6 +113,22 @@
     </section>
 
     <section id="tab-ai" role="tabpanel" hidden>
+      <div class="card copilot" aria-live="polite">
+        <div class="row-between">
+          <b>Meeting copilot</b>
+          <span id="cpPill" class="pill"><i></i><span>Not running</span></span>
+        </div>
+        <p id="cpHint" class="hint">Transcribes the call on your computer and tells you what to say.</p>
+        <div class="row-2 cp-actions">
+          <button id="cpMeeting" class="btn" data-action="meeting"><svg class="ic" aria-hidden="true"><use href="#i-wave"/></svg><small id="cpMeetingText">Start meeting</small></button>
+          <button id="cpAssist" class="btn accent" data-action="assist"><span id="cpAssistText">Assist</span><small>What should I say?</small></button>
+        </div>
+        <div id="cpAnswer" class="cp-answer" hidden>
+          <span id="cpBadge" class="badge"></span>
+          <p id="cpText"></p>
+          <button id="cpSend" class="link" type="button">Send to prompter</button>
+        </div>
+      </div>
       <div class="row-between">
         <span id="aiInfo" class="muted">Ask anything. It can see your screen and search the web.</span>
         <button id="aiClear" class="link" type="button">Clear</button>
@@ -122,7 +140,7 @@
       <form id="aiForm" class="composer" autocomplete="off">
         <textarea id="aiText" class="field" rows="2" maxlength="4000" placeholder="Ask anything..." aria-label="Message"></textarea>
         <div class="row-between">
-          <label class="check"><input id="aiScreen" type="checkbox" checked> Include my screen</label>
+          <label class="check"><input id="aiScreen" type="checkbox" role="switch" checked> Include my screen</label>
           <button id="aiSend" class="btn primary" type="submit">Send</button>
         </div>
       </form>

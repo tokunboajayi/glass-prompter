@@ -69,6 +69,7 @@ class ControlBar(QFrame):
         btn("plus", "Faster", "Up", lambda: owner.change_wpm(+10))
         sep()
         btn("library", "Scripts", "E", owner.requestLibrary.emit)
+        self.copilot = btn("wave", "Meeting copilot", "K", owner.requestCopilot.emit, "copilot")
         self.more = btn("more", "More", "", self.open_menu, "more")
         self.quit = btn("close", "Quit Glass Prompter", C + "+Q", owner.requestQuit.emit, "quit")
         cfg = owner.cfg
@@ -88,10 +89,14 @@ class ControlBar(QFrame):
              "value": lambda: "%d%%" % round(cfg.ghost_opacity * 100),
              "dec": lambda: owner.change_ghost_opacity(-0.05), "inc": lambda: owner.change_ghost_opacity(+0.05)},
             {"kind": "sep"},
+            {"kind": "header", "text": "AI"},
+            {"kind": "action", "icon": "wave", "text": "Meeting copilot" + ELLIPSIS, "keys": "K",
+             "fn": owner.requestCopilot.emit},
+            {"kind": "action", "icon": "history", "text": "Meeting history" + ELLIPSIS,
+             "fn": owner.requestMeetings.emit},
             {"kind": "action", "icon": "spark", "text": "AI assistant" + ELLIPSIS, "keys": "A",
              "fn": owner.requestAI.emit},
-            {"kind": "action", "icon": "mic", "text": "Meeting copilot" + ELLIPSIS, "keys": "K",
-             "fn": owner.requestCopilot.emit},
+            {"kind": "sep"},
             {"kind": "action", "icon": "camera", "text": "Take screenshot", "keys": "S",
              "fn": owner.requestScreenshot.emit},
             {"kind": "action", "icon": "phone", "text": "Phone remote" + ELLIPSIS, "keys": "P",
@@ -164,6 +169,7 @@ class Prompter(QWidget):
     requestPhone = Signal()
     requestAI = Signal()
     requestCopilot = Signal()
+    requestMeetings = Signal()
     requestScreenshot = Signal()
     requestSettings = Signal()
     requestQuit = Signal()
@@ -209,6 +215,7 @@ class Prompter(QWidget):
         self.show_help = False
         self.hovered = False
         self.remote_connected = False
+        self.copilot_live = False                   # the meeting copilot is transcribing (badge + lit button)
         # Voice Follow
         self.listening = False
         self.voice_loading = False
@@ -689,6 +696,8 @@ class Prompter(QWidget):
             segs.append((T.violet, "Preparing voice" + ELLIPSIS if self.tts_preparing else "Reading aloud", on))
         if self.ghost:
             segs.append((None, "Ghost  " + native.MOD + "+G", mute))
+        if self.copilot_live:
+            segs.append((T.violet, "Meeting", on))
         if self.remote_connected:
             segs.append((T.aqua, "Phone", on))
         right = self.status_chip(p, 12, by, segs, clear)
@@ -787,18 +796,21 @@ class Prompter(QWidget):
 
     HELP = (
         ("Anywhere", True, [("Space", "Play / pause"), ("Up", "Faster"), ("Down", "Slower"), ("V", "Voice Follow"),
-                            ("H", "Show / hide"), ("G", "Ghost mode"), ("[", "More see-through"),
-                            ("]", "More solid"), ("Enter", "Assist (copilot)"), ("M", "Start / end meeting")]),
+                            ("H", "Show / hide"), ("G", "Ghost mode"), ("Enter", "Assist me now"),
+                            ("M", "Start / end meeting")]),
         ("On the prompter", False, [("Space", "Play / pause"), ("L", "Read aloud"), ("E", "Scripts"),
                                     ("+", "Bigger text"), ("PgDn", "Next section"), ("C", "Share privacy"),
-                                    ("M", "Mirror text"), ("A", "AI assistant"), ("K", "Meeting copilot"),
-                                    ("S", "Screenshot"), ("F1", "This sheet")]),
+                                    ("M", "Mirror text"), ("F1", "This sheet")]),
+        ("Tools", False, [("K", "Meeting copilot"), ("A", "AI assistant"), ("S", "Screenshot"),
+                          ("P", "Phone remote"), (native.CMD + "+,", "Settings"), (native.CMD + "+Q", "Quit")]),
     )
 
     def paint_help(self, p, w, h, panel):
-        """Shortcut sheet: two columns, label left / keys right, global modifier shown once per column."""
+        """Shortcut sheet: up to three columns, label left / keys right, global modifier shown once per column.
+        A narrow prompter drops the Tools column (its keys are also in the menu)."""
         p.fillPath(panel, QColor(T.surface))
-        pad, gap = 28.0, 40.0
+        pad, gap = 28.0, 36.0
+        cols = self.HELP if w >= 760 else self.HELP[:2]
         kf = font("ui", 11, QFont.Weight.DemiBold)
         hf = font("ui", 14, QFont.Weight.DemiBold)
         # header
@@ -813,12 +825,12 @@ class Prompter(QWidget):
         p.drawText(QRectF(esc_left - 106, 14, 100, 20),
                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight, "Close")
         top, foot = 48.0, 36.0
-        colw = (w - 2 * pad - gap) / 2
-        rows = max(len(r) for _, _, r in self.HELP)
+        colw = (w - 2 * pad - gap * (len(cols) - 1)) / len(cols)
+        rows = max(len(r) for _, _, r in cols)
         if h < 270:                                           # short prompter: drop the footer, keep every row
             foot = 0.0
-        rh = min(24.0, (h - top - 30 - foot - 10) / rows)
-        for ci, (title, glob, items) in enumerate(self.HELP):
+        rh = min(26.0, (h - top - 30 - foot - 10) / rows)
+        for ci, (title, glob, items) in enumerate(cols):
             x = pad + ci * (colw + gap)
             p.setFont(self.badge_font)
             p.setPen(T.muted)
@@ -1254,6 +1266,16 @@ class Prompter(QWidget):
     def toggle_help(self):
         self.show_help = not self.show_help
         self.sync_ui()
+
+    def set_copilot_live(self, live):
+        """Light the copilot button while a meeting is being transcribed, so you can see it at a glance."""
+        self.copilot_live = bool(live)
+        self.update()
+        b = self.bar.copilot
+        b.setProperty("on", bool(live))
+        b.setProperty("tip", "Meeting copilot " + DOT + " live" if live else "Meeting copilot")
+        b.style().unpolish(b)
+        b.style().polish(b)
 
     # ------------------------------------------------------------ mouse
     def edges_at(self, pt):

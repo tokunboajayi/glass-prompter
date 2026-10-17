@@ -288,6 +288,13 @@ class Audit:
         self.check("AI chat without a key explains what to do", st == 400 and
                    (d.get("error") or {}).get("code") == "ai_no_key", "HTTP %s" % st)
 
+        # 8b. meeting copilot from the phone: Assist without a key opens the copilot and explains, never crashes.
+        #     (Starting a meeting needs a microphone, so CI doesn't.)
+        st = self.control("assist")
+        cp = self.wait(lambda: self.state().get("copilot", {}).get("answer") and self.state()["copilot"], 10) or {}
+        self.check("phone Assist reaches the meeting copilot", st == 200 and cp.get("live") is False and
+                   cp.get("ready") is False and "key" in cp.get("answer", ""), "HTTP %s, %s" % (st, str(cp)[:120]))
+
         # 9. still healthy
         time.sleep(1)
         self.check("app still running (no crash)", len(self.alive()) == 1)

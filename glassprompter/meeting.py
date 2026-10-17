@@ -229,6 +229,45 @@ def action_message(action, question=""):
     return text
 
 
+def listen_context(transcript, limit=MAX_TRANSCRIPT_CHARS):
+    """Extra system text for the AI assistant's normal chat while it listens to a meeting."""
+    conv = transcript.render(limit=limit) if transcript is not None else ""
+    if not conv:
+        return ""
+    return ("The user is in a live conversation and this assistant is listening. Lines labelled 'Them' are the "
+            "other people (computer audio), 'You' is the user (microphone). The transcript comes from offline speech "
+            "recognition, so it has no punctuation and may mishear words. Use it when the question is about the "
+            "conversation.\n<transcript>\n%s\n</transcript>" % conv)
+
+
+class SuggestionTrigger:
+    """Decides when the assistant should offer help on its own while it listens.
+
+    * Someone else asks a question -> suggest an answer (at most every `answer_gap` seconds).
+    * The others have said `followup_words` words since the last suggestion, and `followup_gap` seconds have
+      passed -> suggest follow-up questions the user could ask.
+    Only lines from the other side count; the user's own speech never triggers anything.
+    """
+
+    def __init__(self, answer_gap=8.0, followup_gap=45.0, followup_words=60):
+        self.answer_gap, self.followup_gap, self.followup_words = answer_gap, followup_gap, followup_words
+        self.last = -1e9
+        self.heard = 0
+
+    def on_segment(self, who, text, now):
+        """-> ("answer", question) | ("followups", "") | None."""
+        if who != THEM:
+            return None
+        self.heard += len(str(text or "").split())
+        if is_question(text) and now - self.last >= self.answer_gap:
+            self.last, self.heard = now, 0
+            return ("answer", text)
+        if self.heard >= self.followup_words and now - self.last >= self.followup_gap:
+            self.last, self.heard = now, 0
+            return ("followups", "")
+        return None
+
+
 NOTES_PROMPT = (
     "The meeting has ended. Write the meeting notes from the transcript, using exactly these headings on their own "
     "lines:\n"
@@ -257,6 +296,32 @@ def parse_notes(text):
         elif cur:
             out[cur].append(line)
     return {k: "\n".join(v).strip() for k, v in out.items()}
+
+
+def notes_markdown(notes):
+    """The AI's notes with their plain headings (SUMMARY, ACTION ITEMS...) turned into Markdown headings."""
+    parsed = parse_notes(notes)
+    if not parsed:
+        return (notes or "").strip()
+    out = []
+    for h in NOTE_HEADINGS:
+        body = parsed.get(h, "").strip()
+        if h != "TITLE" and body:
+            body = "\n".join(line.rstrip() + "  " for line in body.splitlines())    # keep the email's line breaks
+            out += ["### " + h.capitalize(), "", body, ""]
+    return "\n".join(out).strip()
+
+
+def save_notes(store, mid, reply):
+    """Store the AI's notes (and the title and follow-up email it found) on meeting `mid`. Safe from any thread,
+    so notes are kept even if the window that asked for them has closed."""
+    parsed = parse_notes(reply)
+    fields = {"notes": reply, "email": parsed.get("FOLLOW-UP EMAIL", "")}
+    title = (parsed.get("TITLE") or "").strip().strip("\"'*# ")
+    if title:
+        fields["title"] = title.splitlines()[0][:80]
+    store.update(mid, **fields)
+    return fields
 
 
 # ------------------------------------------------------------------ history
@@ -333,10 +398,10 @@ def to_markdown(m):
     when = time.strftime("%A %d %B %Y, %H:%M", time.localtime(m["started"]))
     out = ["# %s" % (m.get("title") or default_title(m["started"])), "", "*%s*" % when, ""]
     if m.get("notes"):
-        out += [m["notes"].strip(), ""]
+        out += [notes_markdown(m["notes"]), ""]
     segs = m.get("segments") or []
     if segs:
         out += ["## Transcript", ""]
-        out += ["**%s** [%s]: %s  " % (LABELS.get(s.get("who"), "Them"), fmt_clock(s.get("t", 0)), s.get("text", ""))
-                for s in segs]
+        out += ["**%s** \u00b7 %s  \n%s\n" % (LABELS.get(s.get("who"), "Them"), fmt_clock(s.get("t", 0)),
+                                             s.get("text", "")) for s in segs]
     return "\n".join(out).strip() + "\n"

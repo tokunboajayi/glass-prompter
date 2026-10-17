@@ -97,7 +97,33 @@
     else setConn("VISIBLE in share", "bad");
     document.querySelectorAll(".item").forEach((li) =>
       li.classList.toggle("current", !!(s.script && String(s.script.id) === li.dataset.id)));
+    renderCopilot(s.copilot || {});
   }
+  function renderCopilot(cp) {
+    const live = !!cp.live;
+    const pill = $("cpPill");
+    pill.className = "pill" + (live ? " live" : "");
+    pill.lastElementChild.textContent = live ? "Live " + (cp.elapsed || "") : "Not running";
+    $("meetingChip").hidden = !live;
+    if (live) $("meetingChip").lastElementChild.textContent = "Meeting live \u00b7 " + (cp.elapsed || "");
+    $("cpMeetingText").textContent = live ? "End meeting" : "Start meeting";
+    $("cpMeeting").classList.toggle("danger-soft", live);
+    $("cpAssist").disabled = !cp.ready || !!cp.busy;
+    $("cpAssistText").textContent = cp.busy ? "Thinking..." : "Assist";
+    $("cpHint").textContent = !cp.ready ? "Add an AI key in Settings on your computer to get answers."
+      : live ? (cp.words || 0) + " words so far. Tap Assist whenever you need help."
+      : "Transcribes the call on your computer and tells you what to say.";
+    const has = !!(cp.answer && cp.answer.trim());
+    $("cpAnswer").hidden = !has;
+    if (has) { $("cpBadge").textContent = cp.badge || "Answer"; $("cpText").textContent = cp.answer; }
+  }
+  $("meetingChip").addEventListener("click", () => showTab("ai"));
+  $("cpSend").addEventListener("click", () => {
+    const text = $("cpText").textContent.trim();
+    if (!text) return;
+    api("/scripts", { method: "POST", json: { title: "Copilot: " + ($("cpBadge").textContent || "answer"), body: text, load: true } })
+      .then(() => toast("Sent to the prompter", true)).catch(quiet);
+  });
   function start() {
     $("pairView").hidden = true;
     $("app").hidden = false;
@@ -157,7 +183,7 @@
     li.dataset.id = s.id;
     if (state.script && state.script.id === s.id) li.classList.add("current");
     const h = document.createElement("h3"); h.textContent = s.title;
-    const p = document.createElement("p"); p.textContent = s.words + " words · " + ago(s.last_used || s.updated);
+    const p = document.createElement("p"); p.textContent = s.words + " words \u00b7 " + ago(s.last_used || s.updated);
     const row = document.createElement("div"); row.className = "row";
     row.appendChild(button("Load", "primary", () =>
       api("/scripts/" + s.id + "/load", { method: "POST" }).then(() => toast("Loaded on the prompter", true)).catch(quiet)));
@@ -192,7 +218,7 @@
   }
   function count() {
     const n = words($("body").value);
-    $("count").textContent = n + " words · about " + mmss(n / 150 * 60) + " at 150 wpm";
+    $("count").textContent = n + " words \u00b7 about " + mmss(n / 150 * 60) + " at 150 wpm";
   }
   async function save(load) {
     const body = $("body").value;

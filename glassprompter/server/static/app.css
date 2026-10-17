@@ -131,3 +131,34 @@ h1,.status b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Sego
 .shot-actions{margin-top:10px}
 .shot-actions .btn{min-height:48px}
 .shot-actions small{font-size:14px;color:var(--on)}
+/* ---------- meeting copilot + depth (matches the desktop revamp) ---------- */
+.card,.tabs{box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 10px 34px rgba(0,0,0,.30)}
+.field{background:rgba(0,0,0,.28);box-shadow:inset 0 1px 2px rgba(0,0,0,.35)}
+.btn.accent{background:linear-gradient(90deg,#40e8d0,#8b6cff);color:#0a0c14;border:0;font-size:18px;
+  box-shadow:0 8px 24px rgba(64,232,208,.18),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn.accent small{color:rgba(10,12,20,.66)}
+.btn.accent:disabled{background:var(--surface-2);color:var(--muted);box-shadow:none}
+.btn.danger-soft{border-color:rgba(255,92,122,.5);color:var(--bad)}
+.btn.danger-soft small{color:var(--bad)}
+.copilot b{font-size:17px}
+.cp-actions{margin-top:12px}
+.cp-actions .btn{min-height:64px}
+.cp-answer{margin-top:12px;padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.24);border:1px solid var(--outline)}
+.cp-answer p{margin:4px 0 0;white-space:pre-wrap;word-wrap:break-word;font-size:16px;line-height:1.45}
+.cp-answer .link{padding:4px 0;min-height:44px}
+.badge{display:block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.pill.live{color:var(--accent);background:rgba(64,232,208,.14);border-color:rgba(64,232,208,.45)}
+.chip-live{display:inline-flex;align-items:center;gap:8px;margin-top:12px;min-height:36px;padding:4px 12px;border-radius:999px;
+  border:1px solid rgba(139,108,255,.55);background:rgba(139,108,255,.16);color:#c9bbff;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.chip-live i{width:8px;height:8px;border-radius:50%;background:#8b6cff;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+/* switch-style checkbox, like the desktop toggles */
+.check input[role=switch]{appearance:none;-webkit-appearance:none;width:44px;height:26px;border-radius:13px;margin:0;flex:none;
+  background:rgba(255,255,255,.18);position:relative;cursor:pointer;transition:background .17s ease-out}
+.check input[role=switch]::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.4);transition:transform .17s ease-out}
+.check input[role=switch]:checked{background:var(--accent)}
+.check input[role=switch]:checked::after{transform:translateX(18px)}
+.check input[role=switch]:disabled{opacity:.4}
+.check input[role=switch]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.chip-live i{animation:none}}

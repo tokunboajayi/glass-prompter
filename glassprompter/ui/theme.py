@@ -133,13 +133,24 @@ QLabel[role="warn"] {{ color: {EMBER}; font-size: 12px; }}
 QLabel[role="pin"] {{ font-family: "{f['display']}"; font-size: 28px; font-weight: 700; color: #F5F7FF; }}
 QLabel[role="rowtitle"] {{ font-size: 13px; color: #F2F4FA; }}
 QLabel[role="value"] {{ color: #A0A8BC; font-size: 12px; }}
-QFrame[role="card"] {{ background: rgba(255,255,255,8); border: 1px solid rgba(255,255,255,16); border-radius: 12px; }}
+QLabel[role="live"] {{ color: {AQUA}; font-size: 12px; font-weight: 600; background: rgba(64,232,208,22);
+    border: 1px solid rgba(64,232,208,70); border-radius: 11px; padding: 3px 10px; }}
+QLabel[role="idle"] {{ color: #A0A8BC; font-size: 12px; font-weight: 600; background: rgba(255,255,255,10);
+    border: 1px solid rgba(255,255,255,20); border-radius: 11px; padding: 3px 10px; }}
+QLabel[role="badge"] {{ color: {AQUA}; font-size: 11px; font-weight: 600; }}
+/* depth: cards are lit from above (brighter top edge, soft fade down); fields sit inset below them */
+QFrame[role="card"] {{ background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(255,255,255,13),
+    stop:1 rgba(255,255,255,6)); border: 1px solid rgba(255,255,255,15); border-top-color: rgba(255,255,255,30);
+    border-radius: 12px; }}
 QFrame[role="hairline"] {{ background: rgba(255,255,255,12); min-height: 1px; max-height: 1px; border: 0; }}
-QPlainTextEdit, QLineEdit, QSpinBox, QListWidget, QComboBox {{ background: rgba(255,255,255,8); color: #F2F4FA;
-    border: 1px solid rgba(255,255,255,18); border-radius: 9px; padding: 7px 10px; font-family: "{f['ui']}";
+QPlainTextEdit, QTextBrowser, QLineEdit, QSpinBox, QListWidget, QComboBox {{ background: rgba(0,0,0,46);
+    color: #F2F4FA; border: 1px solid rgba(255,255,255,16); border-bottom-color: rgba(255,255,255,24);
+    border-radius: 9px; padding: 7px 10px; font-family: "{f['ui']}";
     font-size: 13px; selection-background-color: rgba(64,232,208,90); selection-color: #FFFFFF; }}
-QPlainTextEdit {{ font-size: 15px; padding: 14px; }}
-QPlainTextEdit:focus, QLineEdit:focus, QSpinBox:focus, QListWidget:focus, QComboBox:focus {{
+QPlainTextEdit, QTextBrowser {{ font-size: 15px; padding: 14px; }}
+QPlainTextEdit[flat="true"], QTextBrowser[flat="true"] {{ background: transparent; border: 0; padding: 4px 2px; }}
+QPlainTextEdit:hover, QLineEdit:hover, QComboBox:hover {{ border-color: rgba(255,255,255,30); }}
+QPlainTextEdit:focus, QTextBrowser:focus, QLineEdit:focus, QSpinBox:focus, QListWidget:focus, QComboBox:focus {{
     border: 1px solid rgba(64,232,208,160); }}
 QComboBox::drop-down {{ border: 0; width: 22px; }}
 QComboBox QAbstractItemView {{ background: #151826; color: #F2F4FA; border: 1px solid #262A3E; padding: 4px;
@@ -158,11 +169,21 @@ QPushButton[primary="true"] {{ background: #F5F7FF; color: #0A0C14; border: 1px 
 QPushButton[primary="true"]:hover {{ background: #FFFFFF; }}
 QPushButton[primary="true"]:focus {{ border: 1px solid rgba(64,232,208,220); }}
 QPushButton[danger="true"] {{ color: #FF6B88; }}
+QPushButton[accent="true"] {{ background: {GRAD}; color: #0A0C14; border: 0; font-weight: 700; padding: 9px 18px;
+    font-size: 14px; }}
+QPushButton[accent="true"]:hover {{ background: {GRAD_HOVER}; }}
+QPushButton[accent="true"]:disabled {{ background: rgba(255,255,255,14); color: #5E6478; }}
+QPushButton[chip="true"] {{ border-radius: 14px; padding: 5px 12px; font-size: 12px; }}
+QPushButton[ghost="true"] {{ background: transparent; border-color: transparent; color: #A0A8BC; }}
+QPushButton[ghost="true"]:hover {{ background: rgba(255,255,255,14); color: #F2F4FA; }}
 QPushButton[compact="true"] {{ padding: 5px 10px; font-size: 12px; }}
 QPushButton#close {{ background: transparent; border: 0; border-radius: 12px; padding: 0; min-width: 24px;
     min-height: 24px; max-width: 24px; max-height: 24px; }}
 QPushButton#close:hover {{ background: rgba(255,255,255,26); }}
 QCheckBox {{ color: #F2F4FA; font-family: "{f['ui']}"; font-size: 13px; spacing: 10px; }}
+QCheckBox::indicator {{ width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,60);
+    background: rgba(0,0,0,40); }}
+QCheckBox::indicator:checked {{ background: {AQUA}; border-color: {AQUA}; }}
 QSlider {{ min-height: 22px; background: transparent; }}
 QSlider::groove:horizontal {{ border: 0; height: 22px; background: transparent; }}
 QSlider::sub-page:horizontal {{ margin: 9px 0 9px 0; background: {AQUA}; border-radius: 2px; }}

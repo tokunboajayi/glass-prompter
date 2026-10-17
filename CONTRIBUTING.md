@@ -88,8 +88,8 @@ The app serves this on port 8765 on your local network.
 |---|---|---|
 | GET | `/api/v1/health` | public |
 | POST | `/api/v1/session` | `{"pin": "123456"}` returns a token and an HttpOnly cookie |
-| GET | `/api/v1/state` · `/api/v1/events` (SSE) | live prompter state, including voice latency |
-| POST | `/api/v1/control` | `{"action": "play"}`. Other actions: `restart`, `faster`, `slower`, `back`, `ahead`, `bigger`, `smaller`, `hide`, `voice`, `ghost`, `ghost_less`, `ghost_more`, `read_aloud`, `next_section`, `prev_section` |
+| GET | `/api/v1/state` · `/api/v1/events` (SSE) | live prompter state, including voice latency, plus `copilot`: `{"live", "busy", "elapsed", "words", "badge", "answer", "ready"}` (never the transcript) |
+| POST | `/api/v1/control` | `{"action": "play"}`. Other actions: `restart`, `faster`, `slower`, `back`, `ahead`, `bigger`, `smaller`, `hide`, `voice`, `ghost`, `ghost_less`, `ghost_more`, `read_aloud`, `next_section`, `prev_section`, `meeting` (start/end the copilot's meeting), `assist` (copilot Assist) |
 | GET/POST | `/api/v1/scripts` | list (`?q=` search) / create (`load: true` to show it) |
 | GET/PUT/DELETE | `/api/v1/scripts/{id}` | read, update, delete |
 | POST | `/api/v1/scripts/{id}/load` | show it on the prompter |

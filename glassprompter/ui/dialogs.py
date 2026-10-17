@@ -6,7 +6,7 @@ from PySide6.QtCore import QRectF, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QGuiApplication, QKeySequence, QPainter, QShortcut
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton,
-                               QSlider, QSpinBox, QVBoxLayout, QWidget)
+                               QScrollArea, QSlider, QSpinBox, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, __version__, engine, paths, scripts
 from .. import platform as native
@@ -378,13 +378,22 @@ class SettingsDialog(BaseDialog):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(24, 20, 24, 20)
         outer.setSpacing(0)
-        cols = QHBoxLayout()
+        body = QWidget()
+        cols = QHBoxLayout(body)
+        cols.setContentsMargins(0, 0, 4, 0)
         cols.setSpacing(20)
         left, mid, right = QVBoxLayout(), QVBoxLayout(), QVBoxLayout()
         for col in (left, mid, right):
             col.setSpacing(6)
             cols.addLayout(col, 1)
-        outer.addLayout(cols)
+        # scrolls only when the screen is too short for every row (small laptops), so nothing gets squeezed
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.Shape.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        area.setStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; }")
+        area.setWidget(body)
+        outer.addWidget(area, 1)
 
         # ---- left: reading, voice, read aloud
         card = Card()
@@ -412,7 +421,7 @@ class SettingsDialog(BaseDialog):
         self.mic.currentIndexChanged.connect(lambda _: self._set("mic_device", self.mic.currentData() or ""))
         lat = controller.voice.latency_ms
         card.row("Microphone", self.mic, ("Measured latency %d ms" % lat) if lat else
-                 "Wired or built-in mics react fastest.")
+                 "Wired mics react fastest.")
         _section(left, card, "Voice Follow")
 
         from .. import tts
@@ -428,7 +437,7 @@ class SettingsDialog(BaseDialog):
         i = self.voice_box.findData(s.tts_voice)
         self.voice_box.setCurrentIndex(max(0, i))
         self.voice_box.currentIndexChanged.connect(self._voice_changed)
-        self.voice_hint = card.row("Voice", self.voice_box, "Natural neural voices, offline. Pace follows your speed.")
+        self.voice_hint = card.row("Voice", self.voice_box, "Offline neural voices.")
         self.preview = button("Play sample", self._preview)
         self.preview.setProperty("compact", True)
         card.row("Hear it", self.preview)
@@ -440,8 +449,8 @@ class SettingsDialog(BaseDialog):
         card.row("Phone remote on this Wi-Fi", switch(s.remote_enabled, self._remote), "Protected by a PIN.")
         card.row("Phone can view my screen", switch(s.phone_screen, lambda v: self._set("phone_screen", v)),
                  "Live view and AI chat on your paired phone.")
+        _section(left, card, "Privacy")
         left.addStretch(1)
-        _section(mid, card, "Privacy")
 
         # ---- right: appearance, privacy, system
         card = Card()
@@ -468,7 +477,7 @@ class SettingsDialog(BaseDialog):
             self.ai_provider.addItem(prov["name"], pid)
         self.ai_provider.setCurrentIndex(max(0, self.ai_provider.findData(s.ai_provider)))
         self.ai_provider.currentIndexChanged.connect(self._provider_changed)
-        card.row("Provider", self.ai_provider, "Claude, GPT, Gemini\u2026")
+        card.row("Provider", self.ai_provider, "Any provider works.")
         self.ai_key = QLineEdit(ai.load_key())
         self.ai_key.setEchoMode(QLineEdit.EchoMode.Password)
         self.ai_key.setPlaceholderText("Paste your API key")
@@ -489,10 +498,11 @@ class SettingsDialog(BaseDialog):
         self.ai_model.setAccessibleName("AI model")
         self.ai_model.setMinimumWidth(190)
         self.ai_model.setMaximumWidth(220)
-        self.ai_model.addItem("Best available (automatic)", "")
+        self.ai_model.addItem("Automatic (best)", "")
         if s.ai_model:
             self.ai_model.addItem(s.ai_model, s.ai_model)
             self.ai_model.setCurrentIndex(1)
+        self.ai_model.lineEdit().setCursorPosition(0)        # show the start of a long name, not its tail
         self.ai_model.currentTextChanged.connect(self._model_changed)
         self.model_hint = card.row("Model", self.ai_model, "Or type any name.")
         self.ai_len = QComboBox()
@@ -521,12 +531,31 @@ class SettingsDialog(BaseDialog):
         if ai.load_key() or s.ai_provider == "ollama":
             self.key_timer.start()
         _section(mid, card, "AI assistant")
+
+        from ..listen import system_audio_supported
+        card = Card()
+        hear = switch(s.copilot_system_audio and system_audio_supported(),
+                      lambda v: self._set("copilot_system_audio", v))
+        hear.setEnabled(system_audio_supported())
+        card.row("Hear the other side", hear, "Transcribe the call's sound as Them." if system_audio_supported()
+                 else "This system can't share its sound; your microphone only.")
+        card.row("Smart answers", switch(s.copilot_smart, lambda v: self._set("copilot_smart", v)),
+                 "Suggests answers to their questions.")
+        card.row("Copilot sees my screen", switch(s.copilot_screen, lambda v: self._set("copilot_screen", v)),
+                 "Only when you press an action.")
+        b = button("Edit" + ELLIPSIS, self._copilot_context)
+        b.setProperty("compact", True)
+        card.row("Context", b, "Your notes, files and custom modes.")
+        b = button("Open", self._meetings)
+        b.setProperty("compact", True)
+        card.row("Meeting history", b, "Notes, transcripts, follow-up emails.")
+        _section(mid, card, "Meeting copilot")
         mid.addStretch(1)
 
 
         card = Card()
         card.row("Check for updates", switch(s.auto_update, lambda v: self._set("auto_update", v)),
-                 "Once a day, from GitHub. Nothing about you is sent.")
+                 "Daily, from GitHub. Sends nothing about you.")
         card.row("Start at login", switch(native.is_autostart(), self._autostart),
                  "Waits quietly in the %s." % native.TRAY.split(" (")[0])
         b = button("Open", lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(s.drop_dir)))
@@ -538,13 +567,19 @@ class SettingsDialog(BaseDialog):
         b = button("Move", controller.prompter.reset_position)
         b.setProperty("compact", True)
         card.row("Prompter position", b, "Put it back under the camera.")
+        if hasattr(controller, "hotkey_summary"):
+            b = button("Show", lambda: (self.accept(), QTimer.singleShot(0, controller.prompter.toggle_help)))
+            b.setProperty("compact", True)
+            card.row("Shortcuts", b, controller.hotkey_summary())
+            b.setToolTip(controller.hotkey_report())
         _section(right, card, "System")
-        hk = controller.hotkey_report() if hasattr(controller, "hotkey_report") else ""
-        if hk:
-            right.addWidget(label(hk, "muted", True))
         right.addStretch(1)
 
+        screen = QGuiApplication.primaryScreen()
+        room = screen.availableGeometry().height() - 150 if screen else 900
+        area.setMinimumHeight(min(body.sizeHint().height(), max(360, room)))
         foot = QHBoxLayout()
+        foot.setContentsMargins(0, 10, 0, 0)
         foot.addStretch(1)
         foot.addWidget(button("Done", self.accept, primary=True))
         outer.addLayout(foot)
@@ -553,6 +588,14 @@ class SettingsDialog(BaseDialog):
     def _set(self, key, value):
         setattr(self.c.cfg.s, key, value)
         self.c.settings_changed(live=True)
+
+    def _copilot_context(self):
+        from .copilot import SetupDialog
+        SetupDialog(self, self.c).exec()
+
+    def _meetings(self):
+        self.accept()                                  # history is a normal window; Settings is modal
+        QTimer.singleShot(0, self.c.open_meetings)
 
     # ---- AI: provider, key, model. The key is cleaned, saved and tested as you paste it (free model-list call),
     #      and the model list is filled from the provider so new models appear without an app update.
@@ -617,7 +660,7 @@ class SettingsDialog(BaseDialog):
             current = self.c.cfg.s.ai_model
             self.ai_model.blockSignals(True)
             self.ai_model.clear()
-            self.ai_model.addItem("Best available (automatic): " + models[0], "")
+            self.ai_model.addItem("Automatic: " + models[0], "")
             for m in models:
                 self.ai_model.addItem(m, m)
             i = self.ai_model.findData(current) if current else 0
@@ -625,6 +668,7 @@ class SettingsDialog(BaseDialog):
                 self.ai_model.addItem(current, current)
                 i = self.ai_model.count() - 1
             self.ai_model.setCurrentIndex(i)
+            self.ai_model.lineEdit().setCursorPosition(0)
             self.ai_model.blockSignals(False)
 
     def _remote(self, on):
@@ -756,7 +800,8 @@ class PhoneDialog(BaseDialog):
         else:
             url = srv.url()
             lay.addWidget(label("Scan with your phone's camera. Your phone must be on the same Wi-Fi as this "
-                                "computer.", "muted", True))
+                                "computer. From the phone you can play, see your screen, chat with the AI and run "
+                                "the meeting copilot.", "muted", True))
             row = QHBoxLayout()
             row.addStretch(1)
             row.addWidget(QrWidget(url))
@@ -813,7 +858,8 @@ class AboutDialog(BaseDialog):
         lay.addWidget(label(APP_NAME, "hero"))
         lay.addWidget(label("Version %s" % __version__, "muted"))
         lay.addWidget(label("A see-through teleprompter that sits under your webcam, so you can read your script "
-                            "and keep eye contact on calls, demos and videos.", None, True))
+                            "and keep eye contact on calls, demos and videos, with an AI assistant and a meeting "
+                            "copilot that stay off the screen share.", None, True))
         lay.addWidget(label("Your scripts and settings stay on this computer:\n" + paths.data_dir(), "muted", True))
         lay.addWidget(label("This is a public beta. Found a bug or have an idea? Report a problem opens a "
                             "pre-filled GitHub issue with your app version and OS only.", "muted", True))
@@ -851,7 +897,11 @@ class WelcomeDialog(BaseDialog):
                                   "into the Glass Prompter folder in Documents."),
             ("3", "Read from any app", "%s+Space plays and pauses even while Zoom or Teams is in front. "
                                        "Turn on Voice Follow (V) and the script follows your voice." % native.MOD),
+            ("4", "Get help in meetings", "Press K for the meeting copilot: it transcribes the call and %s+Enter "
+                                          "tells you what to say. Notes and a follow-up email are written when "
+                                          "you end. Add an AI key in Settings first." % native.MOD),
         ]
+        accents = {"1": AQUA, "2": VIOLET, "3": AQUA, "4": VIOLET}
         for num, head, body in steps:
             card = QFrame()
             card.setProperty("role", "card")
@@ -860,7 +910,7 @@ class WelcomeDialog(BaseDialog):
             g.setHorizontalSpacing(14)
             n = label(num, "title")
             n.setFixedWidth(22)
-            n.setStyleSheet("color: %s;" % (AQUA if num != "2" else VIOLET))
+            n.setStyleSheet("color: %s;" % accents[num])
             g.addWidget(n, 0, 0, 2, 1, Qt.AlignmentFlag.AlignTop)
             hl = label(head)
             hl.setStyleSheet("font-weight: 600;")

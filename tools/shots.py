@@ -7,6 +7,7 @@ import sys
 import faulthandler
 import tempfile
 
+faulthandler.enable()                  # a native crash prints where it happened instead of a bare exit code
 if os.environ.get("GP_SHOTS_DEBUG"):
     faulthandler.dump_traceback_later(15, exit=True)
 
@@ -155,8 +156,44 @@ def run():
     app.processEvents()
     grab(a, "10_assistant.png")
     a.close()
+
+    # meeting copilot with a sample conversation and answer (no audio, no network)
+    from glassprompter import meeting
+    cp = ctl.open_copilot(focus=False)
+    cp.transcript = meeting.Transcript(started=_t.time() - 754)
+    for who, line in (("them", "thanks for making time today"), ("you", "happy to walk you through it"),
+                      ("them", "so how does pricing work for a team of about forty people")):
+        cp.transcript.add(who, line)
+    cp._render_live()
+    cp._start_style(True)
+    cp.refresh_info()
+    cp.badge.setText("ASSIST")
+    cp.answer.setPlainText("For a team of forty you'd be on the Pro plan: $49 per user a month, or about 20% less "
+                           "billed annually.\n\n- Volume pricing starts at 50 seats\n- A 30-day pilot is free")
+    app.processEvents()
+    grab(cp, "11_copilot.png")
+    mid = ctl.meetings.create(_t.time() - 3600, "sales")
+    ctl.meetings.update(mid, transcript=cp.transcript.to_json(), ended=_t.time() - 1800)
+    meeting.save_notes(ctl.meetings, mid, "TITLE\nAcme pilot kickoff\nSUMMARY\nAcme wants a 40-seat pilot.\n"
+                                          "ACTION ITEMS\n- Sam - send the pilot contract by Friday\n"
+                                          "FOLLOW-UP EMAIL\nSubject: Next steps\nHi Jordan,\nThanks for today.")
+    ctl.open_meetings()
+    app.processEvents()
+    grab(ctl.meetings_window, "12_history.png")
+    ctl.meetings_window.close()
+    from glassprompter.ui.copilot import SetupDialog
+    d = SetupDialog(None, ctl)
+    d.show()
+    app.processEvents()
+    grab(d, "13_context.png")
+    d.close()
+    cp.transcript = None                             # a demo: nothing to save or summarise on close
+    cp._start_style(False)
+    cp.close()
     ctl.quit()
 
 
 QTimer.singleShot(300, run)
 app.exec()
+sys.stdout.flush()
+os._exit(0)                                          # same clean exit as the app (see app.main)

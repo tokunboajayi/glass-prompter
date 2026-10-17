@@ -91,6 +91,7 @@ h2{font-size:clamp(28px,3.6vw,40px);letter-spacing:-.025em;line-height:1.15;marg
 .ic svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 .split{display:grid;grid-template-columns:1fr 1.25fr;gap:48px;align-items:center}
 .split img{border-radius:16px;border:1px solid var(--line)}
+.split img.portrait{width:100%;max-width:420px;height:auto;justify-self:center;box-shadow:0 24px 60px rgba(0,0,0,.45)}
 .points{list-style:none;padding:0;margin:0}
 .points li{padding:12px 0;border-top:1px solid var(--line);color:var(--muted)}
 .points li b{color:var(--on);font-weight:600}
@@ -173,6 +174,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   <symbol id="i-camera" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7l1.5-3h4l1.5 3"/><circle cx="12" cy="13.5" r="3.3"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M5 10v4M8.5 7v10M12 4v16M15.5 7v10M19 10v4"/></symbol>
   <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12M6 11l6 6 6-6M5 20h14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 </svg>
 
@@ -181,6 +183,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     <a class="brand" href="#"><img src="img/icon.svg" alt="">Glass Prompter</a>
     <div class="nav-links">
       <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#copilot">Meeting copilot</a>
       <a class="hide-sm" href="#ai">AI assistant</a>
       <a class="hide-sm" href="#compare">Compare</a>
       <a class="hide-sm" href="#shortcuts">Shortcuts</a>
@@ -194,7 +197,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
   <header class="hero">
     <span class="eyebrow"><i></i><span id="ver">Free for Windows and Mac &middot; public beta</span></span>
     <h1>Read your script. Keep eye contact.</h1>
-    <p class="sub">A see-through teleprompter that sits right under your webcam, follows your voice word by word, and stays off the screen share. Now with an AI assistant that can see your screen.</p>
+    <p class="sub">A see-through teleprompter that sits right under your webcam, follows your voice word by word, and stays off the screen share. Now with a meeting copilot that hears the call and tells you what to say.</p>
     <div class="cta">
       <a id="primary" class="btn primary" href="https://github.com/tokunboajayi/glass-prompter/releases/latest">
         <svg aria-hidden="true"><use href="#i-down"/></svg><span id="primaryText">Download free</span></a>
@@ -222,8 +225,10 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <h3>Phone remote</h3><p>Scan a QR code and your phone becomes the remote: play, speed, sections, ghost level, new scripts, and a live view of your screen. PIN protected.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-chart"/></svg></div>
         <h3>Rehearsal coach</h3><p>After each practice run you get your pace, filler words, long pauses, skipped lines and a score you can watch improve.</p></div>
+      <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-wave"/></svg></div>
+        <h3>Meeting copilot <span class="new">New</span></h3><p>Transcribes both sides of a call offline, tells you what to say with <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>Enter</kbd>, answers questions as they're asked, and writes your notes and follow-up email.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-spark"/></svg></div>
-        <h3>AI assistant <span class="new">New</span></h3><p>Ask anything and get a straight answer. Works with Claude, ChatGPT, Gemini, Grok and more. It can look at your screen and send its answer to the prompter. Press <kbd>A</kbd>, or use your phone.</p></div>
+        <h3>AI assistant</h3><p>Ask anything and get a straight answer. Works with Claude, ChatGPT, Gemini, Grok and more. It can look at your screen and send its answer to the prompter. Press <kbd>A</kbd>, or use your phone.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-screen"/></svg></div>
         <h3>Your screen on your phone <span class="new">New</span></h3><p>See your computer's screen live on your phone, about every 1.5 seconds. Pinch to zoom, pause, or save a full-size copy.</p></div>
       <div class="card"><div class="ic"><svg aria-hidden="true"><use href="#i-camera"/></svg></div>
@@ -244,6 +249,26 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       </ul>
     </div>
     <img src="img/ghost.jpg" width="2100" height="760" alt="Ghost mode at 35 percent over a document: the document shows through, the script text stays crisp" loading="lazy">
+  </div>
+</section>
+
+<section id="copilot">
+  <div class="wrap split">
+    <img class="portrait" src="img/copilot.jpg" width="1160" height="1560" alt="The meeting copilot window: a live transcript of the call, the Assist button with quick actions, and a suggested answer about pricing" loading="lazy">
+    <div>
+      <h2>A copilot for every call</h2>
+      <p class="lead">Start a meeting and Glass Prompter listens with you. When you need help, press one key. Nobody else on the call can see it.</p>
+      <ul class="points">
+        <li><b>Hears both sides.</b> Your microphone is <i>You</i>, the call's sound is <i>Them</i>. Speech is recognized offline on your computer; audio never leaves it.</li>
+        <li><b>Assist from any app.</b> <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>Enter</kbd> reads the conversation and your screen and tells you what to say next.</li>
+        <li><b>Quick actions.</b> What to say, Follow-ups, Recap, Fact-check and Explain, one tap each.</li>
+        <li><b>Smart answers.</b> When someone asks you a question, a suggested answer appears on its own.</li>
+        <li><b>Your context.</b> Pick a mode (sales, presentation Q&amp;A, support, negotiation, lecture) or write your own, and add your notes and files. The AI sticks to them.</li>
+        <li><b>Notes when you hang up.</b> Summary, decisions, action items and a follow-up email, saved in a searchable meeting history.</li>
+        <li><b>In the AI assistant and on your phone too.</b> The assistant can listen and suggest answers and questions, and the phone remote can start a meeting and press Assist.</li>
+      </ul>
+      <p class="small">Let people know you're taking notes: some places require everyone's consent to record or transcribe a call.</p>
+    </div>
   </div>
 </section>
 
@@ -279,6 +304,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
           <tr><td>Screen share status</td><td class="us">Honest badge per OS</td><td>"Invisible" claims</td><td>Often undocumented on macOS 15+</td></tr>
           <tr><td>Natural read-aloud</td><td class="us">Built in, offline</td><td>Rare</td><td>Rare</td></tr>
           <tr><td>AI assistant</td><td class="us">Any provider (Claude, ChatGPT, Gemini, Grok&hellip;), sees your screen, on PC and phone</td><td>Script rewriting at most</td><td>Rare</td></tr>
+          <tr><td>Meeting copilot</td><td class="us">Live transcript, Assist from any app, notes and follow-up email, hidden from share</td><td>None</td><td>None</td></tr>
           <tr><td>Your scripts</td><td class="us">Daily backups and export</td><td>Lost-script reports are common</td><td>Varies</td></tr>
           <tr><td>Price</td><td class="us">Free</td><td>Subscription</td><td>$30 to $40</td></tr>
         </tbody>
@@ -367,6 +393,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <div class="krow">Show / hide<span><kbd>H</kbd></span></div>
         <div class="krow">Ghost mode<span><kbd>G</kbd></span></div>
         <div class="krow">Ghost see-through / solid<span><kbd>[</kbd><kbd>]</kbd></span></div>
+        <div class="krow">Assist me now (copilot)<span><kbd>Enter</kbd></span></div>
+        <div class="krow">Start / end a meeting<span><kbd>M</kbd></span></div>
       </div>
       <div class="glass"><h3>On the prompter</h3>
         <div class="krow">Read aloud<span><kbd>L</kbd></span></div>
@@ -375,6 +403,7 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
         <div class="krow">Next section<span><kbd>PgDn</kbd></span></div>
         <div class="krow">Screen-share privacy<span><kbd>C</kbd></span></div>
         <div class="krow">Mirror text<span><kbd>M</kbd></span></div>
+        <div class="krow">Meeting copilot<span><kbd>K</kbd></span></div>
         <div class="krow">AI assistant<span><kbd>A</kbd></span></div>
         <div class="krow">Screenshot<span><kbd>S</kbd></span></div>
       </div>
@@ -391,6 +420,8 @@ footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
       <p>The first time, right-click Glass Prompter in Applications and choose <b>Open</b>. On macOS 15 or later, open System Settings, go to Privacy &amp; Security, and click <b>Open Anyway</b>. You only do this once.</p></details>
     <details><summary>Can people on the call see the prompter?</summary>
       <p>On Windows 10 (2004+) and 11, the prompter and every window Glass Prompter opens (settings, the AI assistant, menus, message boxes, even the file picker) are excluded from screen sharing, recordings and screenshots. macOS 15 and later lets screen recorders capture every window, so on a Mac share a single window or app instead of the whole screen. The badge on the prompter always shows the real state.</p></details>
+    <details><summary>Does the meeting copilot record my calls?</summary>
+      <p>No recording is kept. The copilot turns speech into text on your computer as it happens, and saves only that text, the notes and the follow-up email in your local meeting history (which you can search, export or delete). The AI sees the transcript only when you press an action, or when Smart answers spots a question someone asked you. Check your workplace's rules and tell people you're taking notes; some places require everyone's consent.</p></details>
     <details><summary>Does my voice or script go anywhere?</summary>
       <p>No. Voice recognition and the read-aloud voice run on your computer. Scripts live in a local library. The only internet requests are a once-a-day check for a new version on GitHub (you can turn it off) and, only if you set up the AI assistant, the messages you choose to send to the AI provider you picked.</p></details>
     <details><summary>How do I turn on the AI assistant, and what does it cost?</summary>
