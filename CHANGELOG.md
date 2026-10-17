@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.7.1 - 2026-10-16
+- **Quit button.** The prompter toolbar has an &times; button and the &#8943; menu has *Quit Glass Prompter*
+  (Ctrl+Q, or Cmd+Q on a Mac), so you can close the app without the tray or menu bar. Ctrl+Alt+H still just hides it.
+
 ## 2.7.0 - 2026-10-16
 **Meeting copilot**: live help during calls, still invisible on screen share.
 

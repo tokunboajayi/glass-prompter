@@ -70,6 +70,7 @@ class ControlBar(QFrame):
         sep()
         btn("library", "Scripts", "E", owner.requestLibrary.emit)
         self.more = btn("more", "More", "", self.open_menu, "more")
+        self.quit = btn("close", "Quit Glass Prompter", C + "+Q", owner.requestQuit.emit, "quit")
         cfg = owner.cfg
         self.menu = GlassMenu([
             {"kind": "header", "text": "View"},
@@ -102,6 +103,8 @@ class ControlBar(QFrame):
             {"kind": "sep"},
             {"kind": "action", "icon": "eye_off", "text": "Hide prompter", "keys": M + "+H",
              "fn": owner.hide_window, "quiet": True},
+            {"kind": "action", "icon": "close", "text": "Quit Glass Prompter", "keys": C + "+Q",
+             "fn": owner.requestQuit.emit, "quiet": True},
         ], self)
         self.menu.closed.connect(self.menu_closed)
 
@@ -163,6 +166,7 @@ class Prompter(QWidget):
     requestCopilot = Signal()
     requestScreenshot = Signal()
     requestSettings = Signal()
+    requestQuit = Signal()
     requestHelp = Signal()
     stateChanged = Signal()
     settingsChanged = Signal()
@@ -1360,7 +1364,7 @@ class Prompter(QWidget):
         ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
         if ctrl:
             fn = {K.Key_O: self.requestLibrary.emit, K.Key_V: self.paste_clipboard,
-                  K.Key_Comma: self.requestSettings.emit}.get(k)
+                  K.Key_Comma: self.requestSettings.emit, K.Key_Q: self.requestQuit.emit}.get(k)
             if fn:
                 return fn()
         if k == K.Key_Escape:

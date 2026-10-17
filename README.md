@@ -148,6 +148,7 @@ Press <kbd>F1</kbd> in the app to see these at any time.
 | <kbd>K</kbd> | Meeting copilot |
 | <kbd>S</kbd> | Screenshot to Pictures › Glass Prompter (also copied) |
 | <kbd>Esc</kbd> | Close sheets and dialogs |
+| <kbd>Ctrl</kbd>+<kbd>Q</kbd> (<kbd>Cmd</kbd>+<kbd>Q</kbd> on a Mac) | Quit Glass Prompter (also the &times; button on the toolbar) |
 
 ---
 

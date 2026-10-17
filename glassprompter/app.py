@@ -242,6 +242,7 @@ class Controller(QObject):
         self.prompter.requestCopilot.connect(self.open_copilot)
         self.prompter.requestScreenshot.connect(self.take_screenshot)
         self.prompter.requestSettings.connect(self.open_settings)
+        self.prompter.requestQuit.connect(self.quit)
         self.prompter.settingsChanged.connect(self.settings_changed)
         self.prompter.stateChanged.connect(self.schedule_publish)
         self.prompter.pendingConsumed.connect(self._pending_loaded)
