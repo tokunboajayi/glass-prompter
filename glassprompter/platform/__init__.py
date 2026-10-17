@@ -20,4 +20,4 @@ elif sys.platform == "darwin":
 else:
     from .generic import *          # noqa: F401,F403
 
-from .common import HOTKEY_KEYS, hotkey_label, launch_args   # noqa: F401,E402
+from .common import HOTKEY_KEYS, hard_exit, hotkey_label, launch_args   # noqa: F401,E402

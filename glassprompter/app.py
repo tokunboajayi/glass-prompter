@@ -1059,10 +1059,7 @@ def main(argv=None):
         conn.disconnectFromServer()
     instance.newConnection.connect(incoming)
     code = app.exec()
-    # Controller.quit() has saved settings, closed the databases and stopped every thread by now. Skip Python's
-    # interpreter teardown: PySide can destroy the remaining Qt objects in an unsafe order there and crash after a
-    # clean quit (seen in CI as a silent exit 1 on Windows and a glibc abort on Linux).
+    # Controller.quit() has saved settings and closed the databases by now. Exit without library teardown, which
+    # could crash after a clean quit (CI: glibc abort on Linux, access violation in os._exit on Windows).
     logging.shutdown()
-    sys.stdout and sys.stdout.flush()
-    sys.stderr and sys.stderr.flush()
-    os._exit(code)
+    native.hard_exit(code)

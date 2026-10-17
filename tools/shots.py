@@ -195,5 +195,5 @@ def run():
 
 QTimer.singleShot(300, run)
 app.exec()
-sys.stdout.flush()
-os._exit(0)                                          # same clean exit as the app (see app.main)
+from glassprompter import platform as _native  # noqa: E402
+_native.hard_exit(0)                                 # same clean exit as the app (see app.main)

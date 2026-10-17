@@ -24,6 +24,26 @@ def launch_args(background=True):
     return [exe, os.path.abspath(sys.argv[0])] + extra
 
 
+def hard_exit(code=0):
+    """End the process now, skipping all library teardown. Call it only after everything is saved and flushed.
+
+    Python's interpreter teardown can destroy Qt objects in an unsafe order, and on Windows even os._exit()
+    runs every DLL's shutdown code, which crashed (access violation) while worker threads were still busy.
+    TerminateProcess skips that; elsewhere _exit() already does."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream and stream.flush()
+        except Exception:                                # noqa: BLE001 - closed or missing console
+            pass
+    if sys.platform == "win32":
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        k32.GetCurrentProcess.restype = ctypes.c_void_p
+        k32.TerminateProcess.argtypes = [ctypes.c_void_p, ctypes.c_uint]
+        k32.TerminateProcess(k32.GetCurrentProcess(), int(code) & 0xFFFFFFFF)
+    os._exit(int(code))
+
+
 class HotkeyManagerBase:
     """register(hid, key) -> bool; unregister_all(); taken() -> list of keys that fell back or failed."""
 
