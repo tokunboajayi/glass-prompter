@@ -103,7 +103,7 @@ class Transcript:
     """The conversation so far: [{"t": seconds since start, "who": "you" | "them", "text": str}]."""
 
     def __init__(self, segments=None, started=None):
-        self.started = started or time.time()
+        self.started = time.time() if started is None else float(started)
         self.segments = list(segments or [])
 
     def add(self, who, text, at=None):

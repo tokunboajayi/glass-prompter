@@ -1,5 +1,42 @@
 # Changelog
 
+## 2.7.3 - 2026-10-19
+**Smoother windows, see-through everything, and sign in instead of pasting a key.**
+
+- **Settings fits any screen.** It's now a compact window (780 x 560) with a sidebar: Reading, AI, Look, Privacy
+  and System. The Done button is always visible, Esc closes it, and it reopens on the page you used last. Before,
+  it filled a 1280 x 800 laptop and an auto-hidden taskbar could cover Done.
+- **Make every window see-through, not just Ghost.** Each window's header has a glass button that cycles Solid,
+  Glass and Clear for all windows at once (also in Settings › Look › Windows). The panel turns see-through
+  while the text and controls stay sharp. With *Solid while I use it* on, a window turns solid under the mouse.
+- **Windows remember where you left them** (position, and size for resizable ones), and always open fully on
+  screen, clear of an auto-hidden taskbar.
+- **Settings no longer blocks the app.** It stays open beside the prompter, so you see each change live and can
+  keep playing or scrolling while you adjust.
+- **See-through from the ⋯ menu:** *Panel* sets how solid the prompter is while staying clickable (unlike Ghost),
+  and *Windows* switches every window between Solid, Glass and Clear.
+- **Move windows from any empty spot**, not just the thin title strip. Windows fade in instead of popping up
+  (skipped with Reduce motion).
+- **Meeting copilot refresh:**
+  - **Compact bar** (the − button or Ctrl+B): just the live timer, Start/End, Assist and the latest answer, small
+    enough to sit beside a video call. It remembers your choice.
+  - **Colour-coded transcript:** *You* in aqua, *Them* in violet, each line with its time.
+  - **Answer history:** earlier answers aren't lost. Step through them with ‹ › or Alt+← / Alt+→.
+  - **Keys in the copilot:** Ctrl+Enter for Assist, Ctrl+1 to Ctrl+5 for the quick actions, Ctrl+L to ask.
+- Fixed: a meeting transcript created with a start time of 0 used the current time instead.
+
+- **Sign in with ChatGPT.** ChatGPT Plus and Pro subscribers can power the AI assistant, the meeting copilot and
+  the phone's AI tab with their plan: Settings › AI assistant › Sign in › ChatGPT. Answers count toward the plan's
+  usage instead of an API bill, and you can cap or disconnect the app in ChatGPT Settings. Uses OpenAI's
+  sign-in for open-source local apps (the app registers itself on first sign-in; tokens renew automatically;
+  Sign out revokes them). Web search isn't available on this route.
+- **Sign in with OpenRouter.** One click creates an OpenRouter key for you (pay-as-you-go, hundreds of models), so
+  there's nothing to copy and paste.
+- Both run in your own browser with a one-time local callback (`127.0.0.1`), a random state and PKCE.
+- **Mac releases can be signed and notarized.** The build signs with a Developer ID (hardened runtime), then
+  notarizes and staples the disk image as soon as the signing secrets are added (see RELEASING.md). Until then
+  builds stay ad-hoc signed as before.
+
 ## 2.7.2 - 2026-10-16
 **A cleaner, deeper look with the meeting copilot built in.** Same Aurora Glass style, checked window by window.
 

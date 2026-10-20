@@ -64,7 +64,7 @@ def _repolish(w):
 
 
 def _ai_ready(cfg):
-    return bool(ai.load_key()) or cfg.ai_provider == "ollama"
+    return ai.is_ready(cfg.ai_provider)
 
 
 def _ask(controller, kind, messages, context, jpeg, tokens, web, relay, meeting_id=None):
@@ -126,6 +126,19 @@ def _flat_text(placeholder, px):
     return t
 
 
+def transcript_html(tr, limit=200):
+    """The live transcript as HTML: a coloured speaker label per line (You aqua, Them violet), newest last."""
+    import html
+    rows = []
+    for s in tr.segments[-limit:]:
+        me = s.get("who") == meeting.ME
+        rows.append('<p style="margin:0 0 6px 0"><span style="color:%s;font-weight:600">%s</span>'
+                    '<span style="color:#8C95AB">&nbsp;&nbsp;%s</span><br>%s</p>'
+                    % ("#40E8D0" if me else "#A48BFF", "You" if me else "Them", meeting.fmt_clock(s.get("t", 0)),
+                       html.escape(s.get("text", ""))))
+    return "".join(rows)
+
+
 def make_copilot(controller):
     from .dialogs import BaseDialog, label
 
@@ -148,6 +161,9 @@ def make_copilot(controller):
             self.busy = False
             self.last_smart = 0.0
             self.chat = []                               # follow-up questions typed in this meeting
+            self.answers = []                            # [(badge, text)] every answer this session, oldest first
+            self.ans_i = -1
+            self._full_size = None
             self.resize(580, 780)
             self.setMinimumSize(540, 700)
 
@@ -166,6 +182,9 @@ def make_copilot(controller):
             self.start_btn = _btn("Start meeting", self.toggle_meeting, "Start or end the meeting  (%s+M)" % MOD,
                                   primary=True)
             top.addWidget(self.start_btn)
+            self.compact_btn = _btn("", self.toggle_compact, "Compact bar  (Ctrl+B)", ghost=True, compact=True)
+            self.compact_btn.setFixedWidth(34)
+            top.addWidget(self.compact_btn)
             root.addLayout(top)
 
             # mode + context + history
@@ -180,18 +199,27 @@ def make_copilot(controller):
                                     "Your notes, knowledge files and custom modes"))
             row.addWidget(_icon_btn("history", "History", self.c.open_meetings,
                                     "Past meetings, notes and follow-up emails"))
-            root.addLayout(row)
+            self.mode_row = QWidget()
+            self.mode_row.setLayout(row)
+            row.setContentsMargins(0, 0, 0, 0)
+            root.addWidget(self.mode_row)
 
             # transcript
             card, lay = _card(2)
             lay.addWidget(_card_header("Transcript", label("You = microphone  " + chr(0xB7) + "  Them = computer sound",
                                                           "muted")))
-            self.live = _flat_text("The conversation appears here once the meeting starts.", 13)
+            self.live = QTextBrowser()                     # colour-coded: You in aqua, Them in violet
+            self.live.setProperty("flat", True)
+            self.live.setFrameShape(QFrame.Shape.NoFrame)
+            self.live.setOpenLinks(False)
+            self.live.setStyleSheet("QTextBrowser { font-size: 13px; }")
+            self.live.setPlaceholderText("The conversation appears here once the meeting starts.")
             self.live.setMinimumHeight(80)
             lay.addWidget(self.live, 1)
             self.partial_lab = label("", "muted")
             self.partial_lab.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             lay.addWidget(self.partial_lab)
+            self.transcript_card = card
             root.addWidget(card, 4)
 
             # actions
@@ -208,7 +236,10 @@ def make_copilot(controller):
                 b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
                 chips.addWidget(b)
                 self.chip_btns.append(b)
-            root.addLayout(chips)
+            self.chips_row = QWidget()
+            self.chips_row.setLayout(chips)
+            chips.setContentsMargins(0, 0, 0, 0)
+            root.addWidget(self.chips_row)
 
             # answer
             self.badge = label("", "badge")
@@ -224,7 +255,15 @@ def make_copilot(controller):
             tools.addWidget(_btn("Send to prompter", self.answer_to_prompter, "Read the answer on the prompter",
                                  ghost=True, compact=True))
             tools.addStretch(1)
+            self.prev_btn = _btn(chr(0x2039), lambda: self.show_answer(self.ans_i - 1), "Earlier answer  (Alt+Left)",
+                                 ghost=True, compact=True)
+            self.ans_count = label("", "muted")
+            self.next_btn = _btn(chr(0x203A), lambda: self.show_answer(self.ans_i + 1), "Later answer  (Alt+Right)",
+                                 ghost=True, compact=True)
+            for w in (self.prev_btn, self.ans_count, self.next_btn):
+                tools.addWidget(w)
             lay.addLayout(tools)
+            self.answer_card = card
             root.addWidget(card, 6)
 
             # ask
@@ -237,7 +276,10 @@ def make_copilot(controller):
             ask.addWidget(self.ask_box, 1)
             self.ask_btn = _btn("Ask", self.ask)
             ask.addWidget(self.ask_btn)
-            root.addLayout(ask)
+            self.ask_row = QWidget()
+            self.ask_row.setLayout(ask)
+            ask.setContentsMargins(0, 0, 0, 0)
+            root.addWidget(self.ask_row)
 
             # switches
             opts = QHBoxLayout()
@@ -257,8 +299,14 @@ def make_copilot(controller):
             for w in (self.sys_audio, self.smart, self.use_screen):
                 opts.addWidget(w)
             opts.addStretch(1)
-            root.addLayout(opts)
+            self.opts_row = QWidget()
+            self.opts_row.setLayout(opts)
+            opts.setContentsMargins(0, 0, 0, 0)
+            root.addWidget(self.opts_row)
             self.sync_settings()
+            self._shortcuts()
+            self._update_history_nav()
+            self.set_compact(bool(getattr(self.c.cfg.s, "copilot_compact", False)), save=False)
 
             self.clock = QTimer(self, interval=1000, timeout=self.refresh_info)
             self.clock.start()
@@ -311,7 +359,7 @@ def make_copilot(controller):
                 self.pill.setText("Ready")
                 self.info.setText(("%s %s %s" % (ai.provider_name(s.ai_provider, ai.load_key()).split(" (")[0],
                                                   chr(0xB7), s.ai_model or "best model")) if _ai_ready(s) else
-                                  "Add an AI key in Settings to get answers")
+                                  "Sign in or add an AI key in Settings to get answers")
                 role = "idle"
             if self.pill.property("role") != role:
                 self.pill.setProperty("role", role)
@@ -373,7 +421,7 @@ def make_copilot(controller):
                 self.show_note("Meeting saved to History. It was too short to write notes.")
                 return
             if not _ai_ready(self.c.cfg.s):
-                self.show_note("Meeting saved to History. Add an AI key to get notes and a follow-up email.")
+                self.show_note("Meeting saved to History. Sign in or add an AI key to get notes and a follow-up email.")
                 return
             self.badge.setText("WRITING NOTES" + ELLIPSIS)
             self.answer.setPlainText("Writing your meeting notes and follow-up email" + ELLIPSIS)
@@ -415,7 +463,7 @@ def make_copilot(controller):
                 self.run_action("assist", question=text, auto=True)
 
         def _render_live(self):
-            self.live.setPlainText(self.transcript.render(limit=12000))
+            self.live.setHtml(transcript_html(self.transcript))
             self.live.moveCursor(QTextCursor.MoveOperation.End)
 
         # ---------------------------------------------------------------- AI
@@ -453,7 +501,7 @@ def make_copilot(controller):
                 return
             if not _ai_ready(self.c.cfg.s):
                 self.refresh_info()
-                self.show_note("Add an API key from any AI provider in Settings " + chr(0x203A) +
+                self.show_note("Sign in or add an API key in Settings " + chr(0x203A) +
                                " AI assistant first.")
                 return
             jpeg = self._grab_jpeg()
@@ -469,7 +517,7 @@ def make_copilot(controller):
             if not q or self.busy:
                 return
             if not _ai_ready(self.c.cfg.s):
-                self.show_note("Add an API key from any AI provider in Settings " + chr(0x203A) +
+                self.show_note("Sign in or add an API key in Settings " + chr(0x203A) +
                                " AI assistant first.")
                 return
             self.ask_box.clear()
@@ -481,8 +529,7 @@ def make_copilot(controller):
         def _answered(self, kind, reply, error, saw_screen):
             if kind == "notes":
                 if reply:
-                    self.badge.setText("NOTES " + chr(0xB7) + " SAVED TO HISTORY")
-                    self.answer.setPlainText(reply)
+                    self.add_answer("NOTES " + chr(0xB7) + " SAVED TO HISTORY", reply)
                 else:
                     self.show_note("Meeting saved, but the notes failed: %s. Open History to try again." % error)
                 return
@@ -494,8 +541,7 @@ def make_copilot(controller):
                     self.chat.pop()
             if reply:
                 name = meeting.ACTIONS[kind][0] if kind in meeting.ACTIONS else "Answer"
-                self.badge.setText((name + (" " + chr(0xB7) + " viewed screen" if saw_screen else "")).upper())
-                self.answer.setPlainText(reply)
+                self.add_answer((name + (" " + chr(0xB7) + " viewed screen" if saw_screen else "")).upper(), reply)
             else:
                 self.show_note(error or "No answer.")
 
@@ -506,6 +552,77 @@ def make_copilot(controller):
                     "words": self.transcript.words() if self.running else 0,
                     "badge": self.badge.text().title(), "answer": self.answer.toPlainText()[:4000],
                     "ready": _ai_ready(self.c.cfg.s)}
+
+        # ---------------------------------------------------------------- answer history
+        def add_answer(self, badge, text):
+            self.answers.append((badge, text))
+            self.answers = self.answers[-50:]
+            self.show_answer(len(self.answers) - 1)
+
+        def show_answer(self, i):
+            if not self.answers:
+                return
+            self.ans_i = max(0, min(len(self.answers) - 1, i))
+            badge, text = self.answers[self.ans_i]
+            self.badge.setText(badge)
+            self.answer.setPlainText(text)
+            self._update_history_nav()
+
+        def _update_history_nav(self):
+            n = len(self.answers)
+            for w in (self.prev_btn, self.ans_count, self.next_btn):
+                w.setVisible(n > 1)
+            self.prev_btn.setEnabled(self.ans_i > 0)
+            self.next_btn.setEnabled(0 <= self.ans_i < n - 1)
+            self.ans_count.setText("%d of %d" % (self.ans_i + 1, n) if n else "")
+
+        # ---------------------------------------------------------------- compact bar
+        def toggle_compact(self):
+            self.set_compact(not self.compact)
+
+        def set_compact(self, on, save=True):
+            """Compact: a slim bar (status, Start/End, Assist, the latest answer) to sit beside a video call."""
+            was = getattr(self, "compact", None)
+            self.compact = bool(on)
+            for w in (self.mode_row, self.transcript_card, self.chips_row, self.ask_row, self.opts_row):
+                w.setVisible(not on)
+            self.answer.setMinimumHeight(64 if on else 110)
+            self.compact_btn.setIcon(icons.icon("plus" if on else "minus", "#C9CFDD", 14))
+            self.compact_btn.setToolTip(("Full view" if on else "Compact bar") + "  (Ctrl+B)")
+            if on:
+                if was is False:
+                    self._full_size = self.size()
+                self.setMinimumSize(420, 0)
+                self.layout().activate()
+                self.resize(max(440, min(self.width(), 520)), self.layout().totalMinimumSize().height() + 60)
+            else:
+                self.setMinimumSize(540, 700)
+                size = self._full_size
+                self.resize(size if size is not None else self.size().expandedTo(self.minimumSize()))
+            if save:
+                self._set("copilot_compact", self.compact)
+
+        # ---------------------------------------------------------------- keyboard
+        def _shortcuts(self):
+            from PySide6.QtGui import QKeySequence, QShortcut
+            keys = [("Ctrl+Return", lambda: self.run_action("assist")), ("Ctrl+Enter", lambda: self.run_action("assist")),
+                    ("Ctrl+B", self.toggle_compact), ("Ctrl+L", self._focus_ask),
+                    ("Alt+Left", lambda: self.show_answer(self.ans_i - 1)),
+                    ("Alt+Right", lambda: self.show_answer(self.ans_i + 1))]
+            keys += [("Ctrl+%d" % (i + 1), (lambda a=aid: self.run_action(a))) for i, (aid, _n) in enumerate(CHIPS)]
+            self._keys = []
+            for seq, fn in keys:
+                sc = QShortcut(QKeySequence(seq), self)
+                sc.activated.connect(fn)
+                self._keys.append(sc)
+            for i, b in enumerate(self.chip_btns):
+                b.setToolTip("%s  (Ctrl+%d)" % (b.toolTip(), i + 1))
+            self.assist_btn.setToolTip(self.assist_btn.toolTip() + "  In this window: Ctrl+Enter.")
+
+        def _focus_ask(self):
+            if self.compact:
+                self.set_compact(False)
+            self.ask_box.setFocus()
 
         # ---------------------------------------------------------------- output
         def show_note(self, text):
@@ -868,7 +985,7 @@ def make_meetings(controller):
             if not m or not m.get("segments"):
                 return
             if not _ai_ready(self.c.cfg.s):
-                self.c.prompter.toast("Add an AI key in Settings " + chr(0x203A) + " AI assistant first.", T.bad, 4)
+                self.c.prompter.toast("Sign in or add an AI key in Settings " + chr(0x203A) + " AI assistant first.", T.bad, 4)
                 return
             s = self.c.cfg.s
             tr = meeting.Transcript(m["segments"], m["started"])

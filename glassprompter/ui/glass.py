@@ -1,8 +1,8 @@
 """Aurora Glass toolkit: frosted panel painting, toggle switches and frameless glass dialogs."""
 from PySide6.QtCore import QEasingCurve, QEvent, QObject, QPoint, QPointF, QRectF, QSize, Qt, QTimer, QVariantAnimation, Signal
-from PySide6.QtGui import (QColor, QFont, QFontMetricsF, QGuiApplication, QLinearGradient, QPainter, QPainterPath,
+from PySide6.QtGui import (QColor, QCursor, QFont, QFontMetricsF, QGuiApplication, QLinearGradient, QPainter, QPainterPath,
                            QPen, QRadialGradient)
-from PySide6.QtWidgets import QCheckBox, QDialog, QPushButton, QWidget
+from PySide6.QtWidgets import QApplication, QCheckBox, QDialog, QPushButton, QWidget
 
 from .. import platform as native
 from . import icons
@@ -128,20 +128,61 @@ class Switch(QCheckBox):
                    Qt.AlignmentFlag.AlignVCenter, self.text())
 
 
+GLASS_LEVELS = ((1.0, "Solid"), (0.7, "Glass"), (0.4, "Clear"))
+TASKBAR_ROOM = 48            # keep clear of an auto-hidden Windows taskbar, which the OS doesn't report
+
+
+def usable_rect(screen):
+    """Where windows may go on `screen`: its available area, minus room for an auto-hidden taskbar."""
+    r = screen.availableGeometry()
+    if native.OS == "windows" and r == screen.geometry():
+        r.setBottom(r.bottom() - TASKBAR_ROOM)
+    return r
+
+
+def _level_name(lvl):
+    return min(GLASS_LEVELS, key=lambda p: abs(p[0] - lvl))[1]
+
+
+def step_level(lvl, d):
+    """One step along Solid > Glass > Clear: d=-1 more see-through, d=+1 more solid (stops at the ends)."""
+    levels = [p[0] for p in GLASS_LEVELS]                      # solid first
+    i = min(range(len(levels)), key=lambda k: abs(levels[k] - lvl))
+    return levels[max(0, min(len(levels) - 1, i - d))]
+
+
+def _next_level(lvl):
+    levels = [p[0] for p in GLASS_LEVELS]
+    i = min(range(len(levels)), key=lambda k: abs(levels[k] - lvl))
+    return levels[(i + 1) % len(levels)]
+
+
 class GlassDialog(QDialog):
-    """Frameless frosted dialog: brand header, one close button, drag anywhere on the header, edge resize.
-    Hidden from screen sharing so scripts and PINs stay private."""
+    """Frameless frosted dialog: brand header, see-through + close buttons, drag on the header, edge resize.
+    Hidden from screen sharing so scripts and PINs stay private.
+
+    Every window shares one see-through level (Solid / Glass / Clear: the header's glass button, or Settings >
+    Look) and can turn solid while the mouse is over it. Windows open fully on-screen (clear of an auto-hidden
+    taskbar) and remember where you left them. The controller sets `prefs` (Settings) and `save` (persist)."""
+
+    prefs = None
+    save = None
 
     def __init__(self, parent=None, resizable=False, title=""):
         super().__init__(parent, Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint
                          | Qt.WindowType.WindowStaysOnTopHint)
         self.frosted = native.backdrop_supported()
+        self.frosted_ok = self.frosted                    # this system can blur; we may switch it off for see-through
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setProperty("glass", True)
         self.setMouseTracking(True)
         self.resizable = resizable
         self.header_title = title
         self._shifted = False
+        self._placed = False
+        self._hover = False
+        self._backdrop = None
+        self._hover_timer = QTimer(self, interval=150, timeout=self._check_hover)
         self.close_btn = QPushButton(self)
         self.close_btn.setObjectName("close")
         self.close_btn.setIcon(icons.icon("close", "#C9CFDD", 14))
@@ -150,6 +191,94 @@ class GlassDialog(QDialog):
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_btn.setFocusPolicy(Qt.FocusPolicy.TabFocus)
         self.close_btn.clicked.connect(self.reject)
+        self.glass_btn = QPushButton(self)
+        self.glass_btn.setObjectName("close")             # the same quiet round header button
+        self.glass_btn.setIcon(icons.icon("ghost", "#C9CFDD", 14))
+        self.glass_btn.setAccessibleName("See-through level")
+        self.glass_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.glass_btn.setFocusPolicy(Qt.FocusPolicy.TabFocus)
+        self.glass_btn.clicked.connect(lambda: GlassDialog.set_level(_next_level(self.level())))
+
+    # ---------------------------------------------------------------- see-through
+    @classmethod
+    def level(cls):
+        try:
+            return max(0.2, min(1.0, float(getattr(cls.prefs, "window_glass", 1.0))))
+        except (TypeError, ValueError):
+            return 1.0
+
+    def effective_level(self):
+        solid_hover = bool(getattr(self.prefs, "glass_solid_hover", True))
+        return 1.0 if (solid_hover and self._hover) else self.level()
+
+    @classmethod
+    def set_level(cls, value):
+        """Change the see-through level of every window at once."""
+        if cls.prefs is not None:
+            cls.prefs.window_glass = float(value)
+            if cls.save:
+                cls.save()
+        for w in QApplication.topLevelWidgets():
+            if isinstance(w, GlassDialog) and w.isVisible():
+                w.apply_glass()
+
+    def apply_glass(self):
+        """Repaint at the current level. Below solid the frosted blur is switched off, so what's behind really
+        shows through (over a blur it would only look grey). Text and controls stay fully sharp."""
+        want = "acrylic" if self.effective_level() >= 0.99 else "none"
+        if self.frosted_ok and self.isVisible() and want != self._backdrop:
+            self.frosted = bool(native.apply_backdrop(self, want)) if want == "acrylic" else False
+            if want == "none":
+                native.apply_backdrop(self, "none")
+            self._backdrop = want
+        if self.level() < 0.99:
+            self._hover_timer.start()
+        else:
+            self._hover_timer.stop()
+            self._hover = False
+        self.glass_btn.setToolTip("See-through: %s  (click for %s)" % (_level_name(self.level()),
+                                                                       _level_name(_next_level(self.level()))))
+        self.update()
+
+    def _check_hover(self):
+        inside = self.isVisible() and self.frameGeometry().contains(QCursor.pos())
+        if inside != self._hover:
+            self._hover = inside
+            self.apply_glass()
+
+    # ---------------------------------------------------------------- placement
+    def _key(self):
+        return self.header_title or type(self).__name__
+
+    def _place(self):
+        """First show: restore the saved spot (and size, if resizable), then keep the whole window visible."""
+        saved = (getattr(self.prefs, "window_geometry", None) or {}).get(self._key())
+        if isinstance(saved, (list, tuple)) and len(saved) == 4:
+            x, y, w, h = (int(v) for v in saved)
+            if self.resizable:
+                self.resize(max(w, self.minimumWidth()), max(h, self.minimumHeight()))
+            screen = QGuiApplication.screenAt(QPoint(x + 40, y + 20)) or QGuiApplication.primaryScreen()
+        else:
+            screen = QGuiApplication.screenAt(QCursor.pos()) or QGuiApplication.primaryScreen()
+            a = usable_rect(screen)
+            x = a.center().x() - self.width() // 2
+            y = a.top() + max(8, (a.height() - self.height()) // 3)
+        area = usable_rect(screen).adjusted(8, 8, -8, -8)
+        w, h = min(self.width(), area.width()), min(self.height(), area.height())
+        if (w, h) != (self.width(), self.height()):
+            self.resize(w, h)
+        self.move(min(max(x, area.left()), area.right() - w + 1), min(max(y, area.top()), area.bottom() - h + 1))
+
+    def hideEvent(self, e):
+        prefs, save = GlassDialog.prefs, GlassDialog.save    # via the class: a plain function must not get `self`
+        if prefs is not None and self._placed:
+            geo = dict(getattr(prefs, "window_geometry", None) or {})
+            geo[self._key()] = [self.x(), self.y(), self.width(), self.height()]
+            prefs.window_geometry = geo
+            if save:
+                save()
+        self._hover_timer.stop()
+        super().hideEvent(e)
 
     def showEvent(self, e):
         if not self._shifted and self.layout():
@@ -159,15 +288,35 @@ class GlassDialog(QDialog):
             self.layout().activate()
             if not self.resizable:
                 self.resize(self.width(), max(self.height(), self.layout().totalSizeHint().height()))
+        if not self._placed:
+            self._place()
+            self._placed = True
         super().showEvent(e)
         native.prepare_window(self, above_prompter=True)
         # Qt can re-apply its own window level right after showing; re-assert ours once it has settled (macOS)
         QTimer.singleShot(0, self, lambda: native.prepare_window(self, above_prompter=True))
         QTimer.singleShot(120, self, lambda: self.isVisible() and native.prepare_window(self, above_prompter=True))
-        if self.frosted:
+        if self.frosted_ok and self._backdrop is None and self.effective_level() >= 0.99:
             self.frosted = bool(native.apply_backdrop(self, "acrylic"))
+            self._backdrop = "acrylic"
         native.set_capture_excluded(self, True)
         self._place_close()
+        self.apply_glass()
+        self._fade_in()
+
+    def _fade_in(self):
+        """Ease in over ~160 ms instead of popping up (skipped with Reduce motion)."""
+        if getattr(self.prefs, "reduce_motion", False) or getattr(self, "_faded", False):
+            return
+        self._faded = True
+        from PySide6.QtCore import QPropertyAnimation
+        self.setWindowOpacity(0.0)
+        self._fade = QPropertyAnimation(self, b"windowOpacity", self)
+        self._fade.setDuration(160)
+        self._fade.setStartValue(0.0)
+        self._fade.setEndValue(1.0)
+        self._fade.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._fade.start()
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
@@ -175,13 +324,19 @@ class GlassDialog(QDialog):
 
     def _place_close(self):
         self.close_btn.move(self.width() - 24 - 12, 10)
+        self.glass_btn.move(self.width() - 24 - 12 - 30, 10)
         self.close_btn.raise_()
+        self.glass_btn.raise_()
 
     def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         r = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
-        paint_glass(p, r, 175 if self.frosted else 250, self.frosted, phase=0, rim=0.0, glow=0.0)
+        lvl = self.effective_level()
+        if lvl >= 0.99:
+            paint_glass(p, r, 175 if self.frosted else 250, self.frosted, phase=0, rim=0.0, glow=0.0)
+        else:                                       # unblurred: final panel opacity = lvl (paint_glass adds 40)
+            paint_glass(p, r, max(10, int(255 * lvl) - 40), False, phase=0, rim=0.0, glow=0.0)
         icons.draw(p, "spark", QRectF(18, 15, 14, 14), T.aqua)
         p.setPen(T.on_surface)
         p.setFont(font("ui", 13, font_weight_semibold()))
@@ -206,8 +361,8 @@ class GlassDialog(QDialog):
             return super().mousePressEvent(ev)
         pt = ev.position().toPoint()
         edges = self._edges(pt)
-        if edges == Qt.Edge(0) and pt.y() >= HEADER + 8:
-            return                                       # only the header works like a title bar
+        # Any empty spot moves the window (presses on buttons, fields and lists never reach here), so you don't
+        # have to aim for the thin title strip.
         wh, ok = self.windowHandle(), False
         if native.OS != "macos" and wh is not None:      # macOS: drag by hand (system move is a no-op there)
             ok = wh.startSystemResize(edges) if edges != Qt.Edge(0) else wh.startSystemMove()

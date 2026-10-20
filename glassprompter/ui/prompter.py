@@ -78,6 +78,12 @@ class ControlBar(QFrame):
             {"kind": "stepper", "icon": "text_bigger", "text": "Text size",
              "value": lambda: "%d" % cfg.font_px, "dec": lambda: owner.change_font(-2),
              "inc": lambda: owner.change_font(+2)},
+            {"kind": "stepper", "icon": None, "text": "Panel",
+             "value": lambda: "%d%%" % round(cfg.panel_alpha * 100),
+             "dec": lambda: owner.change_glass(-0.1), "inc": lambda: owner.change_glass(+0.1)},
+            {"kind": "stepper", "icon": None, "text": "Windows",
+             "value": lambda: owner.window_glass_name(),
+             "dec": lambda: owner.step_window_glass(-1), "inc": lambda: owner.step_window_glass(+1)},
             {"kind": "toggle", "icon": "mirror", "text": "Mirror text", "keys": "M",
              "state": lambda: cfg.mirror, "fn": owner.toggle_mirror},
             {"kind": "toggle", "icon": "shield", "text": "Hide from screen share", "keys": "C",
@@ -1208,6 +1214,16 @@ class Prompter(QWidget):
         self.toast("Text size %d px" % self.cfg.font_px)
         self.settingsChanged.emit()
         self.stateChanged.emit()
+
+    def window_glass_name(self):
+        from .glass import GlassDialog, _level_name
+        return _level_name(GlassDialog.level())
+
+    def step_window_glass(self, d):
+        """Every window's see-through level: d=-1 more see-through, +1 more solid."""
+        from .glass import GlassDialog, step_level
+        GlassDialog.set_level(step_level(GlassDialog.level(), d))
+        self.toast("Windows: %s" % self.window_glass_name())
 
     def change_glass(self, d):
         if self.cfg.clear_mode:

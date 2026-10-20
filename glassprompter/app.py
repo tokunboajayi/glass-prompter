@@ -229,11 +229,14 @@ class Controller(QObject):
         self.dialog = None
         self.assistant = None
         self.copilot = None
+        self.settings_win = None
         self.meetings_window = None
         self.meetings = meeting.MeetingStore()
         self.drop_mtimes = {}
         self.network_note = ""
 
+        from .ui.glass import GlassDialog
+        GlassDialog.prefs, GlassDialog.save = self.cfg.s, self.cfg.save     # see-through level + window spots
         self.prompter = Prompter(self.cfg.s)
         self.prompter.paste_requested = self.paste_text
         self.prompter.requestLibrary.connect(self.open_library)
@@ -831,6 +834,11 @@ class Controller(QObject):
             self.copilot.activateWindow()
         return self.copilot
 
+    def set_window_glass(self, level):
+        """See-through level of every window (Settings > Look, or a window's glass button)."""
+        from .ui.glass import GlassDialog
+        GlassDialog.set_level(level)
+
     def open_meetings(self):
         if self.meetings_window is None:
             from .ui.copilot import make_meetings
@@ -851,8 +859,18 @@ class Controller(QObject):
         self.prompter.toast("Screenshot saved to Pictures › Glass Prompter and copied", theme.T.ok, 4)
 
     def open_settings(self):
-        self.show_dialog(SettingsDialog(None, self))
+        """Settings is a normal window: it stays open beside the prompter, so you see each change as you make it
+        and can keep using the prompter (play, scroll, try a speed) while it's open."""
+        if self.settings_win is None:
+            self.settings_win = SettingsDialog(None, self)
+            self.settings_win.finished.connect(self._settings_closed)
+            self.settings_win.show()
+        self.settings_win.raise_()
+        self.settings_win.activateWindow()
+
+    def _settings_closed(self, _result=0):
         self.cfg.save()
+        self.settings_win = None
 
     def open_about(self):
         self.show_dialog(AboutDialog(None, lambda: self.check_updates(True), self.report_problem))

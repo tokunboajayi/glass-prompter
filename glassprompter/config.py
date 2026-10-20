@@ -51,6 +51,10 @@ class Settings:
     copilot_screen: bool = True                        # actions may include a screenshot
     copilot_model: str = ""                            # speech model folder name; "" = the bundled English one
     copilot_consent_seen: bool = False
+    copilot_compact: bool = False                      # the copilot as a slim bar: status, Assist, latest answer
+    window_glass: float = 1.0                          # see-through level of every window (1 = solid)
+    glass_solid_hover: bool = True                     # see-through windows turn solid under the mouse
+    window_geometry: dict = field(default_factory=dict)  # saved position/size per window
     assistant_suggest: bool = True                     # AI assistant: suggest answers/questions while it listens
     remote_enabled: bool = True
     remote_port: int = 8765
@@ -74,6 +78,7 @@ LIMITS = {
     "read_line": (0.2, 0.7),
     "remote_port": (1024, 65535),
     "ai_max_tokens": (256, 64000),
+    "window_glass": (0.25, 1.0),
 }
 
 
@@ -102,6 +107,8 @@ def validate(s):
                 v = d if v is None else str(v)
             elif isinstance(d, list):
                 v = list(v) if isinstance(v, (list, tuple)) else []
+            elif isinstance(d, dict):
+                v = dict(v) if isinstance(v, dict) else {}
         except (TypeError, ValueError):
             v = d
         if f.name in LIMITS:

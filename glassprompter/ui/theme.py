@@ -159,6 +159,9 @@ QListWidget {{ padding: 4px; outline: 0; }}
 QListWidget::item {{ border-radius: 8px; padding: 8px 10px; margin: 1px 0; color: #F2F4FA; }}
 QListWidget::item:selected {{ background: rgba(255,255,255,20); color: #FFFFFF; }}
 QListWidget::item:hover:!selected {{ background: rgba(255,255,255,9); }}
+QListWidget#nav {{ background: transparent; border: 0; padding: 0; }}
+QListWidget#nav::item {{ padding: 9px 10px; margin: 1px 0; font-size: 14px; }}
+QListWidget#nav::item:selected {{ background: rgba(64,232,208,30); color: #FFFFFF; }}
 QPushButton {{ background: rgba(255,255,255,12); color: #F2F4FA; border: 1px solid rgba(255,255,255,18);
     border-radius: 9px; padding: 7px 14px; min-height: 18px; font-family: "{f['ui']}"; font-size: 13px; }}
 QPushButton:hover {{ background: rgba(255,255,255,22); }}

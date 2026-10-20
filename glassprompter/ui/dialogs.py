@@ -6,11 +6,12 @@ from PySide6.QtCore import QRectF, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QFont, QGuiApplication, QKeySequence, QPainter, QShortcut
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QPushButton,
-                               QScrollArea, QSlider, QSpinBox, QVBoxLayout, QWidget)
+                               QScrollArea, QSlider, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, __version__, engine, paths, scripts
 from .. import platform as native
-from .glass import GlassDialog, Switch
+from . import icons
+from .glass import GLASS_LEVELS, GlassDialog, Switch
 from .theme import AQUA, DASH, DOT, ELLIPSIS, T, VIOLET
 
 try:
@@ -370,36 +371,55 @@ def switch(val, apply):
 
 
 class SettingsDialog(BaseDialog):
+    last_page = 0                                       # reopen on the page you used last
+
     def __init__(self, parent, controller):
-        super().__init__(parent, "Settings")
+        super().__init__(parent, "Settings", resizable=True)
         self.c = controller
         s = controller.cfg.s
-        self.setFixedWidth(1240)                      # three columns: short enough for a laptop screen
+        # A sidebar of pages, one shown at a time: fits a 1280x800 laptop with room to spare, and Done stays put.
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(24, 20, 24, 20)
+        outer.setContentsMargins(20, 16, 20, 18)
         outer.setSpacing(0)
-        body = QWidget()
-        cols = QHBoxLayout(body)
-        cols.setContentsMargins(0, 0, 4, 0)
-        cols.setSpacing(20)
-        left, mid, right = QVBoxLayout(), QVBoxLayout(), QVBoxLayout()
-        for col in (left, mid, right):
-            col.setSpacing(6)
-            cols.addLayout(col, 1)
-        # scrolls only when the screen is too short for every row (small laptops), so nothing gets squeezed
-        area = QScrollArea()
-        area.setWidgetResizable(True)
-        area.setFrameShape(QFrame.Shape.NoFrame)
-        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        area.setStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; }")
-        area.setWidget(body)
-        outer.addWidget(area, 1)
+        main = QHBoxLayout()
+        main.setSpacing(18)
+        outer.addLayout(main, 1)
+        self.nav = QListWidget()
+        self.nav.setObjectName("nav")
+        self.nav.setAccessibleName("Settings pages")
+        self.nav.setFixedWidth(150)
+        self.nav.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        main.addWidget(self.nav)
+        self.stack = QStackedWidget()
+        main.addWidget(self.stack, 1)
+        self._pages = {}
+
+        def page(name, icon):
+            if name not in self._pages:
+                body = QWidget()
+                lay = QVBoxLayout(body)
+                lay.setContentsMargins(0, 0, 8, 0)
+                lay.setSpacing(6)
+                area = QScrollArea()
+                area.setWidgetResizable(True)
+                area.setFrameShape(QFrame.Shape.NoFrame)
+                area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+                area.setStyleSheet("QScrollArea, QScrollArea > QWidget > QWidget { background: transparent; }")
+                area.setWidget(body)
+                self.stack.addWidget(area)
+                it = QListWidgetItem(icons.icon(icon, "#C9CFDD", 18), name)
+                self.nav.addItem(it)
+                self._pages[name] = lay
+            return self._pages[name]
+        reading, ai_page = page("Reading", "mic"), page("AI", "spark")
+        look, privacy, system = page("Look", "ghost"), page("Privacy", "shield"), page("System", "settings")
+        self.nav.currentRowChanged.connect(self._show_page)
 
         # ---- left: reading, voice, read aloud
         card = Card()
         card.slider("Speed", 40, 400, s.wpm, lambda v: "%d wpm" % v, lambda v: self._set("wpm", v))
         card.row("3-2-1 countdown", switch(s.countdown, lambda v: self._set("countdown", v)))
-        _section(left, card, "Reading")
+        _section(reading, card, "Reading")
 
         card = Card()
         card.row("Voice Follow", switch(s.voice_follow, lambda v: v != s.voice_follow and controller.prompter.toggle_voice()),
@@ -422,7 +442,7 @@ class SettingsDialog(BaseDialog):
         lat = controller.voice.latency_ms
         card.row("Microphone", self.mic, ("Measured latency %d ms" % lat) if lat else
                  "Wired mics react fastest.")
-        _section(left, card, "Voice Follow")
+        _section(reading, card, "Voice Follow")
 
         from .. import tts
         card = Card()
@@ -441,7 +461,7 @@ class SettingsDialog(BaseDialog):
         self.preview = button("Play sample", self._preview)
         self.preview.setProperty("compact", True)
         card.row("Hear it", self.preview)
-        _section(left, card, "Read aloud")
+        _section(reading, card, "Read aloud")
         level, note = native.capture_support()
         card = Card()
         card.row("Hide from screen share", switch(s.hide_from_capture, lambda v: self._set("hide_from_capture", v)),
@@ -449,8 +469,7 @@ class SettingsDialog(BaseDialog):
         card.row("Phone remote on this Wi-Fi", switch(s.remote_enabled, self._remote), "Protected by a PIN.")
         card.row("Phone can view my screen", switch(s.phone_screen, lambda v: self._set("phone_screen", v)),
                  "Live view and AI chat on your paired phone.")
-        _section(left, card, "Privacy")
-        left.addStretch(1)
+        _section(privacy, card, "Privacy")
 
         # ---- right: appearance, privacy, system
         card = Card()
@@ -464,10 +483,39 @@ class SettingsDialog(BaseDialog):
         card.row("Text only, no panel", switch(s.clear_mode, lambda v: self._set("clear_mode", v)))
         card.row("Mirror for teleprompter glass", switch(s.mirror, lambda v: self._set("mirror", v)))
         card.row("Reduce motion", switch(s.reduce_motion, lambda v: self._set("reduce_motion", v)))
-        _section(right, card, "Appearance")
+        _section(look, card, "Prompter")
+
+        card = Card()
+        self.glass_box = QComboBox()
+        self.glass_box.setAccessibleName("Window see-through")
+        self.glass_box.setMinimumWidth(170)
+        for lvl, name in GLASS_LEVELS:
+            self.glass_box.addItem(name, lvl)
+        self.glass_box.setCurrentIndex(max(0, self.glass_box.findData(s.window_glass)))
+        self.glass_box.currentIndexChanged.connect(lambda _: self.c.set_window_glass(self.glass_box.currentData()))
+        card.row("See-through", self.glass_box, "Every window: settings, copilot, AI. Text stays sharp.")
+        card.row("Solid while I use it", switch(s.glass_solid_hover, lambda v: self._set_glass_hover(v)),
+                 "Turns solid under the mouse, see-through again when you move away.")
+        _section(look, card, "Windows")
 
         from .. import ai
         card = Card()
+        # one-click sign-in instead of copying a key: ChatGPT (your Plus/Pro plan) or OpenRouter (makes a key)
+        signin_box = QWidget()
+        sb = QHBoxLayout(signin_box)
+        sb.setContentsMargins(0, 0, 0, 0)
+        sb.setSpacing(6)
+        self.chatgpt_btn = button("ChatGPT", self._chatgpt_sign_in)
+        self.chatgpt_btn.setProperty("compact", True)
+        self.chatgpt_btn.setToolTip("Sign in with your ChatGPT Plus or Pro account. Answers use your plan's "
+                                    "allowance, no API key or API bill.")
+        self.openrouter_btn = button("OpenRouter", self._openrouter_sign_in)
+        self.openrouter_btn.setProperty("compact", True)
+        self.openrouter_btn.setToolTip("Sign in with OpenRouter and get a key automatically: one key for Claude, "
+                                       "GPT, Gemini and hundreds more. Pay-as-you-go credit.")
+        sb.addWidget(self.chatgpt_btn)
+        sb.addWidget(self.openrouter_btn)
+        self.signin_hint = card.row("Sign in", signin_box, "No key needed.")      # text set by _refresh_signin
         self.ai_provider = QComboBox()
         self.ai_provider.setAccessibleName("AI provider")
         self.ai_provider.setMinimumWidth(190)
@@ -526,11 +574,16 @@ class SettingsDialog(BaseDialog):
 
         class _Relay(QObject):
             done = Signal(bool, str, list)
+            signed = Signal(str, object, object)          # (which, result, error)
         self.key_relay = _Relay(self)
         self.key_relay.done.connect(self._key_checked)
-        if ai.load_key() or s.ai_provider == "ollama":
+        self.key_relay.signed.connect(self._signed_in)
+        self._signing = None
+        self._refresh_signin()
+        self._key_field_state()
+        if ai.is_ready(s.ai_provider):
             self.key_timer.start()
-        _section(mid, card, "AI assistant")
+        _section(ai_page, card, "AI assistant")
 
         from ..listen import system_audio_supported
         card = Card()
@@ -549,8 +602,7 @@ class SettingsDialog(BaseDialog):
         b = button("Open", self._meetings)
         b.setProperty("compact", True)
         card.row("Meeting history", b, "Notes, transcripts, follow-up emails.")
-        _section(mid, card, "Meeting copilot")
-        mid.addStretch(1)
+        _section(ai_page, card, "Meeting copilot")
 
 
         card = Card()
@@ -572,22 +624,122 @@ class SettingsDialog(BaseDialog):
             b.setProperty("compact", True)
             card.row("Shortcuts", b, controller.hotkey_summary())
             b.setToolTip(controller.hotkey_report())
-        _section(right, card, "System")
-        right.addStretch(1)
+        _section(system, card, "System")
+        for lay in self._pages.values():
+            lay.addStretch(1)
 
-        screen = QGuiApplication.primaryScreen()
-        room = screen.availableGeometry().height() - 150 if screen else 900
-        area.setMinimumHeight(min(body.sizeHint().height(), max(360, room)))
         foot = QHBoxLayout()
-        foot.setContentsMargins(0, 10, 0, 0)
+        foot.setContentsMargins(0, 12, 0, 0)
+        foot.addWidget(label("Changes apply as you make them.", "muted"))
         foot.addStretch(1)
-        foot.addWidget(button("Done", self.accept, primary=True))
+        done = button("Done", self.accept, primary=True)
+        done.setToolTip("Close Settings  (Esc)")
+        foot.addWidget(done)
         outer.addLayout(foot)
+        self.nav.setCurrentRow(max(0, min(self.nav.count() - 1, SettingsDialog.last_page)))
+        self.resize(780, 560)
+        self.setMinimumSize(640, 420)
         self._dl = None
 
     def _set(self, key, value):
         setattr(self.c.cfg.s, key, value)
         self.c.settings_changed(live=True)
+
+    def apply_glass(self):
+        super().apply_glass()
+        box = getattr(self, "glass_box", None)              # keep the menu in step with the header's glass button
+        if box is not None:
+            i = min(range(box.count()), key=lambda k: abs(box.itemData(k) - self.level()))
+            box.blockSignals(True)
+            box.setCurrentIndex(i)
+            box.blockSignals(False)
+
+    def _show_page(self, row):
+        if row >= 0:
+            self.stack.setCurrentIndex(row)
+            SettingsDialog.last_page = row
+
+    def _set_glass_hover(self, on):
+        self._set("glass_solid_hover", on)
+        self.c.set_window_glass(self.c.cfg.s.window_glass)
+
+    # ---- one-click sign-in (signin.py). Runs on a worker thread; the browser does the rest.
+    def _refresh_signin(self):
+        from .. import signin
+        connected = signin.chatgpt_connected()
+        busy = self._signing
+        self.chatgpt_btn.setText("Waiting" + ELLIPSIS if busy == "chatgpt" else
+                                 ("Sign out" if connected else "ChatGPT"))
+        self.openrouter_btn.setText("Waiting" + ELLIPSIS if busy == "openrouter" else "OpenRouter")
+        self.chatgpt_btn.setEnabled(busy in (None, "chatgpt"))
+        self.openrouter_btn.setEnabled(busy in (None, "openrouter"))
+        if busy:
+            self.signin_hint.setText("Finish in your browser. Click again to cancel.")
+        elif connected:
+            who = signin.chatgpt_account()
+            self.signin_hint.setText("ChatGPT plan connected" + ((" " + DOT + " " + who) if who else "") + ".")
+        else:
+            self.signin_hint.setText("Use your ChatGPT plan, or get an OpenRouter key.")
+
+    def _start_signin(self, which, fn):
+        import threading
+        if self._signing == which:                       # second click cancels
+            self._cancel.set()
+            return
+        self._signing = which
+        self._cancel = threading.Event()
+        cancel = self._cancel
+        self._refresh_signin()
+
+        def work():
+            from .. import signin
+            try:
+                self.key_relay.signed.emit(which, fn(cancel=cancel), None)
+            except signin.SignInError as e:
+                self.key_relay.signed.emit(which, None, str(e))
+            except Exception as e:                       # noqa: BLE001
+                self.key_relay.signed.emit(which, None, "Sign-in failed: %s" % e)
+        threading.Thread(target=work, name="signin-" + which, daemon=True).start()
+
+    def _chatgpt_sign_in(self):
+        from .. import signin
+        if self._signing is None and signin.chatgpt_connected():
+            return self._chatgpt_sign_out()
+        self._start_signin("chatgpt", signin.chatgpt_sign_in)
+
+    def _openrouter_sign_in(self):
+        from .. import signin
+        self._start_signin("openrouter", signin.openrouter_sign_in)
+
+    def _signed_in(self, which, result, error):
+        from .. import ai
+        self._signing = None
+        if error:
+            self._refresh_signin()
+            self.signin_hint.setText(("✗ " + error) if "cancelled" not in error else "Sign-in cancelled.")
+            self.signin_hint.setStyleSheet("" if "cancelled" in error else "color: #FF8DA3;")
+            return
+        self.signin_hint.setStyleSheet("")
+        if which == "openrouter":
+            self.ai_key.setText(result)                  # saves it and checks it (_key_changed)
+            self.ai_provider.setCurrentIndex(self.ai_provider.findData("openrouter"))
+        else:
+            self.ai_provider.setCurrentIndex(self.ai_provider.findData("chatgpt"))
+            self.key_timer.start()
+        self._refresh_signin()
+        self.c.prompter.toast("Signed in with %s" % ("ChatGPT" if which == "chatgpt" else "OpenRouter"), T.ok)
+        if ai.is_ready(self.c.cfg.s.ai_provider) and getattr(self.c, "assistant", None) is not None:
+            self.c.assistant.refresh_info()
+
+    def _chatgpt_sign_out(self):
+        import threading
+        from .. import signin
+        threading.Thread(target=signin.chatgpt_sign_out, name="signout-chatgpt", daemon=True).start()
+        from .. import ai
+        if self.c.cfg.s.ai_provider == "chatgpt":
+            self.ai_provider.setCurrentIndex(max(0, self.ai_provider.findData(ai.AUTO)))
+        self._refresh_signin()
+        self.c.prompter.toast("Signed out of ChatGPT", T.ok)
 
     def _copilot_context(self):
         from .copilot import SetupDialog
@@ -616,10 +768,17 @@ class SettingsDialog(BaseDialog):
         self._set("ai_model", "")                 # a model from the old provider won't exist on the new one
         self.ai_model.blockSignals(True)
         self.ai_model.clear()
-        self.ai_model.addItem("Best available (automatic)", "")
+        self.ai_model.addItem("Automatic (best)", "")
         self.ai_model.setCurrentIndex(0)
         self.ai_model.blockSignals(False)
+        self._key_field_state()
         self.key_timer.start()
+
+    def _key_field_state(self):
+        """With the ChatGPT plan there's no key: grey the field out instead of asking for one."""
+        plan = self.c.cfg.s.ai_provider == "chatgpt"
+        self.ai_key.setEnabled(not plan)
+        self.ai_key.setPlaceholderText("Not needed with ChatGPT sign-in" if plan else "Paste your API key")
 
     def _model_changed(self, text):
         idx = self.ai_model.findText(text)
@@ -650,7 +809,7 @@ class SettingsDialog(BaseDialog):
                 except Exception:                     # noqa: BLE001 - the list is a convenience
                     models = []
             self.key_relay.done.emit(ok, msg, models)
-        if key or prov == "ollama":
+        if key or prov in ("ollama", "chatgpt"):
             threading.Thread(target=work, daemon=True).start()
 
     def _key_checked(self, ok, msg, models):
@@ -899,7 +1058,7 @@ class WelcomeDialog(BaseDialog):
                                        "Turn on Voice Follow (V) and the script follows your voice." % native.MOD),
             ("4", "Get help in meetings", "Press K for the meeting copilot: it transcribes the call and %s+Enter "
                                           "tells you what to say. Notes and a follow-up email are written when "
-                                          "you end. Add an AI key in Settings first." % native.MOD),
+                                          "you end. Sign in or add an AI key in Settings first." % native.MOD),
         ]
         accents = {"1": AQUA, "2": VIOLET, "3": AQUA, "4": VIOLET}
         for num, head, body in steps:

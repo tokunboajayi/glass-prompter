@@ -110,7 +110,7 @@
     $("cpMeeting").classList.toggle("danger-soft", live);
     $("cpAssist").disabled = !cp.ready || !!cp.busy;
     $("cpAssistText").textContent = cp.busy ? "Thinking..." : "Assist";
-    $("cpHint").textContent = !cp.ready ? "Add an AI key in Settings on your computer to get answers."
+    $("cpHint").textContent = !cp.ready ? "Sign in or add an AI key in Settings on your computer to get answers."
       : live ? (cp.words || 0) + " words so far. Tap Assist whenever you need help."
       : "Transcribes the call on your computer and tells you what to say.";
     const has = !!(cp.answer && cp.answer.trim());

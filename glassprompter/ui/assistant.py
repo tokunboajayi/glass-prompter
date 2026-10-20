@@ -155,7 +155,7 @@ def make_assistant(controller):
 
         # ---------------------------------------------------------------- state
         def _ready(self):
-            return bool(ai.load_key()) or self.c.cfg.s.ai_provider == "ollama"
+            return ai.is_ready(self.c.cfg.s.ai_provider)
 
         def refresh_info(self):
             s = self.c.cfg.s
@@ -166,7 +166,7 @@ def make_assistant(controller):
                 self.info.setText("%s · %s · answers anything and can see your screen"
                                   % (name, s.ai_model or "best model"))
             else:
-                self.info.setText("Add an API key from any AI provider in Settings › AI assistant to start.")
+                self.info.setText("Sign in or add an API key in Settings › AI assistant to start.")
             self.send_btn.setEnabled(ready and not self.busy)
 
         def refresh_live(self):

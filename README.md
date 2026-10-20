@@ -178,6 +178,12 @@ It works over your Wi-Fi only and never goes through the internet. On Windows, c
 - **AI assistant on the computer:** press <kbd>A</kbd> on the prompter or choose **&#8943; &rsaquo; AI assistant**. Same chat, on your PC. Turn on **Listen to meeting** and it follows the call (offline transcription). With **Auto-suggest** on, it offers an answer when someone asks you a question, and questions you could ask after they've talked for a while.
 - **Screenshots:** press <kbd>S</kbd> on the prompter, or tap **Save screenshot** on the phone's Screen tab.
 - **AI tab:** a chat with Claude that answers any question. It can look at your current screen, search the web and read the script on the prompter. Ask *"what should I say about this slide?"* or *"tighten my intro"*, then tap **Send to prompter** to read the answer.
+  **Quickest: sign in, no key.** In **Settings &rsaquo; AI assistant &rsaquo; Sign in**:
+  - **ChatGPT** uses your ChatGPT **Plus or Pro** plan. Answers count toward your plan's usage instead of an API bill. You can cap how much Glass Prompter may use, or disconnect it, in ChatGPT Settings. (OpenAI offers this to open-source apps that run locally.)
+  - **OpenRouter** signs you in and creates a key automatically: one key for Claude, GPT, Gemini and hundreds more, on pay-as-you-go credit.
+
+  Or use an API key:
+
   1. Get an API key from any AI provider: [Anthropic (Claude)](https://console.anthropic.com/settings/keys), [OpenAI (ChatGPT)](https://platform.openai.com/api-keys), [Google (Gemini)](https://aistudio.google.com/apikey), [xAI (Grok)](https://console.x.ai), DeepSeek, Mistral, Groq, Perplexity, Together, or [OpenRouter](https://openrouter.ai/keys) (hundreds of models with one key). Or run a free model on your own computer with [Ollama](https://ollama.com).
   2. Paste it into **Settings &rsaquo; AI assistant** on your computer. The provider is detected from the key, the key is tested straight away, and the newest model is picked for you (you can choose another).
 

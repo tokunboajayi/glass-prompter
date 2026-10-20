@@ -590,7 +590,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         cfg = self._ai_config()
         try:
             _, prov, _ = ai.resolve(cfg.get("provider", ai.AUTO), cfg.get("key", ""), cfg.get("base_url", ""))
-            ready = bool(cfg.get("key")) or bool(prov.get("nokey") and cfg.get("provider") == "ollama")
+            ready = ai.is_ready(cfg.get("provider", ai.AUTO), cfg.get("key", ""))
             name = prov["name"]
         except ai.AIError:
             ready, name = False, ""
@@ -637,8 +637,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             raise ApiError(400, "bad_request", "Send messages: [{role, content}]")
         cfg = self._ai_config()
         key = cfg.get("key", "")
-        if not (key or "").strip() and cfg.get("provider") != "ollama":
-            raise ApiError(400, "ai_no_key", "Add your AI API key in Settings > AI assistant on your computer.")
+        if not ai.is_ready(cfg.get("provider", ai.AUTO), key):
+            raise ApiError(400, "ai_no_key", "Add your AI API key, or sign in, in Settings > AI assistant on your "
+                                             "computer.")
         jpeg = None
         if data.get("screen") and self._bridge_call("screen_allowed", default=False):
             try:

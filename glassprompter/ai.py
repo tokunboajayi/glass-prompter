@@ -45,8 +45,21 @@ PROVIDERS = {
     "ollama": dict(name="Ollama (free, runs on this computer)", kind="openai", base="http://localhost:11434/v1",
                    keys="https://ollama.com/download", prefix=(), nokey=True),
     "custom": dict(name="Other (OpenAI-compatible URL)", kind="openai", base="", keys="", prefix=()),
+    # Sign in with ChatGPT (Plus/Pro): requests are paid from the user's ChatGPT plan, no API key. See signin.py.
+    "chatgpt": dict(name="ChatGPT plan (sign in, Plus or Pro)", kind="chatgpt", base="https://api.openai.com/v1",
+                    keys="https://chatgpt.com/#settings/Security", prefix=(), nokey=True, signin=True),
 }
 AUTO = "auto"
+
+
+def is_ready(provider, key=None):
+    """Can the assistant answer? An API key, a local Ollama, or a ChatGPT sign-in with plan usage allowed."""
+    if provider == "chatgpt":
+        from . import signin
+        return signin.chatgpt_connected()
+    if provider == "ollama":
+        return True
+    return bool(load_key() if key is None else clean_key(key))
 
 # Generous limits: long answers and long conversations. You only pay for tokens actually used.
 MAX_TURNS = 40                 # messages of history sent with each question
@@ -212,6 +225,10 @@ def list_models(provider, key, base_url="", timeout=20):
     ck = (pid, base, key[-8:])
     if ck in _cache and time.time() - _cache[ck][0] < 3600:
         return _cache[ck][1]
+    if p["kind"] == "chatgpt":
+        ids = _chatgpt_models(timeout)
+        _cache[ck] = (time.time(), ids)
+        return ids
     hdr = _auth_headers(pid, p, key)
     if p["kind"] == "gemini":
         data = _http(base + "/models?pageSize=200", headers=hdr, timeout=timeout)
@@ -332,6 +349,16 @@ def check_key(key, provider=AUTO, base_url="", timeout=20):
     if not key and not p.get("nokey"):
         return False, "No key yet."
     _cache.pop((pid, base, key[-8:]), None)
+    if p["kind"] == "chatgpt":
+        from . import signin
+        if not signin.chatgpt_connected():
+            return False, "Not signed in. Click Sign in with ChatGPT."
+        try:
+            n = len(list_models(pid, key, base, timeout))
+        except AIError as e:
+            return False, str(e)
+        who = signin.chatgpt_account()
+        return True, "Signed in%s · ChatGPT plan · %d models" % ((" as " + who) if who else "", n)
     hdr = _auth_headers(pid, p, key)
     try:
         if pid == "openrouter":                       # OpenRouter's model list is public; ask about the key itself
@@ -449,6 +476,156 @@ def _gemini_body(messages, screen_jpeg, script_title, script_text, max_tokens, w
     return body
 
 
+# ------------------------------------------------------------------ ChatGPT plan (Sign in with ChatGPT)
+# Plan-funded requests use the Responses API with the user's OAuth access token: store=false and stream=true
+# are required, system guidance goes in `instructions`, and max_output_tokens / temperature / hosted tools
+# (web search) are not allowed.
+_CHATGPT_ERRORS = {
+    "subscription_sharing_usage_limit_exceeded": "You've reached the ChatGPT usage limit for this app. Check usage "
+                                                 "and app limits in ChatGPT Settings, or try again later.",
+    "subscription_sharing_user_not_eligible": "Using your plan in other apps isn't available for this ChatGPT "
+                                              "account or workspace (it needs Plus or Pro).",
+    "subscription_sharing_usage_unavailable": "ChatGPT usage couldn't be checked. Try again shortly.",
+    "subscription_sharing_user_unavailable": "Your ChatGPT account is temporarily unavailable. Try again shortly.",
+    "subscription_sharing_unsupported_capability": "Your ChatGPT plan can't be used for this kind of request.",
+    "model_not_found": "This model isn't available with your ChatGPT plan. Pick another in Settings > AI assistant.",
+    "invalid_token": "ChatGPT didn't accept the connection. Sign in with ChatGPT again in Settings.",
+}
+
+
+def _chatgpt_token():
+    from . import signin
+    try:
+        return signin.chatgpt_access_token()
+    except signin.SignInError as e:
+        raise AIError(str(e))
+
+
+def _chatgpt_open(req, timeout):
+    from . import signin
+    return signin._opener().open(req, timeout=timeout)    # never follows redirects with the token attached
+
+
+def _chatgpt_error(status, raw):
+    try:
+        d = json.loads(raw or "{}")
+    except ValueError:
+        d = {}
+    for _ in range(4):                                    # unwrap {"error": {...}} / {"detail": {...}}
+        if isinstance(d, dict) and isinstance(d.get("error"), dict):
+            d = d["error"]
+        elif isinstance(d, dict) and isinstance(d.get("detail"), dict):
+            d = d["detail"]
+        else:
+            break
+    code = (d.get("error") if isinstance(d.get("error"), str) else d.get("code")) if isinstance(d, dict) else None
+    code = str(code or "").replace("subscription_sharing_v2_", "subscription_sharing_")
+    if code in _CHATGPT_ERRORS:
+        return code, _CHATGPT_ERRORS[code]
+    if status == 401:
+        return code, "ChatGPT didn't accept the connection. Sign in with ChatGPT again in Settings."
+    if status == 429:
+        return code, "Too many requests to ChatGPT. Wait a moment and try again."
+    if status and status >= 500:
+        return code, "ChatGPT is busy right now. Try again in a few seconds."
+    msg = d.get("message") if isinstance(d, dict) else ""
+    return code, ("ChatGPT couldn't answer (%s). %s" % (code or status, str(msg or "")[:200])).strip()
+
+
+def _chatgpt_models(timeout=20):
+    token = _chatgpt_token()
+    req = urllib.request.Request(PROVIDERS["chatgpt"]["base"] + "/models",
+                                 headers={"authorization": "Bearer " + token, "accept": "application/json",
+                                          "user-agent": "GlassPrompter"})
+    try:
+        with _chatgpt_open(req, timeout) as r:
+            data = json.loads(r.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as e:
+        raise AIError(_chatgpt_error(e.code, e.read().decode("utf-8", "replace"))[1])
+    except (urllib.error.URLError, TimeoutError, OSError):
+        raise AIError("Couldn't reach ChatGPT. Is this computer online?")
+    rows = data.get("models") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        raise AIError("ChatGPT returned an unexpected model list. Try again.")
+    return [str(m["slug"]) for m in rows if isinstance(m, dict) and m.get("visibility") == "list" and m.get("slug")]
+
+
+def chatgpt_body(model, messages, screen_jpeg=None, script_title="", script_text="", context=""):
+    """Responses API body for a plan-funded request (public so tests can check the rules)."""
+    msgs = _clean(messages)
+    items = [{"role": m["role"], "content": m["content"]} for m in msgs]
+    if screen_jpeg:
+        items[-1]["content"] = [
+            {"type": "input_text", "text": SCREEN_NOTE + msgs[-1]["content"]},
+            {"type": "input_image", "image_url": "data:image/jpeg;base64,"
+                                                 + base64.b64encode(screen_jpeg).decode("ascii")},
+        ]
+    return {"model": model, "instructions": _system(script_title, script_text, context), "input": items,
+            "store": False, "stream": True}
+
+
+def _chatgpt_stream(base, body, timeout):
+    """POST and read the server-sent events; -> the answer text once response.completed arrives."""
+    req = urllib.request.Request(base + "/responses", data=json.dumps(body).encode("utf-8"), method="POST",
+                                 headers={"authorization": "Bearer " + _chatgpt_token(),
+                                          "content-type": "application/json", "accept": "text/event-stream",
+                                          "user-agent": "GlassPrompter"})
+    text, done = [], False
+    with _chatgpt_open(req, timeout) as r:
+        for raw in r:
+            line = raw.decode("utf-8", "replace").strip()
+            if not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if payload == "[DONE]":
+                break
+            try:
+                ev = json.loads(payload)
+            except ValueError:
+                continue
+            kind = ev.get("type")
+            if kind == "response.output_text.delta" and isinstance(ev.get("delta"), str):
+                text.append(ev["delta"])
+            elif kind in ("response.failed", "error"):
+                detail = ev.get("response", ev) if kind == "response.failed" else ev
+                raise AIError(_chatgpt_error(400, json.dumps(detail))[1])
+            elif kind == "response.incomplete":
+                raise AIError("ChatGPT stopped before finishing. Try asking again.")
+            elif kind == "response.completed":
+                done = True
+                break
+    if not done and not text:
+        raise AIError("The ChatGPT response ended early. Try asking again.")
+    return "".join(text)
+
+
+def _chatgpt_chat(base, model, messages, screen_jpeg, script_title, script_text, context, timeout):
+    chosen = (model or "").strip()
+    if not chosen or _foreign_model("openai", chosen):
+        models = list_models("chatgpt", "", base)
+        if not models:
+            raise AIError("No models are available with your ChatGPT plan.")
+        chosen = models[0]
+    image, note = screen_jpeg, ""
+    for _attempt in range(2):
+        body = chatgpt_body(chosen, messages, image, script_title, script_text, context)
+        try:
+            text = _chatgpt_stream(base, body, timeout).strip()
+            if not text:
+                raise AIError("ChatGPT returned an empty answer. Try asking again.")
+            return note + text
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode("utf-8", "replace")
+            code, msg = _chatgpt_error(e.code, raw)
+            if image is not None and e.code in (400, 422) and ("image" in raw.lower() or "capabilit" in code):
+                image, note = None, "(Your ChatGPT plan couldn't look at the screen here, so I answered from text.)\n\n"
+                continue
+            raise AIError(msg)
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            raise AIError("Couldn't reach ChatGPT. Is this computer online? (%s)" % e)
+    raise AIError("ChatGPT couldn't answer this request. Try again.")
+
+
 def _friendly(pid, p, key, e, detail):
     name = p["name"]
     if _bad_key(e.code, detail):
@@ -469,6 +646,8 @@ def chat(key, messages, model=None, screen_jpeg=None, script_title="", script_te
     `context` is extra system-prompt text (the meeting copilot's mode, knowledge and live transcript)."""
     key = clean_key(key)
     pid, p, base = resolve(provider, key, base_url)
+    if p["kind"] == "chatgpt":
+        return _chatgpt_chat(base, model, messages, screen_jpeg, script_title, script_text, context, timeout)
     if not key and not p.get("nokey"):
         raise AIError("Add your AI API key in Settings > AI assistant on your computer.")
     chosen = (model or "").strip()

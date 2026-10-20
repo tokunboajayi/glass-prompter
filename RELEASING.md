@@ -54,24 +54,32 @@ Recording permission resets after each update.
 
 ### Step A: macOS (Developer ID + notarization)
 
-1. Join the Apple Developer Program as an individual (developer.apple.com/programs). Approval can take 1-2 days.
-2. In Xcode or the developer site, create a **Developer ID Application** certificate. Export it from Keychain as a
-   `.p12` file with a password.
-3. Create an **app-specific password** for your Apple ID (account.apple.com > Sign-In and Security) and note your
-   **Team ID** (developer.apple.com > Membership).
-4. Add these repository secrets (GitHub > Settings > Secrets and variables > Actions):
-   `MACOS_CERT_P12` (the .p12, base64-encoded), `MACOS_CERT_PASSWORD`, `APPLE_ID`, `APPLE_TEAM_ID`,
-   `APPLE_APP_PASSWORD`.
-5. In `packaging/build_mac.sh`, replace the ad-hoc `codesign --sign -` with a real signature when the secrets are
-   present, using the hardened runtime and an entitlements file that allows the microphone
-   (`com.apple.security.device.audio-input`) and what PyInstaller needs
-   (`com.apple.security.cs.allow-unsigned-executable-memory`, `com.apple.security.cs.disable-library-validation`):
-   `codesign --force --deep --options runtime --timestamp --entitlements packaging/entitlements.plist --sign "Developer ID Application: <Name> (<TEAMID>)" "$APP"`
-6. Notarize and staple the .dmg:
-   `xcrun notarytool submit GlassPrompter-*.dmg --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait`
-   then `xcrun stapler staple GlassPrompter-*.dmg`.
-7. Import the certificate into a temporary keychain in `release.yml` before the build, then remove the
-   "not notarized" caveat from the Homebrew cask and the Mac FAQ on the website.
+**Already built in.** `release.yml` and `packaging/build_mac.sh` sign with the hardened runtime
+(`packaging/entitlements.plist`: microphone + what PyInstaller needs), self-test the signed app, then sign,
+notarize and staple the .dmg. Each part switches on only when its secrets exist; with none, builds stay ad-hoc
+signed exactly as before. All you add is secrets (GitHub > Settings > Secrets and variables > Actions).
+
+The account can be your own, or someone else's **with their permission**. Never use their Apple ID password.
+Instead they add your Apple ID to their team, or give you the two items below.
+
+1. **Certificate.** The account holder creates a **Developer ID Application** certificate (Xcode > Settings >
+   Accounts > Manage Certificates, or developer.apple.com > Certificates) and exports it from Keychain Access as a
+   `.p12` with a password. macOS will show their name or company as the developer.
+   - `MACOS_CERT_P12`: the .p12, base64-encoded (`base64 -i cert.p12 | pbcopy`)
+   - `MACOS_CERT_PASSWORD`: the .p12 export password
+2. **Notarization**, one of these:
+   - *Recommended, no password shared:* an **App Store Connect API key** (appstoreconnect.apple.com > Users and
+     Access > Integrations > Team Keys, role Developer). They can revoke it at any time.
+     `APPLE_API_KEY_P8` (the whole `AuthKey_XXXX.p8` file contents), `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`
+   - *Or* the account holder's Apple ID with an app-specific password: `APPLE_ID`, `APPLE_TEAM_ID`,
+     `APPLE_APP_PASSWORD`
+3. Tag a release. The Mac build logs "Signing as: Developer ID Application: ..." and "notarizing", and fails loudly
+   if Apple rejects it (the notary log is printed).
+4. Once a signed release is out, remove the "not notarized" notes from the Homebrew cask, the README and the
+   website's Mac FAQ.
+
+Keep the same signing identity from then on. A different certificate makes macOS treat updates as a new app,
+which resets the Screen Recording permission.
 
 ### Step B: Windows (Azure Artifact Signing)
 

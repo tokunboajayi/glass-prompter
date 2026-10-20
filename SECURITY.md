@@ -15,6 +15,9 @@ Only the latest release gets security fixes. The app checks for updates on its o
 ## How Glass Prompter handles your data
 
 - **Scripts and settings** stay on your computer. Nothing is uploaded.
+- **Sign in with ChatGPT / OpenRouter** runs in your own browser. The app listens on `127.0.0.1` only for that
+  one callback and checks a random `state` plus PKCE. ChatGPT tokens are kept in `chatgpt.json` in the data folder
+  (owner-only); signing out revokes them at OpenAI. An OpenRouter sign-in produces a normal key kept in `ai.key`.
 - **Your AI API key** is stored only on your computer (`ai.key` in the data folder). It is never sent to the phone
   and never included in bug reports. Messages go from your computer straight to the AI provider you chose, and
   only when you press Send.
