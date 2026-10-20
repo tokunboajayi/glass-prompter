@@ -27,7 +27,7 @@ def main():
     c = config.Config()
     c.load()
     c.s.first_run_done, c.s.auto_update, c.s.remote_enabled = True, False, True
-    c.s.remote_port, c.s.pin, c.s.probe_version = port, "246810", __version__
+    c.s.remote_port, c.s.pin, c.s.probe_version, c.s.probe_exe = port, "246810", __version__, sys.executable
     c.save()
     app = subprocess.Popen([sys.executable, os.path.join(ROOT, "glass_prompter.pyw")], env=env)
     try:
