@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.7.4 - 2026-10-20
+**The AI assistant and the meeting copilot are one system.**
+
+- **Listen to meeting** in the AI assistant now runs through the meeting copilot, even with the copilot window
+  closed. Before, the assistant ran its own listener: those meetings weren't saved, got no notes, and ignored
+  your copilot mode and notes. Now stopping saves the meeting, notes and follow-up email to Meeting history.
+- **One set of suggestions.** Smart answers (an answer when they ask you something, follow-up questions after a
+  long stretch) come from the copilot and show up in both windows. The assistant's *Auto-suggest* is now the same
+  *Smart answers* switch, so the AI is never asked twice.
+- **The copilot's actions in the assistant:** Assist and the five quick actions appear while you're listening,
+  and their answers land in the chat as cards.
+- **Typed questions use your copilot context:** mode, notes, knowledge files and the live transcript.
+- Closing the copilot window while the assistant is listening keeps the meeting running; stop it from the
+  assistant.
+
 ## 2.7.3 - 2026-10-19
 **Smoother windows, see-through everything, and sign in instead of pasting a key.**
 

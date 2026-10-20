@@ -1,11 +1,11 @@
 """AI assistant window on the computer: chat with any AI, optionally showing it your screen, plus one-click screenshots.
 
-It can also listen to a meeting. Your microphone ("You") and the computer's sound ("Them") are transcribed offline
-by the same engine as the meeting copilot (it shares the copilot's live transcript when a meeting is running there).
-While it listens:
-  * every question you type also sees the conversation;
-  * with Auto-suggest on, it offers an answer when someone asks you a question, and follow-up questions after the
-    others have talked for a while.
+It can also listen to a meeting, through the meeting copilot (one engine, even with the copilot window closed):
+  * Listen to meeting starts or joins the copilot's meeting; stopping it ends the meeting, saving the transcript,
+    notes and follow-up email to Meeting history;
+  * the copilot's Smart answers (an answer when they ask you something, follow-up questions after a long stretch)
+    and its Assist / quick actions show up here as suggestion cards;
+  * questions you type also see the conversation, your copilot mode, notes and knowledge files.
 
 The window is hidden from screen capture (like every Glass Prompter window), so the screenshot the AI sees is what's
 underneath it. Requests run on worker threads; the UI never blocks.
@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QPlain
                                QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
 from .. import ai, meeting
-from ..listen import MeetingListener
 from .glass import Switch
 from .theme import ELLIPSIS, T
 
@@ -37,7 +36,6 @@ _BUBBLE = {
 class _Relay(QObject):
     """Carries worker-thread results back to the UI thread (queued signal)."""
     done = Signal(object, object)                 # (reply text | None, error text | None)
-    suggested = Signal(str, str, object, object)  # (kind, trigger text, reply | None, error | None)
 
 
 class _Composer(QPlainTextEdit):
@@ -67,14 +65,10 @@ def make_assistant(controller):
             self.c = controller
             self.history = []
             self.busy = False
-            self.suggesting = False
             self.relay = _Relay()
             self.relay.done.connect(self._answered)
-            self.relay.suggested.connect(self._suggested)
-            self.listener = None              # our own; None while sharing the copilot's (or not listening)
-            self.shared = False               # True: following the copilot's running meeting
-            self.transcript = None
-            self.trigger = meeting.SuggestionTrigger()
+            self.cp = None                    # the copilot whose meeting we're listening through
+            self.owns = False                 # we started that meeting, so stopping here ends it
             self.resize(580, 720)
             self.setMinimumSize(460, 520)
 
@@ -102,10 +96,10 @@ def make_assistant(controller):
                                       "the AI can follow the conversation.")
             self.listen_sw.toggled.connect(self.set_listening)
             r.addWidget(self.listen_sw)
-            self.suggest_sw = Switch("Auto-suggest")
-            self.suggest_sw.setChecked(controller.cfg.s.assistant_suggest)
-            self.suggest_sw.setToolTip("While listening: suggest an answer when someone asks you a question, and "
-                                       "follow-up questions after they've talked for a while.")
+            self.suggest_sw = Switch("Smart answers")
+            self.suggest_sw.setChecked(controller.cfg.s.copilot_smart)
+            self.suggest_sw.setToolTip("While listening: an answer when someone asks you a question, and follow-up "
+                                       "questions after they've talked for a while. Same switch as the copilot's.")
             self.suggest_sw.toggled.connect(self._suggest_toggled)
             r.addWidget(self.suggest_sw)
             r.addStretch(1)
@@ -115,6 +109,27 @@ def make_assistant(controller):
             self.heard_lab = label("", "muted")
             self.heard_lab.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
             sl.addWidget(self.heard_lab)
+            # the copilot's actions, shown while listening; answers arrive in the chat below
+            from .copilot import CHIPS, _btn
+            self.actions = QWidget()
+            al = QVBoxLayout(self.actions)
+            al.setContentsMargins(0, 4, 0, 0)
+            al.setSpacing(6)
+            self.assist_btn = _btn("Assist", lambda: self._act("assist"),
+                                   "What should I say right now? Reads the conversation and your screen.", accent=True)
+            self.assist_btn.setMinimumHeight(34)
+            al.addWidget(self.assist_btn)
+            chips = QHBoxLayout()
+            chips.setSpacing(6)
+            self.chip_btns = []
+            for aid, name in CHIPS:
+                b = _btn(name, lambda _=False, a=aid: self._act(a), meeting.ACTIONS[aid][0], chip=True)
+                b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                chips.addWidget(b)
+                self.chip_btns.append(b)
+            al.addLayout(chips)
+            self.actions.setVisible(False)
+            sl.addWidget(self.actions)
             root.addWidget(strip)
 
             self.scroll = QScrollArea()
@@ -173,9 +188,19 @@ def make_assistant(controller):
             on = self.transcript is not None
             if on:
                 t = meeting.fmt_clock(time.time() - self.transcript.started)
-                self.live_pill.setText(chr(0x2022) + "  " + ("Copilot " if self.shared else "") + "Live  " + t)
+                self.live_pill.setText(chr(0x2022) + "  Live  " + t)
             else:
                 self.live_pill.setText("Not listening")
+            busy = self.cp is not None and self.cp.busy
+            ready = self._ready() and not busy
+            for b in [self.assist_btn] + self.chip_btns:
+                b.setEnabled(ready)
+            self.assist_btn.setText("Thinking" + ELLIPSIS if busy else "Assist")
+            smart = bool(self.c.cfg.s.copilot_smart)              # the copilot window can change it too
+            if self.suggest_sw.isChecked() != smart:
+                self.suggest_sw.blockSignals(True)
+                self.suggest_sw.setChecked(smart)
+                self.suggest_sw.blockSignals(False)
             role = "live" if on else "idle"
             if self.live_pill.property("role") != role:
                 self.live_pill.setProperty("role", role)
@@ -228,51 +253,86 @@ def make_assistant(controller):
                 self.empty.deleteLater()
                 self.empty = None
 
-        # ---------------------------------------------------------------- listening
+        # ---------------------------------------------------------------- listening (through the copilot)
+        # One meeting engine: Listen to meeting starts (or joins) the meeting copilot's meeting, even with its
+        # window closed. So the transcript, mode, notes, Smart answers and the saved notes/follow-up email are the
+        # same in both windows, the microphone is opened once, and nothing is asked of the AI twice.
+        def following(self, cp=None):
+            return self.cp is not None and (cp is None or cp is self.cp)
+
+        @property
+        def transcript(self):
+            return self.cp.transcript if (self.cp is not None and self.cp.running) else None
+
         def set_listening(self, on):
             if on:
-                cp = self.c.copilot
-                if cp is not None and cp.running:
-                    self.attach_copilot(cp)
-                else:
-                    self._start_own()
+                self._join()
             else:
-                self._stop_all()
+                self._leave(end=True)
             self.refresh_live()
 
-        def _start_own(self):
-            s = self.c.cfg.s
-            if not MeetingListener.available(s.copilot_model):
-                self._bubble("error", MeetingListener.why_unavailable(s.copilot_model))
-                self._set_switch(False)
-                return
-            self.shared = False
-            self.transcript = meeting.Transcript()
-            self.trigger = meeting.SuggestionTrigger()
-            self.listener = MeetingListener()
-            self.listener.segment.connect(self._own_segment)
-            self.listener.partial.connect(self._partial)
-            self.listener.status.connect(lambda st: st == "loading" and self.heard_lab.setText(
-                "Loading speech recognition" + ELLIPSIS))
-            self.listener.note.connect(lambda m: self._bubble("note", m))
-            self.listener.failed.connect(self._listen_failed)
-            self.listener.start(s.mic_device, s.copilot_system_audio, s.copilot_model)
-            self.heard_lab.setText("Listening" + ELLIPSIS)
-            if not s.copilot_consent_seen:
-                s.copilot_consent_seen = True
-                self.c.cfg.save()
-                self._bubble("note", "Tip: let the other people know you're taking notes. In some places "
-                                     "transcribing a call needs everyone's consent.")
+        def _join(self):
+            cp = self.c.ensure_copilot()
+            self.owns = not cp.running
+            if not cp.running:
+                cp.start_meeting()
+                if not cp.running:                       # e.g. the speech model is missing
+                    self._bubble("error", cp.answer.toPlainText().strip() or "Couldn't start listening.")
+                    self.owns = False
+                    self._set_switch(False)
+                    return
+            self._attach(cp)
+            self._drop_empty()
+            self._bubble("note", "Listening with the meeting copilot. The meeting, its notes and a follow-up email "
+                                 "are saved in Meeting history when you stop.")
 
-        def _stop_all(self):
-            if self.listener is not None:
-                self.listener.stop()
-                self.listener.deleteLater()
-                self.listener = None
-            if self.shared:
-                self._detach_copilot()
-            self.transcript = None
+        def _attach(self, cp):
+            if self.cp is cp:
+                return
+            self._detach()
+            self.cp = cp
+            cp.listener.segment.connect(self._heard)
+            cp.listener.partial.connect(self._partial)
+            cp.answered.connect(self._copilot_answer)
+            cp.answer_failed.connect(self._copilot_failed)
+            cp.meeting_changed.connect(self._meeting_changed)
+            self.actions.setVisible(True)
+            self.heard_lab.setText("Listening" + ELLIPSIS)
+
+        def _detach(self):
+            cp, self.cp = self.cp, None
+            if cp is not None:
+                for sig, slot in ((cp.listener.segment, self._heard), (cp.listener.partial, self._partial),
+                                  (cp.answered, self._copilot_answer), (cp.answer_failed, self._copilot_failed),
+                                  (cp.meeting_changed, self._meeting_changed)):
+                    try:
+                        sig.disconnect(slot)
+                    except (RuntimeError, TypeError):
+                        pass
+            self.actions.setVisible(False)
             self.heard_lab.setText("")
+
+        def _leave(self, end):
+            cp, owned = self.cp, self.owns
+            self._detach()
+            self.owns = False
+            if not (end and cp is not None and cp.running):
+                return
+            if owned:
+                words = cp.transcript.words()
+                cp.end_meeting()                         # notes + follow-up email go to Meeting history
+                self._bubble("note", "Meeting ended. %s" % ("Its notes and a follow-up email will be in Meeting "
+                                                            "history shortly." if words >= 15 else
+                                                            "It was too short for notes, but it's in Meeting history."))
+            else:
+                self._bubble("note", "Stopped listening here. The meeting continues in the copilot window.")
+
+        def _meeting_changed(self, live):
+            if not live and self.cp is not None:         # ended from the copilot window
+                self._detach()
+                self.owns = False
+                self._set_switch(False)
+                self._bubble("note", "The meeting ended. Its notes are in Meeting history.")
 
         def _set_switch(self, on):
             self.listen_sw.blockSignals(True)
@@ -280,116 +340,43 @@ def make_assistant(controller):
             self.listen_sw.blockSignals(False)
             self.refresh_live()
 
-        def attach_copilot(self, cp):
-            """Follow the copilot's running meeting instead of opening the microphone twice."""
-            if self.listener is not None:
-                self.listener.stop()
-                self.listener.deleteLater()
-                self.listener = None
-            self.shared = True
-            self._cp = cp
-            self.transcript = cp.transcript
-            self.trigger = meeting.SuggestionTrigger()
-            cp.listener.segment.connect(self._shared_segment)
-            cp.listener.partial.connect(self._partial)
-            self.heard_lab.setText("Following the meeting copilot" + ELLIPSIS)
-            self.refresh_live()
-
-        def _detach_copilot(self):
-            cp = getattr(self, "_cp", None)
-            if cp is not None:
-                for sig, slot in ((cp.listener.segment, self._shared_segment), (cp.listener.partial, self._partial)):
-                    try:
-                        sig.disconnect(slot)
-                    except (RuntimeError, TypeError):
-                        pass
-            self._cp = None
-            self.shared = False
-
-        def copilot_ended(self):
-            """The copilot's meeting ended while we followed it: keep listening on our own."""
-            if self.shared:
-                self._detach_copilot()
-                self.transcript = None
-                if self.listen_sw.isChecked():
-                    self._start_own()
-                self.refresh_live()
-
-        def _listen_failed(self, msg):
-            self._bubble("error", msg)
-            self._stop_all()
-            self._set_switch(False)
-
         def _partial(self, who, text):
             if text:
                 self.heard_lab.setText(("%s: %s" % (meeting.LABELS.get(who, "Them"), text))[-160:])
 
-        def _own_segment(self, who, text):
-            if self.transcript is not None and self.transcript.add(who, text) is not None:
-                self._heard(who, text)
-
-        def _shared_segment(self, who, text):
-            if self.shared:                      # the copilot already added it to the shared transcript
-                self._heard(who, text)
-
         def _heard(self, who, text):
             self.heard_lab.setText(("%s: %s" % (meeting.LABELS.get(who, "Them"), text))[-160:])
-            if not self.suggest_sw.isChecked() or self.suggesting or not self._ready():
-                return
-            hit = self.trigger.on_segment(who, text, time.time())
-            if hit:
-                self.suggest(*hit)
 
         def _suggest_toggled(self, on):
-            self.c.cfg.s.assistant_suggest = on
+            """Smart answers is one setting for the copilot and the assistant."""
+            self.c.cfg.s.copilot_smart = on
             self.c.cfg.save()
+            if self.c.copilot is not None:
+                self.c.copilot.sync_settings()
 
-        # ---------------------------------------------------------------- suggestions
-        def suggest(self, kind, question=""):
-            """Ask for an answer to `question`, or for follow-up questions, from the live conversation."""
-            s = self.c.cfg.s
-            key = ai.load_key()
-            action = "assist" if kind == "answer" else "followups"
-            msg = meeting.action_message(action, question)
-            ctx = meeting.build_context(s.copilot_mode, s.copilot_modes, self.transcript,
-                                        meeting.read_knowledge(s.copilot_files), s.copilot_notes)
-            jpeg = None
-            if self.use_screen.isChecked() and sys.platform == "win32":     # no window flicker for automatic help
-                try:
-                    jpeg = self._grab_jpeg()
-                except Exception:                           # noqa: BLE001 - suggest without the screen
-                    jpeg = None
-            self.suggesting = True
-            self._drop_empty()
-            self.suggest_wait = self._bubble("note", ("They asked a question. Thinking" if kind == "answer" else
-                                                      "Thinking of good questions") + ELLIPSIS)
-
-            def work():
-                try:
-                    reply = ai.chat(key, [{"role": "user", "content": msg}], s.ai_model, jpeg, "", "", web=False,
-                                    provider=s.ai_provider, base_url=s.ai_base_url,
-                                    max_tokens=meeting.LIVE_TOKENS, context=ctx)
-                    self.relay.suggested.emit(kind, question, reply, None)
-                except ai.AIError as e:
-                    self.relay.suggested.emit(kind, question, None, str(e))
-                except Exception as e:                      # noqa: BLE001
-                    self.relay.suggested.emit(kind, question, None, "Something went wrong: %s" % e)
-            threading.Thread(target=work, name="ai-suggest", daemon=True).start()
-
-        def _suggested(self, kind, question, reply, error):
-            self.suggesting = False
-            if getattr(self, "suggest_wait", None) is not None:
-                self.suggest_wait.deleteLater()
-                self.suggest_wait = None
-            if not reply:
-                self._bubble("error", "Couldn't suggest: %s" % (error or "no answer"))
+        # ---------------------------------------------------------------- copilot answers + actions
+        def _act(self, action):
+            if self.cp is None or self.cp.busy:
                 return
-            if kind == "answer":
+            if not self._ready():
+                self._bubble("error", "Sign in or add an API key in Settings " + chr(0x203A) + " AI assistant first.")
+                return
+            self.cp.run_action(action)
+            self.refresh_live()
+
+        def _copilot_answer(self, badge, text, question):
+            self._drop_empty()
+            if question:
                 q = question if len(question) <= 140 else question[:137] + ELLIPSIS
-                self._bubble("suggest", reply, reply=True, header="SUGGESTED ANSWER",
+                self._bubble("suggest", text, reply=True, header="SUGGESTED ANSWER",
                              sub="They asked: " + chr(0x201C) + q + chr(0x201D))
             else:
-                self._bubble("suggest", reply, reply=True, header="QUESTIONS YOU COULD ASK")
+                self._bubble("suggest", text, reply=True, header=badge or "COPILOT")
+            self.refresh_live()
+
+        def _copilot_failed(self, msg):
+            self._bubble("error", msg)
+            self.refresh_live()
 
         # ---------------------------------------------------------------- chat
         def _grab_jpeg(self):
@@ -431,7 +418,7 @@ def make_assistant(controller):
             cfg = self.c.cfg.s
             model, extra = cfg.ai_model, {"provider": cfg.ai_provider, "base_url": cfg.ai_base_url,
                                           "max_tokens": cfg.ai_max_tokens,
-                                          "context": meeting.listen_context(self.transcript)}
+                                          "context": self.cp._context() if self.transcript is not None else ""}
 
             def work():
                 try:
@@ -462,7 +449,7 @@ def make_assistant(controller):
                 it = self.log_lay.takeAt(1)
                 if it.widget():
                     it.widget().deleteLater()
-            self.waiting = self.suggest_wait = None
+            self.waiting = None
             self.empty = self._bubble("note", "New chat. Ask anything.")
 
         def screenshot(self):
@@ -491,7 +478,7 @@ def make_assistant(controller):
             self.c.load_script(s["id"], "the AI assistant")
 
         def done(self, r):
-            self._stop_all()
+            self._leave(end=True)
             self.clock.stop()
             self.c.assistant = None
             super().done(r)

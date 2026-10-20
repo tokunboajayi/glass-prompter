@@ -821,14 +821,21 @@ class Controller(QObject):
         self.assistant.activateWindow()
         self.assistant.text.setFocus()
 
-    def open_copilot(self, focus=True):
-        """The meeting copilot: live transcript, Assist and quick actions, notes when the meeting ends."""
+    def ensure_copilot(self):
+        """The meeting engine, created without showing its window (the AI assistant listens through it)."""
         if self.copilot is None:
             from .ui.copilot import make_copilot
             self.copilot = make_copilot(self)
-            self.copilot.show()
-        else:
+        return self.copilot
+
+    def open_copilot(self, focus=True):
+        """The meeting copilot: live transcript, Assist and quick actions, notes when the meeting ends."""
+        fresh = self.copilot is None
+        self.ensure_copilot()
+        if not fresh:
             self.copilot.sync_settings()
+        if not self.copilot.isVisible():
+            self.copilot.show()
         self.copilot.raise_()
         if focus:
             self.copilot.activateWindow()

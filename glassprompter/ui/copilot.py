@@ -143,8 +143,15 @@ def make_copilot(controller):
     from .dialogs import BaseDialog, label
 
     class Copilot(BaseDialog):
+        # The one meeting engine: the AI assistant listens through it too, and shows every answer it produces.
+        answered = Signal(str, str, str)          # (badge, answer, the question that triggered it, or "")
+        answer_failed = Signal(str)
+        meeting_changed = Signal(bool)            # live?
+
         def __init__(self):
             super().__init__(None, "Meeting copilot", resizable=True)
+            self._pending_q = ""
+            self.trigger = meeting.SuggestionTrigger(answer_gap=SMART_GAP)
             self.c = controller
             self.store = controller.meetings
             self.listener = MeetingListener()
@@ -392,6 +399,7 @@ def make_copilot(controller):
                 self.show_note("Tip: let the other people know you're taking notes. In some places recording or "
                                "transcribing a call needs everyone's consent.")
             self.transcript = meeting.Transcript()
+            self.trigger = meeting.SuggestionTrigger(answer_gap=SMART_GAP)
             self.meeting_id = self.store.create(self.transcript.started, s.copilot_mode)
             self.chat = []
             self.live.clear()
@@ -399,9 +407,7 @@ def make_copilot(controller):
             self._start_style(True)
             self.refresh_info()
             self.c.schedule_publish()
-            a = self.c.assistant                         # one microphone: the assistant follows this meeting
-            if a is not None and a.listen_sw.isChecked():
-                a.attach_copilot(self)
+            self.meeting_changed.emit(True)
 
         def end_meeting(self):
             self.listener.stop()
@@ -409,8 +415,7 @@ def make_copilot(controller):
             self.transcript = None
             self.partials = {}
             self.partial_lab.setText("")
-            if self.c.assistant is not None:
-                self.c.assistant.copilot_ended()         # it keeps listening on its own
+            self.meeting_changed.emit(False)
             self._start_style(False)
             self.refresh_info()
             self.c.schedule_publish()
@@ -457,10 +462,17 @@ def make_copilot(controller):
             self._render_live()
             if len(self.transcript.segments) % 8 == 0:   # crash-safe: keep the saved copy close to live
                 self.store.update(self.meeting_id, transcript=self.transcript.to_json())
-            if (who == meeting.THEM and self.smart.isChecked() and meeting.is_question(text) and not self.busy
-                    and time.time() - self.last_smart > SMART_GAP and _ai_ready(self.c.cfg.s)):
-                self.last_smart = time.time()
-                self.run_action("assist", question=text, auto=True)
+            # Smart answers: an answer when they ask you something, follow-up questions after a long stretch of
+            # them talking. Only their lines count. The assistant shows these too, so nothing is asked twice.
+            if self.smart.isChecked() and not self.busy and _ai_ready(self.c.cfg.s):
+                hit = self.trigger.on_segment(who, text, time.time())
+                if hit:
+                    self.last_smart = time.time()
+                    kind, question = hit
+                    if kind == "answer":
+                        self.run_action("assist", question=question, auto=True)
+                    else:
+                        self.run_action("followups", auto=True)
 
         def _render_live(self):
             self.live.setHtml(transcript_html(self.transcript))
@@ -507,7 +519,8 @@ def make_copilot(controller):
             jpeg = self._grab_jpeg()
             msg = meeting.action_message(action, question)
             name = meeting.ACTIONS.get(action, meeting.ACTIONS["assist"])[0]
-            self._set_busy(True, "Answering their question" if auto else name)
+            self._pending_q = question
+            self._set_busy(True, "Answering their question" if (auto and question) else name)
             self.badge.setText("")
             _ask(self.c, action, [{"role": "user", "content": msg}], self._context(), jpeg,
                  meeting.LIVE_TOKENS, action == "factcheck", self.relay)
@@ -544,6 +557,8 @@ def make_copilot(controller):
                 self.add_answer((name + (" " + chr(0xB7) + " viewed screen" if saw_screen else "")).upper(), reply)
             else:
                 self.show_note(error or "No answer.")
+                self._pending_q = ""
+                self.answer_failed.emit(error or "No answer.")
 
         def snapshot(self):
             """What the phone remote shows: live state and the latest answer (never the transcript itself)."""
@@ -558,6 +573,8 @@ def make_copilot(controller):
             self.answers.append((badge, text))
             self.answers = self.answers[-50:]
             self.show_answer(len(self.answers) - 1)
+            question, self._pending_q = self._pending_q, ""
+            self.answered.emit(badge, text, question)
 
         def show_answer(self, i):
             if not self.answers:
@@ -640,6 +657,11 @@ def make_copilot(controller):
                 self.c.load_script(s["id"], "the meeting copilot")
 
         def done(self, r):
+            a = self.c.assistant
+            if self.running and a is not None and a.following(self):
+                self.hide()                              # the assistant is listening through this meeting
+                self.c.prompter.toast("Meeting still running in the AI assistant", T.ok, 3)
+                return
             if self.running:
                 notes = self.transcript.words() >= 15 and _ai_ready(self.c.cfg.s)
                 self.end_meeting()
