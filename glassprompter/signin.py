@@ -22,7 +22,6 @@ import json
 import logging
 import os
 import secrets
-import socket
 import threading
 import time
 import urllib.error
@@ -109,6 +108,8 @@ class _Listener:
         listener = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
+            timeout = 5                                  # browsers open idle speculative connections; don't let one block the callback
+
             def log_message(self, *a):                   # quiet: query strings carry one-time codes
                 pass
 
@@ -417,9 +418,3 @@ def chatgpt_sign_out():
     except SignInError:
         pass
     return False
-
-
-def free_port():
-    with socket.socket() as sk:
-        sk.bind(("127.0.0.1", 0))
-        return sk.getsockname()[1]

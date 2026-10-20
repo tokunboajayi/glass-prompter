@@ -13,6 +13,19 @@ def hotkey_label(mod, key):
     return "%s+%s" % (mod, KEY_NAMES.get(key, key))
 
 
+def home_documents():
+    return os.path.join(os.path.expanduser("~"), "Documents")
+
+
+def mic_error(msg, blocked_markers=(), blocked_text=""):
+    """Plain-English reason for a PortAudio error; each OS passes its own "blocked by privacy settings" wording."""
+    if "Error querying device" in msg or "Invalid device" in msg or "-9996" in msg:
+        return "No microphone found. Plug one in or pick another in Settings."
+    if blocked_text and any(m in msg for m in blocked_markers):
+        return blocked_text
+    return msg
+
+
 def launch_args(background=True):
     """Command line that starts this app again (frozen bundle or source checkout)."""
     extra = ["--background"] if background else []

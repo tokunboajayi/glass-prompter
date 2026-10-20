@@ -6,6 +6,7 @@ import subprocess
 import sys
 from ctypes import wintypes
 
+from . import common
 from .common import HotkeyManagerBase, launch_args
 
 log = logging.getLogger(__name__)
@@ -357,12 +358,9 @@ def tts_command(path, wpm):
 
 
 def mic_error(msg):
-    if "Error querying device" in msg or "Invalid device" in msg or "-9996" in msg:
-        return "No microphone found. Plug one in or pick another in Settings."
-    if "-9999" in msg or "Unanticipated host error" in msg:
-        return ("Windows blocked the microphone. Allow it in Settings > Privacy & security > Microphone > "
-                "Let desktop apps access your microphone.")
-    return msg
+    return common.mic_error(msg, ("-9999", "Unanticipated host error"),
+                            "Windows blocked the microphone. Allow it in Settings > Privacy & security > Microphone > "
+                            "Let desktop apps access your microphone.")
 
 
 def open_mic_settings():

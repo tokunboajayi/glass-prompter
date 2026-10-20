@@ -49,8 +49,9 @@ def _decode_text(data):
 
 def _strip_markdown(text):
     text = re.sub(r"^#{1,6}\s*", "# ", text, flags=re.M)          # headings become sections
-    text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)              # images
-    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)           # links -> text
+    # bounded classes keep these linear: an unbounded [^\]]+ rescans to the end of the file for every "["
+    text = re.sub(r"!\[[^\]\n]{0,500}\]\([^)\n]{0,2000}\)", "", text)              # images
+    text = re.sub(r"\[([^\]\n]{1,500})\]\([^)\n]{0,2000}\)", r"\1", text)           # links -> text
     text = re.sub(r"(\*\*|__|`)", "", text)
     text = re.sub(r"(?<![\w\[])\*(?!\s)|(?<!\s)\*(?![\w\]])", "", text)
     return text

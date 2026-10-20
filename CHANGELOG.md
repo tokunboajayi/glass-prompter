@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.7.5 - 2026-10-20
+**Security and reliability fixes from a full code review.**
+
+- **Updates are always verified.** An update without a published fingerprint is refused instead of installed
+  unchecked. The file name is sanitised, and a cancelled or failed download no longer leaves a `.part` file.
+- **Phone remote:**
+  - Signing out on the phone now ends its session on the computer (before, the token kept working for 12 hours).
+  - Wrong PINs are also counted across all devices, so the 6-digit PIN can't be guessed by spreading tries over
+    several addresses.
+  - The pairing request is limited to 1 KB.
+- **Large Markdown imports stay fast.** The link and image cleanup could take seconds on a big file from the phone
+  or the drop folder.
+- **Sign-in can't hang** on an idle browser connection.
+- **Meeting history is safe from two threads** saving at once (live transcript and notes). Searching for `%` or `_`
+  now finds them literally.
+- **Smart answers fire less often by mistake:** "have a good weekend" no longer counts as a question.
+- A hand-edited setting of `"false"` is now read as off.
+- The phone's AI chat ignores malformed messages instead of failing.
+- Internal: large files split into smaller modules (settings, scripts, phone, copilot, prompter), shared platform
+  helpers, and unused code removed. No change in behaviour.
+
 ## 2.7.4 - 2026-10-20
 **The AI assistant and the meeting copilot are one system.**
 

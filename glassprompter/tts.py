@@ -42,17 +42,6 @@ DEFAULT_VOICE = "lessac"
 SYSTEM = "system"
 
 
-def speakable(text):
-    """Strip prompter markers so the voice reads only what you'd say."""
-    out = []
-    for ln in engine.normalize(text).split("\n"):
-        s = ln.strip()
-        if not s or engine.is_marker(s):
-            continue
-        out.append(s)
-    return "\n".join(out)
-
-
 def voice_file(voice_id):
     """Path of an installed .onnx voice (bundled, downloaded or a dev copy), else None."""
     if voice_id not in VOICES:

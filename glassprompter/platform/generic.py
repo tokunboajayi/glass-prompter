@@ -3,6 +3,7 @@ import os
 import shutil
 import subprocess
 
+from . import common
 from .common import HotkeyManagerBase
 
 OS = "linux"
@@ -84,8 +85,7 @@ def is_autostart():
     return False
 
 
-def documents_dir():
-    return os.path.join(os.path.expanduser("~"), "Documents")
+documents_dir = common.home_documents
 
 
 def data_base():
@@ -101,10 +101,7 @@ def tts_command(path, wpm):
     return exe, ["-s", str(int(wpm)), "-f", path]
 
 
-def mic_error(msg):
-    if "Error querying device" in msg or "Invalid device" in msg:
-        return "No microphone found. Plug one in or pick another in Settings."
-    return msg
+mic_error = common.mic_error
 
 
 def open_mic_settings():

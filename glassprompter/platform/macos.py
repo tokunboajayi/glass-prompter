@@ -13,6 +13,7 @@ import plistlib
 import struct
 import subprocess
 
+from . import common
 from .common import HotkeyManagerBase, launch_args
 
 log = logging.getLogger(__name__)
@@ -378,8 +379,7 @@ def is_autostart():
 
 
 # ------------------------------------------------------------------ files, network, speech
-def documents_dir():
-    return os.path.join(os.path.expanduser("~"), "Documents")
+documents_dir = common.home_documents
 
 
 def data_base():
@@ -395,12 +395,9 @@ def tts_command(path, wpm):
 
 
 def mic_error(msg):
-    if "Error querying device" in msg or "Invalid device" in msg or "-9996" in msg:
-        return "No microphone found. Plug one in or pick another in Settings."
-    if "-9986" in msg or "-9999" in msg or "Internal PortAudio error" in msg:
-        return ("macOS blocked the microphone. Allow Glass Prompter in System Settings > Privacy & Security > "
-                "Microphone, then try again.")
-    return msg
+    return common.mic_error(msg, ("-9986", "-9999", "Internal PortAudio error"),
+                            "macOS blocked the microphone. Allow Glass Prompter in System Settings > Privacy & "
+                            "Security > Microphone, then try again.")
 
 
 def open_mic_settings():

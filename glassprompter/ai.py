@@ -69,13 +69,6 @@ DEFAULT_MAX_TOKENS = 16000     # longest answer; providers that allow less are r
 ANSWER_LENGTHS = {2000: "Short", 8000: "Long", 16000: "Very long (default)", 32000: "Maximum"}
 TIMEOUT = 240
 
-# kept for compatibility with 2.5.x settings and the phone/desktop labels
-MODELS = {
-    "claude-sonnet-5-5": "Sonnet 5.5 · best value",
-    "claude-opus-5-5": "Opus 5.5 · smartest",
-    "claude-haiku-4-5-20251001": "Haiku 4.5 · fastest",
-}
-
 SYSTEM = (
     "You are a capable general-purpose assistant built into Glass Prompter, a see-through teleprompter. "
     "Answer ANY question the user asks, on any subject (homework, work, coding, finance, writing, general "
@@ -394,6 +387,8 @@ def check_key(key, provider=AUTO, base_url="", timeout=20):
 def _clean(messages):
     out = []
     for m in (messages or [])[-MAX_TURNS:]:
+        if not isinstance(m, dict):
+            continue
         role = m.get("role")
         text = str(m.get("content", ""))[:MAX_MESSAGE_CHARS]
         if role in ("user", "assistant") and text.strip():

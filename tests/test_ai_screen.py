@@ -27,8 +27,8 @@ class ScreenBridge:
         self.last_full = full
         return JPEG
 
-    def ai_settings(self):
-        return self.key, self.model
+    def ai_config(self):
+        return {"key": self.key, "model": self.model}
 
     def script_context(self):
         return "Demo", "# Intro\nHello everyone."
@@ -169,7 +169,7 @@ def test_build_request_adds_image_and_script():
     assert content[0]["type"] == "image" and base64.b64decode(content[0]["source"]["data"]) == JPEG
     assert content[0]["source"]["media_type"] == "image/jpeg" and content[1]["text"].endswith("help")
     plain = ai.build_request([{"role": "user", "content": "help"}], None)
-    assert plain["messages"][-1]["content"] == "help" and plain["model"] in ai.MODELS
+    assert plain["messages"][-1]["content"] == "help" and plain["model"]
 
 
 def test_chat_without_key_raises_before_network():

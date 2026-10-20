@@ -197,11 +197,6 @@ class Bridge(QObject):
             raise RuntimeError(box["error"])
         return box["data"]
 
-    def ai_settings(self):
-        from . import ai
-        s = self.settings
-        return ai.load_key(), (s.ai_model if s else "")
-
     def ai_config(self):
         """Everything the AI call needs. The key never leaves this computer (the phone only gets yes/no)."""
         from . import ai
@@ -824,8 +819,8 @@ class Controller(QObject):
     def ensure_copilot(self):
         """The meeting engine, created without showing its window (the AI assistant listens through it)."""
         if self.copilot is None:
-            from .ui.copilot import make_copilot
-            self.copilot = make_copilot(self)
+            from .ui.copilot import Copilot
+            self.copilot = Copilot(self)
         return self.copilot
 
     def open_copilot(self, focus=True):
@@ -848,8 +843,8 @@ class Controller(QObject):
 
     def open_meetings(self):
         if self.meetings_window is None:
-            from .ui.copilot import make_meetings
-            self.meetings_window = make_meetings(self)
+            from .ui.copilot_meetings import Meetings
+            self.meetings_window = Meetings(self)
             self.meetings_window.show()
         else:
             self.meetings_window.refresh()

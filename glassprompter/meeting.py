@@ -10,6 +10,7 @@ import json
 import os
 import re
 import sqlite3
+import threading
 import time
 
 from . import paths
@@ -156,7 +157,8 @@ def fmt_clock(secs):
 _Q_START = re.compile(
     r"^(?:so |and |but |okay |ok |well |um |uh |right |also )*"
     r"(?:what|why|how|when|where|who|whom|whose|which|"
-    r"can|could|would|will|should|shall|do|does|did|is|are|was|were|have|has|had|may|might|"
+    r"(?:can|could|would|will|should|shall|do|does|did|is|are|was|were|have|has|had|may|might)"
+    r" (?:you|we|i|they|he|she|it|there|this|that|these|those|the|your|our|anyone|anybody|everyone|someone)|"
     r"tell me|walk me through|explain|describe|talk me through|any thoughts|thoughts on|"
     r"what's|whats|how's|hows|where's|who's|isn't|aren't|don't|doesn't|didn't|won't|wouldn't|couldn't)\b", re.I)
 _Q_TAIL = re.compile(r"\b(?:right|correct|yeah|no|isn't it|don't you think|you know what i mean|"
@@ -227,17 +229,6 @@ def action_message(action, question=""):
         text = ("Someone just asked me: \"%s\". Give me a strong, honest answer I can say out loud in 2-4 short "
                 "sentences, then up to two bullets of supporting facts." % question.strip()[:600])
     return text
-
-
-def listen_context(transcript, limit=MAX_TRANSCRIPT_CHARS):
-    """Extra system text for the AI assistant's normal chat while it listens to a meeting."""
-    conv = transcript.render(limit=limit) if transcript is not None else ""
-    if not conv:
-        return ""
-    return ("The user is in a live conversation and this assistant is listening. Lines labelled 'Them' are the "
-            "other people (computer audio), 'You' is the user (microphone). The transcript comes from offline speech "
-            "recognition, so it has no punctuation and may mishear words. Use it when the question is about the "
-            "conversation.\n<transcript>\n%s\n</transcript>" % conv)
 
 
 class SuggestionTrigger:
@@ -334,6 +325,7 @@ class MeetingStore:
 
     def __init__(self, path=None):
         self.db = sqlite3.connect(path or meetings_path(), check_same_thread=False)
+        self._lock = threading.RLock()                   # the UI thread and the notes thread share this connection
         self.db.row_factory = sqlite3.Row
         self.db.execute("""CREATE TABLE IF NOT EXISTS meetings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -351,36 +343,43 @@ class MeetingStore:
         return d
 
     def create(self, started, mode, title=""):
-        cur = self.db.execute("INSERT INTO meetings (started, mode, title) VALUES (?, ?, ?)",
-                              (float(started), mode, title or default_title(started)))
-        self.db.commit()
-        return cur.lastrowid
+        with self._lock:
+            cur = self.db.execute("INSERT INTO meetings (started, mode, title) VALUES (?, ?, ?)",
+                                  (float(started), mode, title or default_title(started)))
+            self.db.commit()
+            return cur.lastrowid
 
     def update(self, mid, **fields):
         allowed = {"ended", "title", "mode", "transcript", "notes", "email"}
         sets = {k: v for k, v in fields.items() if k in allowed}
         if not sets:
             return
-        self.db.execute("UPDATE meetings SET %s WHERE id = ?" % ", ".join("%s = ?" % k for k in sets),
-                        list(sets.values()) + [mid])
-        self.db.commit()
+        with self._lock:
+            self.db.execute("UPDATE meetings SET %s WHERE id = ?" % ", ".join("%s = ?" % k for k in sets),
+                            list(sets.values()) + [mid])
+            self.db.commit()
 
     def get(self, mid):
-        r = self.db.execute("SELECT * FROM meetings WHERE id = ?", (mid,)).fetchone()
+        with self._lock:
+            r = self.db.execute("SELECT * FROM meetings WHERE id = ?", (mid,)).fetchone()
         return self._row(r) if r else None
 
     def list(self, query=None, limit=300):
-        if query:
-            like = "%" + query.strip() + "%"
-            rows = self.db.execute("SELECT * FROM meetings WHERE title LIKE ? OR notes LIKE ? OR transcript LIKE ? "
-                                   "ORDER BY started DESC LIMIT ?", (like, like, like, limit)).fetchall()
-        else:
-            rows = self.db.execute("SELECT * FROM meetings ORDER BY started DESC LIMIT ?", (limit,)).fetchall()
+        with self._lock:
+            if query:
+                q = query.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                like = "%" + q + "%"
+                rows = self.db.execute("SELECT * FROM meetings WHERE title LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\' "
+                                       "OR transcript LIKE ? ESCAPE '\\' ORDER BY started DESC LIMIT ?",
+                                       (like, like, like, limit)).fetchall()
+            else:
+                rows = self.db.execute("SELECT * FROM meetings ORDER BY started DESC LIMIT ?", (limit,)).fetchall()
         return [self._row(r, full=False) for r in rows]
 
     def delete(self, mid):
-        self.db.execute("DELETE FROM meetings WHERE id = ?", (mid,))
-        self.db.commit()
+        with self._lock:
+            self.db.execute("DELETE FROM meetings WHERE id = ?", (mid,))
+            self.db.commit()
 
     def close(self):
         try:

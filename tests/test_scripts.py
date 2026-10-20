@@ -105,3 +105,11 @@ def test_rehearsal_history(store):
 
 def test_title_from_filename():
     assert scripts.title_from_filename(r"C:\x\my_big-talk.docx") == "my big talk"
+
+
+def test_markdown_import_stays_fast_on_pathological_brackets():
+    import time
+    t = time.time()
+    scripts._strip_markdown("[" * 60000 + "![" * 30000)
+    assert time.time() - t < 3
+    assert scripts._strip_markdown("see [the docs](http://x.y) ok") == "see the docs ok"

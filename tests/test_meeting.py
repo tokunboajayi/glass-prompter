@@ -25,7 +25,8 @@ def test_questions_are_spotted_without_punctuation():
     for q in ("what does pricing look like", "can you walk me through the setup", "so how long does it take",
               "tell me about your background", "it works with zoom right", "is that available today?"):
         assert meeting.is_question(q), q
-    for s in ("thanks everyone", "we shipped it last week", "okay", "the price is fine"):
+    for s in ("thanks everyone", "we shipped it last week", "okay", "the price is fine",
+              "have a great weekend", "will do thanks again"):
         assert not meeting.is_question(s), s
 
 
@@ -150,9 +151,3 @@ def test_suggestions_fire_on_their_questions_and_after_a_long_stretch():
     assert t.on_segment(meeting.THEM, "so can you send the contract", 70) == ("answer", "so can you send the contract")
 
 
-def test_listen_context_carries_the_transcript_only_when_there_is_one():
-    assert meeting.listen_context(None) == "" and meeting.listen_context(meeting.Transcript()) == ""
-    tr = meeting.Transcript(started=0.0)
-    tr.add(meeting.THEM, "how much is the pro plan", at=2.0)
-    ctx = meeting.listen_context(tr)
-    assert "Them: how much is the pro plan" in ctx and "<transcript>" in ctx

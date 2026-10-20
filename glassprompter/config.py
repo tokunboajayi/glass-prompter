@@ -98,7 +98,7 @@ def validate(s):
         d = getattr(defaults, f.name)
         try:
             if isinstance(d, bool):
-                v = bool(v)
+                v = v if isinstance(v, bool) else str(v).strip().lower() in ("1", "true", "yes", "on")
             elif isinstance(d, int):
                 v = int(v)
             elif isinstance(d, float):

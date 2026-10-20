@@ -114,26 +114,39 @@ def download(update, progress=None, cancelled=lambda: False):
     """Download and verify the installer. Returns its path; raises if the checksum doesn't match."""
     asset = update["installer"]
     want = expected_sha256(update.get("checksum"), installer=asset)
-    dest = os.path.join(tempfile.gettempdir(), asset["name"])
+    if not want:                                  # never run an installer we can't verify
+        raise RuntimeError("This update has no published fingerprint to check it against, so it wasn't installed. "
+                           "Download it from the website instead.")
+    name = os.path.basename(str(asset.get("name") or "")).strip()
+    if not name or name in (".", "..") or not re.fullmatch(r"[\w.\- ]{1,120}", name):
+        raise RuntimeError("The update has an unexpected file name, so it wasn't installed.")
+    dest = os.path.join(tempfile.gettempdir(), name)
     tmp = dest + ".part"
     h = hashlib.sha256()
-    with urllib.request.urlopen(asset["browser_download_url"], timeout=30, context=tls_context()) as r, open(tmp, "wb") as f:
-        size, got = int(r.headers.get("Content-Length") or asset.get("size") or 0), 0
-        while True:
-            if cancelled():
-                raise RuntimeError("cancelled")
-            block = r.read(1 << 17)
-            if not block:
-                break
-            f.write(block)
-            h.update(block)
-            got += len(block)
-            if progress and size:
-                progress(got / size)
-    if want and h.hexdigest() != want:
-        os.remove(tmp)
-        raise RuntimeError("The download didn't match its checksum, so it wasn't installed.")
-    os.replace(tmp, dest)
+    try:
+        with urllib.request.urlopen(asset["browser_download_url"], timeout=30, context=tls_context()) as r, \
+                open(tmp, "wb") as f:
+            size, got = int(r.headers.get("Content-Length") or asset.get("size") or 0), 0
+            while True:
+                if cancelled():
+                    raise RuntimeError("cancelled")
+                block = r.read(1 << 17)
+                if not block:
+                    break
+                f.write(block)
+                h.update(block)
+                got += len(block)
+                if progress and size:
+                    progress(got / size)
+        if h.hexdigest() != want:
+            raise RuntimeError("The download didn't match its checksum, so it wasn't installed.")
+        os.replace(tmp, dest)
+    finally:
+        if os.path.exists(tmp):                   # cancelled, failed or mismatched: leave nothing behind
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
     return dest
 
 

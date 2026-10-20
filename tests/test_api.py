@@ -290,3 +290,23 @@ def test_sse_closes_on_pin_change(srv):
     srv.set_pin("111222")
     t.join(timeout=8)
     assert "event: logout" in events
+
+
+def test_logout_revokes_the_token_and_session_body_is_tiny(srv):
+    token = login(srv)
+    r, _ = req(srv, "DELETE", "/api/v1/session", token=token)
+    assert r.status == 200
+    r, _ = req(srv, "GET", "/api/v1/state", token=token)
+    assert r.status == 401                                       # the token itself is dead, not just the cookie
+    r, _ = req(srv, "POST", "/api/v1/session", b"x" * 2048, headers={"Content-Type": "application/json"})
+    assert r.status == 413
+
+
+def test_wrong_pins_from_many_addresses_lock_everyone_out():
+    clock = [0.0]
+    lim = api.RateLimiter(window=60, limit=2, lockout=30, clock=lambda: clock[0])
+    for i in range(8):                                           # 8 addresses, each under its own limit of 2
+        lim.fail("10.0.0.%d" % i)
+    assert lim.check("10.0.0.99") > 0
+    clock[0] = 31.0
+    assert lim.check("10.0.0.99") == 0

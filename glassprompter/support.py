@@ -12,7 +12,6 @@ from . import __version__
 from .updater import REPO
 
 ISSUES = "https://github.com/%s/issues/new" % REPO
-WEBSITE = "https://tokunboajayi.github.io/glass-prompter/"
 
 
 def _os_label():

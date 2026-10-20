@@ -67,29 +67,32 @@ class ApiError(Exception):
 
 # ------------------------------------------------------------------ security primitives
 class RateLimiter:
+    ANY = "*"          # shared bucket: a 6-digit PIN must not be guessable by spreading tries over addresses
+
     def __init__(self, window=FAIL_WINDOW, limit=FAIL_LIMIT, lockout=LOCKOUT, clock=time.monotonic):
         self.window, self.limit, self.lockout, self.clock = window, limit, lockout, clock
         self._fails, self._locked = {}, {}
         self._lock = threading.Lock()
 
     def check(self, ip):
-        """Seconds the client must wait, or 0 if it may try."""
+        """Seconds the client must wait, or 0 if it may try. Applies per address and across all addresses."""
         with self._lock:
-            until = self._locked.get(ip, 0)
-            left = until - self.clock()
-            if left > 0:
-                return int(left) + 1
-            self._locked.pop(ip, None)
-            return 0
+            left = 0
+            for key in (ip, self.ANY):
+                left = max(left, self._locked.get(key, 0) - self.clock())
+                if self._locked.get(key, 0) <= self.clock():
+                    self._locked.pop(key, None)
+            return int(left) + 1 if left > 0 else 0
 
     def fail(self, ip):
         now = self.clock()
         with self._lock:
-            q = [t for t in self._fails.get(ip, []) if now - t < self.window] + [now]
-            self._fails[ip] = q
-            if len(q) >= self.limit:
-                self._locked[ip] = now + self.lockout
-                self._fails[ip] = []
+            for key, limit in ((ip, self.limit), (self.ANY, self.limit * 4)):
+                q = [t for t in self._fails.get(key, []) if now - t < self.window] + [now]
+                self._fails[key] = q
+                if len(q) >= limit:
+                    self._locked[key] = now + self.lockout
+                    self._fails[key] = []
 
     def success(self, ip):
         with self._lock:
@@ -124,6 +127,10 @@ class Sessions:
                 self._tokens.pop(token, None)
                 return False
             return True
+
+    def revoke(self, token):
+        with self._lock:
+            self._tokens.pop(token, None)
 
     def revoke_all(self):
         with self._lock:
@@ -335,9 +342,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self._consumed = True
         return self.rfile.read(n) if n else b""
 
-    def _json_body(self):
+    def _json_body(self, max_len=MAX_BODY):
         ctype = (self.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-        raw = self._body()          # read the body first: answering with unread data makes Windows reset the socket
+        raw = self._body(max_len)        # read the body first: answering with unread data makes Windows reset the socket
         if ctype != "application/json":
             raise ApiError(415, "unsupported_media_type", "Send JSON with Content-Type: application/json")
         try:
@@ -466,7 +473,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if wait:
             raise ApiError(429, "locked", "Too many wrong PINs. Try again in %d seconds." % wait,
                            {"Retry-After": str(wait)})
-        data = self._json_body()
+        data = self._json_body(1024)            # before login: keep the body tiny
         pin = str(data.get("pin", ""))
         if not (len(pin) == 6 and pin.isdigit() and secrets.compare_digest(pin, self.srv.pin)):
             self.srv.limiter.fail(ip)
@@ -480,6 +487,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self._json(200, {"token": token, "expires_in": SESSION_TTL}, {"Set-Cookie": cookie})
 
     def h_logout(self, qs):
+        self.srv.sessions.revoke(self._token())
         self._json(200, {"ok": True}, {"Set-Cookie": "gp_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"})
 
     def h_state(self, qs):
@@ -598,11 +606,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                          "ai": ready, "ai_model": cfg.get("model") or "", "ai_provider": name})
 
     def _ai_config(self):
-        cfg = self._bridge_call("ai_config", default=None)
-        if cfg is None:                                   # older bridges: key + model only
-            key, model = self._bridge_call("ai_settings", default=("", "")) or ("", "")
-            cfg = {"key": key, "model": model}
-        return cfg
+        return self._bridge_call("ai_config", default=None) or {"key": "", "model": ""}
 
     def h_screen(self, qs):
         self._require_auth()
@@ -640,18 +644,18 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if not ai.is_ready(cfg.get("provider", ai.AUTO), key):
             raise ApiError(400, "ai_no_key", "Add your AI API key, or sign in, in Settings > AI assistant on your "
                                              "computer.")
-        jpeg = None
-        if data.get("screen") and self._bridge_call("screen_allowed", default=False):
-            try:
-                jpeg = self.srv.bridge.screenshot()
-            except Exception as e:                    # noqa: BLE001 - answer without the screen
-                log.warning("AI chat: screen capture failed: %s", e)
-        title, text = ("", "")
-        if data.get("script", True):
-            title, text = self._bridge_call("script_context", default=("", "")) or ("", "")
         if not self.srv.ai_lock.acquire(timeout=1):
             raise ApiError(429, "ai_busy", "Still answering your last message")
         try:
+            jpeg = None
+            if data.get("screen") and self._bridge_call("screen_allowed", default=False):
+                try:
+                    jpeg = self.srv.bridge.screenshot()
+                except Exception as e:                # noqa: BLE001 - answer without the screen
+                    log.warning("AI chat: screen capture failed: %s", e)
+            title, text = ("", "")
+            if data.get("script", True):
+                title, text = self._bridge_call("script_context", default=("", "")) or ("", "")
             extra = {k: cfg[k] for k in ("provider", "base_url", "max_tokens") if cfg.get(k)}
             reply = ai.chat(key, messages, cfg.get("model"), jpeg, title, text, **extra)
         except ai.AIError as e:
